@@ -76,23 +76,30 @@ export function renderObjectives(state) {
 // ---------------------------------------------------------------------------
 // Barre supérieure (toujours visible)
 // ---------------------------------------------------------------------------
+// Contenu (sans image) de la zone d'activité du topbar — mis à jour à chaque tick.
+export function topbarActivityInner(state) {
+  if (!state.activity) return '<span class="muted">Aucune activité</span>';
+  const job = JOBS[state.activity.jobId];
+  const action = job.actions.find((a) => a.id === state.activity.actionId);
+  const p = activityProgress(state) * 100;
+  const remain = fmtDuration(activityRemainingMs(state));
+  return `
+    <span class="activity-label">${job.icon} ${esc(action ? action.name : "")} · <strong>${remain}</strong></span>
+    <div class="bar tiny"><div class="bar-fill" style="width:${p}%"></div></div>`;
+}
+
+function pct(value, max) {
+  return Math.max(0, Math.min(100, max > 0 ? (value / max) * 100 : 0));
+}
+
 export function renderTopbar(state) {
   const ch = state.character;
   const cls = getClass(ch.classId);
   const ds = getDerivedStats(state);
   const xpNext = charXpToNext(ch.level);
 
-  let activityHtml = '<span class="muted">Aucune activité</span>';
-  if (state.activity) {
-    const job = JOBS[state.activity.jobId];
-    const action = job.actions.find((a) => a.id === state.activity.actionId);
-    const p = activityProgress(state) * 100;
-    const remain = fmtDuration(activityRemainingMs(state));
-    activityHtml = `
-      <span class="activity-label">${job.icon} ${esc(action ? action.name : "")} · <strong>${remain}</strong></span>
-      <div class="bar tiny"><div class="bar-fill" style="width:${p}%"></div></div>`;
-  }
-
+  // Les éléments qui varient dans le temps ont un id : mis à jour sans recréer
+  // les <img> (sinon clignotement à chaque tick).
   return `
     <div class="top-hero">
       ${sigil(cls.image, classEmoji(cls.id))}
@@ -102,12 +109,16 @@ export function renderTopbar(state) {
       </div>
     </div>
     <div class="top-bars">
-      <div class="bar-row"><span class="bar-icon">❤️</span>${bar(ch.hpCurrent, ds.maxHp, "hp")}<span class="bar-num">${fmt(ch.hpCurrent)}/${fmt(ds.maxHp)}</span></div>
-      <div class="bar-row"><span class="bar-icon">✨</span>${bar(ch.xp, xpNext, "xp")}<span class="bar-num">${fmt(ch.xp)}/${fmt(xpNext)}</span></div>
+      <div class="bar-row"><span class="bar-icon">❤️</span>
+        <div class="bar hp"><div class="bar-fill" id="tb-hp-fill" style="width:${pct(ch.hpCurrent, ds.maxHp)}%"></div></div>
+        <span class="bar-num" id="tb-hp-num">${fmt(ch.hpCurrent)}/${fmt(ds.maxHp)}</span></div>
+      <div class="bar-row"><span class="bar-icon">✨</span>
+        <div class="bar xp"><div class="bar-fill" id="tb-xp-fill" style="width:${pct(ch.xp, xpNext)}%"></div></div>
+        <span class="bar-num" id="tb-xp-num">${fmt(ch.xp)}/${fmt(xpNext)}</span></div>
     </div>
     <div class="top-side">
-      <div class="gold">🪙 ${fmt(state.gold)}</div>
-      <div class="top-activity">${activityHtml}</div>
+      <div class="gold" id="tb-gold">🪙 ${fmt(state.gold)}</div>
+      <div class="top-activity" id="tb-activity">${topbarActivityInner(state)}</div>
     </div>`;
 }
 
@@ -238,8 +249,8 @@ function renderJobAction(state, job, a) {
     control = `
       <div class="action-active">
         <div class="action-progress">
-          <div class="bar"><div class="bar-fill" style="width:${p}%"></div></div>
-          <span class="remain">${remain}</span>
+          <div class="bar"><div class="bar-fill" id="job-active-fill" style="width:${p}%"></div></div>
+          <span class="remain" id="job-active-remain">${remain}</span>
         </div>
         <button class="btn tiny danger" data-act="stop-activity">Arrêter</button>
       </div>`;
@@ -393,67 +404,77 @@ export function renderZones(state) {
 // ---------------------------------------------------------------------------
 // Écran Combat — la bataille
 // ---------------------------------------------------------------------------
-export function renderBattle(state, combat) {
-  const p = combat.player;
-  const e = combat.enemy;
-
-  const logHtml = combat.log
+// Log de combat (texte seulement, mis à jour de façon ciblée).
+export function renderBattleLog(combat) {
+  return combat.log
     .slice(-40)
     .map((l) => `<div class="log-line ${l.kind}">${esc(l.text)}</div>`)
     .join("");
+}
 
-  let controls;
+// Contrôles : barre de compétences (combat actif) ou écran de fin (sans image).
+export function renderBattleControls(state, combat) {
   if (combat.status === "active") {
-    controls = combat.player.skills
+    const btns = combat.player.skills
       .map((id) => {
         const s = getSkill(id);
         const cd = combat.player.cooldowns[id] || 0;
-        const disabled = cd > 0;
-        return `<button class="btn skill-btn" data-act="skill" data-id="${id}" ${disabled ? "disabled" : ""} title="${esc(s.desc)}">
+        return `<button class="btn skill-btn" data-act="skill" data-id="${id}" ${cd > 0 ? "disabled" : ""} title="${esc(s.desc)}">
             ${esc(s.name)}${cd > 0 ? ` <span class="cd">(${cd})</span>` : ""}
           </button>`;
       })
       .join("");
-    controls = `<div class="skill-bar">${controls}</div>`;
-  } else {
-    const won = combat.status === "won";
-    let rewardHtml = "";
-    if (won && combat.rewards) {
-      const drops = combat.rewards.drops.map((d) => `<li>${esc(d.name)} ×${d.qty}</li>`).join("");
-      rewardHtml = `
-        <div class="reward-box">
-          <p>+${combat.rewards.xp} XP · +${combat.rewards.gold} 🪙</p>
-          ${drops ? `<ul class="drop-list">${drops}</ul>` : '<p class="muted small">Aucun butin cette fois.</p>'}
-          ${combat.rewards.levels > 0 ? `<p class="lvlup">Niveau ${state.character.level} atteint !</p>` : ""}
-        </div>`;
-    }
-    controls = `
-      <div class="battle-end">
-        <h3 class="${won ? "win" : "lose"}">${won ? "Victoire !" : "Défaite..."}</h3>
-        ${rewardHtml}
-        <div class="end-actions">
-          ${won ? `<button class="btn primary" data-act="fight" data-id="${combat.enemyId}">Rejouer</button>` : ""}
-          <button class="btn" data-act="leave-combat">Retour à la zone</button>
-        </div>
+    return `<div class="skill-bar">${btns}</div>`;
+  }
+  const won = combat.status === "won";
+  let rewardHtml = "";
+  if (won && combat.rewards) {
+    const drops = combat.rewards.drops.map((d) => `<li>${esc(d.name)} ×${d.qty}</li>`).join("");
+    rewardHtml = `
+      <div class="reward-box">
+        <p>+${combat.rewards.xp} XP · +${combat.rewards.gold} 🪙</p>
+        ${drops ? `<ul class="drop-list">${drops}</ul>` : '<p class="muted small">Aucun butin cette fois.</p>'}
+        ${combat.rewards.levels > 0 ? `<p class="lvlup">Niveau ${state.character.level} atteint !</p>` : ""}
       </div>`;
   }
+  return `
+    <div class="battle-end">
+      <h3 class="${won ? "win" : "lose"}">${won ? "Victoire !" : "Défaite..."}</h3>
+      ${rewardHtml}
+      <div class="end-actions">
+        ${won ? `<button class="btn primary" data-act="fight" data-id="${combat.enemyId}">Rejouer</button>` : ""}
+        <button class="btn" data-act="leave-combat">Retour à la zone</button>
+      </div>
+    </div>`;
+}
 
+export function renderBattle(state, combat) {
+  const p = combat.player;
+  const e = combat.enemy;
+
+  // Les barres ont un id : mises à jour à chaque tour SANS recréer les portraits.
   return `
     <section class="panel battle">
       <div class="battle-arena">
         <div class="combatant enemy-side">
           ${sigil(e.image, e.icon, "lg")}
           <strong>${esc(e.name)}</strong>
-          <div class="bar-row">${bar(e.hp, e.maxHp, "hp enemy")}<span class="bar-num">${fmt(e.hp)}/${fmt(e.maxHp)}</span></div>
+          <div class="bar-row">
+            <div class="bar hp enemy"><div class="bar-fill" id="bt-enemy-fill" style="width:${pct(e.hp, e.maxHp)}%"></div></div>
+            <span class="bar-num" id="bt-enemy-num">${fmt(e.hp)}/${fmt(e.maxHp)}</span>
+          </div>
         </div>
         <div class="vs">⚔</div>
         <div class="combatant player-side">
           ${sigil(getClass(state.character.classId).image, classEmoji(state.character.classId), "lg")}
           <strong>${esc(p.name)}</strong>
-          <div class="bar-row">${bar(p.hp, p.maxHp, "hp")}<span class="bar-num">${fmt(p.hp)}/${fmt(p.maxHp)}</span></div>
+          <div class="bar-row">
+            <div class="bar hp"><div class="bar-fill" id="bt-player-fill" style="width:${pct(p.hp, p.maxHp)}%"></div></div>
+            <span class="bar-num" id="bt-player-num">${fmt(p.hp)}/${fmt(p.maxHp)}</span>
+          </div>
         </div>
       </div>
-      <div class="battle-log" id="battle-log">${logHtml}</div>
-      ${controls}
+      <div class="battle-log" id="battle-log">${renderBattleLog(combat)}</div>
+      <div id="bt-controls">${renderBattleControls(state, combat)}</div>
     </section>`;
 }

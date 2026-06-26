@@ -19,7 +19,10 @@ import {
   stopActivity,
   processActivity,
   processOffline,
+  activityProgress,
+  activityRemainingMs,
 } from "./systems/jobs.js";
+import { charXpToNext } from "./core/progression.js";
 import { craft } from "./systems/crafting.js";
 import { startCombat, resolveRound } from "./systems/combat.js";
 import { updateObjectives, ensureObjectives, objectiveLabel } from "./systems/objectives.js";
@@ -27,7 +30,7 @@ import { setMuted, isMuted, playHit, playWin, playLose, playDing } from "./core/
 import { getResource } from "./data/resources.js";
 import { getEquipment } from "./data/equipment.js";
 import { getRecipe } from "./data/recipes.js";
-import { $, toast, showModal, closeModal, esc, fmt } from "./ui/dom.js";
+import { $, toast, showModal, closeModal, esc, fmt, fmtDuration } from "./ui/dom.js";
 import {
   renderCreation,
   renderTopbar,
@@ -37,7 +40,10 @@ import {
   renderInventory,
   renderZones,
   renderBattle,
+  renderBattleLog,
+  renderBattleControls,
   renderObjectives,
+  topbarActivityInner,
 } from "./ui/views.js";
 
 const TABS = [
@@ -140,6 +146,69 @@ function checkObjectives() {
   }
 }
 
+// Helpers de mise à jour ciblée du DOM (sans recréer d'éléments).
+function setWidth(id, v, max) {
+  const el = document.getElementById(id);
+  if (el) el.style.width = (max > 0 ? Math.max(0, Math.min(100, (v / max) * 100)) : 0) + "%";
+}
+function setText(id, t) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = t;
+}
+
+// Re-render de l'écran seul (et des objectifs), sans toucher au topbar.
+function renderScreenOnly() {
+  const state = getState();
+  if (!state) return;
+  $("#objectives").innerHTML = currentCombat ? "" : renderObjectives(state);
+  $("#screen").innerHTML = renderScreen();
+}
+
+// Mise à jour CIBLÉE des valeurs qui changent dans le temps, SANS recréer
+// le moindre <img> (sinon les illustrations clignotent à chaque tick).
+function updateTick() {
+  const state = getState();
+  if (!state) return;
+  const ds = getDerivedStats(state);
+
+  // Barre supérieure
+  setWidth("tb-hp-fill", state.character.hpCurrent, ds.maxHp);
+  setText("tb-hp-num", fmt(state.character.hpCurrent) + "/" + fmt(ds.maxHp));
+  const xpNext = charXpToNext(state.character.level);
+  setWidth("tb-xp-fill", state.character.xp, xpNext);
+  setText("tb-xp-num", fmt(state.character.xp) + "/" + fmt(xpNext));
+  setText("tb-gold", "🪙 " + fmt(state.gold));
+  const az = document.getElementById("tb-activity");
+  if (az) az.innerHTML = topbarActivityInner(state); // sans <img> -> pas de clignotement
+
+  // Compte à rebours de l'action de métier en cours (si onglet Métiers affiché)
+  setWidth("job-active-fill", activityProgress(state), 1);
+  setText("job-active-remain", fmtDuration(activityRemainingMs(state)));
+
+  // Objectifs (texte seulement) hors combat
+  if (!currentCombat) {
+    const ob = document.getElementById("objectives");
+    if (ob) ob.innerHTML = renderObjectives(state);
+  }
+}
+
+// Mise à jour ciblée de l'arène pendant un combat actif (barres, log, contrôles)
+// SANS recréer les portraits -> pas de flash à chaque attaque.
+function updateBattle(state, combat) {
+  setWidth("bt-enemy-fill", combat.enemy.hp, combat.enemy.maxHp);
+  setText("bt-enemy-num", fmt(combat.enemy.hp) + "/" + fmt(combat.enemy.maxHp));
+  setWidth("bt-player-fill", combat.player.hp, combat.player.maxHp);
+  setText("bt-player-num", fmt(combat.player.hp) + "/" + fmt(combat.player.maxHp));
+  const lg = document.getElementById("battle-log");
+  if (lg) {
+    lg.innerHTML = renderBattleLog(combat);
+    lg.scrollTop = lg.scrollHeight;
+  }
+  const ctrl = document.getElementById("bt-controls");
+  if (ctrl) ctrl.innerHTML = renderBattleControls(state, combat);
+  applyCombatFx(combat);
+}
+
 // --- Boucle de jeu ----------------------------------------------------------
 
 function tick() {
@@ -150,16 +219,20 @@ function tick() {
   lastTick = now;
 
   // Les métiers tournent même pendant un combat.
-  processActivity(state, now);
+  const cycle = processActivity(state, now);
   checkObjectives();
-
-  if (currentCombat && currentCombat.status === "active") {
-    // En combat : on ne rafraîchit que la barre supérieure pour ne pas écraser l'arène.
-    $("#topbar").innerHTML =
-      renderTopbar(state) + `<button class="gear-btn" data-act="open-options" title="Options">⚙</button>`;
-  } else {
+  if (!(currentCombat && currentCombat.status === "active")) {
     regenOutOfCombat(state, delta);
-    renderAll();
+  }
+
+  // Mise à jour ciblée (pas de re-render complet -> aucune image recréée).
+  updateTick();
+
+  // Quand un cycle de récolte s'achève, on rafraîchit l'écran (jobs/inventaire,
+  // qui n'ont que des emojis -> pas de clignotement) SANS reconstruire le topbar
+  // (qui contient l'emblème SVG). Les autres onglets se mettent à jour au clic.
+  if (cycle && !currentCombat && (currentTab === "inventory" || currentTab === "jobs")) {
+    renderScreenOnly();
   }
 
   tickCount += 1;
@@ -259,11 +332,17 @@ const handlers = {
   skill: (el) => {
     if (!currentCombat || currentCombat.status !== "active") return;
     resolveRound(getState(), currentCombat, el.dataset.id);
-    if (currentCombat.status === "won") playWin();
-    else if (currentCombat.status === "lost") playLose();
     checkObjectives();
     save();
-    renderAll();
+    if (currentCombat.status === "active") {
+      // Combat en cours : mise à jour ciblée (portraits intacts -> pas de flash).
+      updateBattle(getState(), currentCombat);
+    } else {
+      // Fin du combat : transition vers l'écran de victoire/défaite (rendu complet).
+      if (currentCombat.status === "won") playWin();
+      else playLose();
+      renderAll();
+    }
   },
   "leave-combat": () => {
     currentCombat = null;
