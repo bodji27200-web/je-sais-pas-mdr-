@@ -85,9 +85,12 @@ sont rafraîchis de façon ciblée. **Contrainte forte à préserver.**
   (`applyXp` cappé via `MAX_LEVEL`).
 - Hors-ligne plafonné 8 h, **efficacité 70 %** (`OFFLINE_EFFICIENCY`) : la récolte
   active reste préférable.
-- **Reste à faire (Lot 3+)** : paliers de ressources supplémentaires (avec leurs
-  usages craft pour éviter les ressources orphelines), métiers de transformation
-  (fonte/forge/alchimie/cuisine) avec niveau propre, outils de métier.
+- **Lot 3** : nouveaux paliers (charbon L7, argent L14, bois ancestral L10) avec
+  usages craft réels. **Métiers de transformation à niveau propre** : `state.professions`
+  (Fonte/Forge/Tannerie/Couture/Joaillerie), XP gagnée en fabriquant, recettes
+  gardées par niveau de métier (`profReq`). Migration v4→v5.
+- **Reste à faire** : Alchimie/Cuisine (consommables), outils de métier, filtres
+  de l'Atelier (Lot 4).
 
 ### Combat & IA (`combat.js`)
 - DoT (poison/saignement), buffs/debuffs, garde, bouclier, soin, vol de vie,
@@ -130,7 +133,9 @@ sont rafraîchis de façon ciblée. **Contrainte forte à préserver.**
 1. ✅ Audit, sécurité de sauvegarde, infrastructure de tests, doc.
 2. ✅ Métiers : une activité principale évolutive par métier (+ courbe 1..100
    data-driven, hors-ligne 70 %).
-3. Paliers de ressources supplémentaires (avec usages), métiers de transformation.
+3. ✅ Métiers de transformation à niveau propre (Fonte ≠ Forge, XP en fabriquant,
+   recettes gating par niveau de métier) + paliers de ressources (charbon,
+   argent, bois ancestral) câblés à des usages réels (anti-orphelin testé).
 4. Atelier : organisation fonctionnelle + cohérence des recettes.
 5. Matériaux d'armure : passifs intrinsèques + bonus hybrides 2/4 + comparaison.
 6. Stats lisibles (base/équip/classe), Vitesse documentée, rendements décroissants.

@@ -369,7 +369,11 @@ a { color: var(--gold); }
 .next-tier { margin-top: 8px; }
 
 /* --- Craft --------------------------------------------------------------- */
-.craft-station { margin-bottom: 12px; }
+.craft-station { margin-bottom: 18px; }
+.station-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.station-head .section-title { margin: 0; }
+.station-prog { flex: 1; min-width: 160px; display: flex; align-items: center; gap: 8px; }
+.station-prog .bar { flex: 1; }
 .recipe-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));

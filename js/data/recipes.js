@@ -1,31 +1,52 @@
 // Recettes de craft. Le craft est instantané (l'attente, c'est la récolte).
-// station : forge | tannerie | couture | joaillerie  (extensible : cuisine, alchimie...)
+// station : identifie aussi le MÉTIER de transformation (niveau propre, qui monte
+//   en fabriquant). fonte | forge | tannerie | couture | joaillerie
 // output : { type: "resource" | "equipment", id, qty }
 // inputs : [{ resource, qty }]
-// levelReq : niveau de personnage requis (0 = aucun).
+// levelReq : niveau de PERSONNAGE requis (0 = aucun).
+// profReq  : niveau de MÉTIER de transformation requis (défaut 1).
+// profXp   : XP de métier de transformation gagnée en fabriquant (défaut dérivé).
 
 export const STATIONS = {
-  forge: { id: "forge", name: "Forge", icon: "🔥" },
-  tannerie: { id: "tannerie", name: "Tannerie", icon: "🟤" },
-  couture: { id: "couture", name: "Couture", icon: "🧵" },
-  joaillerie: { id: "joaillerie", name: "Joaillerie", icon: "💎" },
+  // La Fonte (transformer minerai -> lingot) est un métier distinct de la Forge.
+  fonte: { id: "fonte", name: "Fonte", icon: "🫕", desc: "Transforme les minerais en lingots et alliages." },
+  forge: { id: "forge", name: "Forge", icon: "🔥", desc: "Bat le métal et le bois en armes et armures." },
+  tannerie: { id: "tannerie", name: "Tannerie", icon: "🟤", desc: "Travaille le cuir en armures souples." },
+  couture: { id: "couture", name: "Couture", icon: "🧵", desc: "Tisse l'étoffe en tenues légères." },
+  joaillerie: { id: "joaillerie", name: "Joaillerie", icon: "💎", desc: "Sertit gemmes et métaux en accessoires." },
 };
 
 export const RECIPES = [
-  // --- Forge : intermédiaires ---
+  // --- Fonte : intermédiaires (métier Fonte) ---
   {
     id: "smelt_copper",
-    station: "forge",
+    station: "fonte",
     output: { type: "resource", id: "copper_ingot", qty: 1 },
     inputs: [{ resource: "copper_ore", qty: 2 }],
     levelReq: 0,
+    profReq: 1,
+    profXp: 5,
   },
   {
     id: "smelt_iron",
-    station: "forge",
+    station: "fonte",
     output: { type: "resource", id: "iron_ingot", qty: 1 },
     inputs: [{ resource: "iron_ore", qty: 2 }],
     levelReq: 0,
+    profReq: 3,
+    profXp: 9,
+  },
+  {
+    id: "smelt_silver",
+    station: "fonte",
+    output: { type: "resource", id: "silver_ingot", qty: 1 },
+    inputs: [
+      { resource: "silver_ore", qty: 2 },
+      { resource: "coal", qty: 1 }, // le charbon sert de fondant
+    ],
+    levelReq: 0,
+    profReq: 6,
+    profXp: 16,
   },
 
   // --- Forge : armes ---
@@ -38,6 +59,8 @@ export const RECIPES = [
       { resource: "soft_wood", qty: 1 },
     ],
     levelReq: 1,
+    profReq: 1,
+    profXp: 8,
   },
   {
     id: "craft_iron_sword",
@@ -48,6 +71,8 @@ export const RECIPES = [
       { resource: "oak_wood", qty: 1 },
     ],
     levelReq: 4,
+    profReq: 3,
+    profXp: 18,
   },
   {
     id: "craft_iron_greatsword",
@@ -58,8 +83,9 @@ export const RECIPES = [
       { resource: "oak_wood", qty: 2 },
     ],
     levelReq: 6,
+    profReq: 4,
+    profXp: 24,
   },
-
   {
     id: "craft_iron_mace",
     station: "forge",
@@ -69,6 +95,8 @@ export const RECIPES = [
       { resource: "oak_wood", qty: 1 },
     ],
     levelReq: 4,
+    profReq: 3,
+    profXp: 18,
   },
 
   // --- Forge : armes du Gardien ---
@@ -81,6 +109,8 @@ export const RECIPES = [
       { resource: "copper_ingot", qty: 1 },
     ],
     levelReq: 2,
+    profReq: 2,
+    profXp: 12,
   },
   {
     id: "craft_iron_spear",
@@ -91,6 +121,8 @@ export const RECIPES = [
       { resource: "oak_wood", qty: 1 },
     ],
     levelReq: 5,
+    profReq: 3,
+    profXp: 18,
   },
   {
     id: "craft_iron_buckler",
@@ -98,6 +130,8 @@ export const RECIPES = [
     output: { type: "equipment", id: "iron_buckler", qty: 1 },
     inputs: [{ resource: "iron_ingot", qty: 3 }],
     levelReq: 3,
+    profReq: 3,
+    profXp: 16,
   },
 
   // --- Forge : armes de l'Archer ---
@@ -110,6 +144,8 @@ export const RECIPES = [
       { resource: "coarse_cloth", qty: 1 },
     ],
     levelReq: 1,
+    profReq: 1,
+    profXp: 8,
   },
   {
     id: "craft_oak_longbow",
@@ -120,6 +156,8 @@ export const RECIPES = [
       { resource: "coarse_cloth", qty: 1 },
     ],
     levelReq: 4,
+    profReq: 3,
+    profXp: 18,
   },
   {
     id: "craft_light_crossbow",
@@ -130,6 +168,20 @@ export const RECIPES = [
       { resource: "oak_wood", qty: 2 },
     ],
     levelReq: 5,
+    profReq: 3,
+    profXp: 20,
+  },
+  {
+    id: "craft_ancient_longbow",
+    station: "forge",
+    output: { type: "equipment", id: "ancient_longbow", qty: 1 },
+    inputs: [
+      { resource: "ancient_wood", qty: 3 },
+      { resource: "iron_ingot", qty: 1 },
+    ],
+    levelReq: 8,
+    profReq: 5,
+    profXp: 28,
   },
 
   // --- Forge : armes du Mage ---
@@ -142,6 +194,8 @@ export const RECIPES = [
       { resource: "copper_ingot", qty: 1 },
     ],
     levelReq: 1,
+    profReq: 1,
+    profXp: 8,
   },
   {
     id: "craft_oak_staff",
@@ -152,7 +206,23 @@ export const RECIPES = [
       { resource: "rough_gem", qty: 1 },
     ],
     levelReq: 4,
+    profReq: 3,
+    profXp: 18,
   },
+  {
+    id: "craft_ancient_staff",
+    station: "forge",
+    output: { type: "equipment", id: "ancient_staff", qty: 1 },
+    inputs: [
+      { resource: "ancient_wood", qty: 3 },
+      { resource: "rough_gem", qty: 1 },
+    ],
+    levelReq: 8,
+    profReq: 5,
+    profXp: 28,
+  },
+
+  // --- Joaillerie : orbe & accessoires ---
   {
     id: "craft_arcane_orb",
     station: "joaillerie",
@@ -162,6 +232,32 @@ export const RECIPES = [
       { resource: "copper_ingot", qty: 2 },
     ],
     levelReq: 5,
+    profReq: 2,
+    profXp: 18,
+  },
+  {
+    id: "craft_gem_amulet",
+    station: "joaillerie",
+    output: { type: "equipment", id: "gem_amulet", qty: 1 },
+    inputs: [
+      { resource: "rough_gem", qty: 1 },
+      { resource: "copper_ingot", qty: 1 },
+    ],
+    levelReq: 5,
+    profReq: 1,
+    profXp: 14,
+  },
+  {
+    id: "craft_silver_amulet",
+    station: "joaillerie",
+    output: { type: "equipment", id: "silver_amulet", qty: 1 },
+    inputs: [
+      { resource: "silver_ingot", qty: 2 },
+      { resource: "rough_gem", qty: 1 },
+    ],
+    levelReq: 9,
+    profReq: 4,
+    profXp: 26,
   },
 
   // --- Forge : armes de l'Assassin ---
@@ -174,6 +270,8 @@ export const RECIPES = [
       { resource: "soft_wood", qty: 1 },
     ],
     levelReq: 1,
+    profReq: 1,
+    profXp: 8,
   },
   {
     id: "craft_short_blade",
@@ -184,6 +282,8 @@ export const RECIPES = [
       { resource: "copper_ingot", qty: 1 },
     ],
     levelReq: 3,
+    profReq: 2,
+    profXp: 14,
   },
   {
     id: "craft_twin_daggers",
@@ -194,6 +294,8 @@ export const RECIPES = [
       { resource: "soft_wood", qty: 1 },
     ],
     levelReq: 4,
+    profReq: 3,
+    profXp: 18,
   },
 
   // --- Forge : armures de métal ---
@@ -203,6 +305,20 @@ export const RECIPES = [
     output: { type: "equipment", id: "iron_helm", qty: 1 },
     inputs: [{ resource: "iron_ingot", qty: 3 }],
     levelReq: 3,
+    profReq: 3,
+    profXp: 16,
+  },
+  {
+    id: "craft_reinforced_helm",
+    station: "forge",
+    output: { type: "equipment", id: "reinforced_helm", qty: 1 },
+    inputs: [
+      { resource: "iron_ingot", qty: 3 },
+      { resource: "coal", qty: 1 }, // trempe : le charbon durcit le métal
+    ],
+    levelReq: 7,
+    profReq: 5,
+    profXp: 24,
   },
   {
     id: "craft_iron_plate",
@@ -210,6 +326,8 @@ export const RECIPES = [
     output: { type: "equipment", id: "iron_plate", qty: 1 },
     inputs: [{ resource: "iron_ingot", qty: 6 }],
     levelReq: 4,
+    profReq: 4,
+    profXp: 22,
   },
   {
     id: "craft_iron_greaves",
@@ -217,6 +335,8 @@ export const RECIPES = [
     output: { type: "equipment", id: "iron_greaves", qty: 1 },
     inputs: [{ resource: "iron_ingot", qty: 4 }],
     levelReq: 3,
+    profReq: 3,
+    profXp: 18,
   },
 
   // --- Tannerie : armures de cuir ---
@@ -226,6 +346,8 @@ export const RECIPES = [
     output: { type: "equipment", id: "leather_cap", qty: 1 },
     inputs: [{ resource: "raw_hide", qty: 2 }],
     levelReq: 1,
+    profReq: 1,
+    profXp: 8,
   },
   {
     id: "craft_leather_armor",
@@ -236,6 +358,8 @@ export const RECIPES = [
       { resource: "coarse_cloth", qty: 1 },
     ],
     levelReq: 2,
+    profReq: 2,
+    profXp: 14,
   },
   {
     id: "craft_leather_boots",
@@ -243,6 +367,8 @@ export const RECIPES = [
     output: { type: "equipment", id: "leather_boots", qty: 1 },
     inputs: [{ resource: "raw_hide", qty: 3 }],
     levelReq: 1,
+    profReq: 1,
+    profXp: 10,
   },
 
   // --- Couture : armures de tissu ---
@@ -252,6 +378,8 @@ export const RECIPES = [
     output: { type: "equipment", id: "cloth_hood", qty: 1 },
     inputs: [{ resource: "coarse_cloth", qty: 2 }],
     levelReq: 1,
+    profReq: 1,
+    profXp: 8,
   },
   {
     id: "craft_cloth_robe",
@@ -259,18 +387,17 @@ export const RECIPES = [
     output: { type: "equipment", id: "cloth_robe", qty: 1 },
     inputs: [{ resource: "coarse_cloth", qty: 4 }],
     levelReq: 2,
+    profReq: 2,
+    profXp: 14,
   },
-
-  // --- Joaillerie : accessoire ---
   {
-    id: "craft_gem_amulet",
-    station: "joaillerie",
-    output: { type: "equipment", id: "gem_amulet", qty: 1 },
-    inputs: [
-      { resource: "rough_gem", qty: 1 },
-      { resource: "copper_ingot", qty: 1 },
-    ],
-    levelReq: 5,
+    id: "craft_cloth_leggings",
+    station: "couture",
+    output: { type: "equipment", id: "cloth_leggings", qty: 1 },
+    inputs: [{ resource: "coarse_cloth", qty: 3 }],
+    levelReq: 2,
+    profReq: 1,
+    profXp: 12,
   },
 ];
 

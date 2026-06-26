@@ -23,7 +23,8 @@ test("unlockedTiers liste du meilleur au moindre", () => {
 
 test("nextTier annonce le prochain palier verrouillé", () => {
   assert.equal(nextTier("woodcutting", 1).id, "chop_oak");
-  assert.equal(nextTier("woodcutting", 3), null); // tout débloqué
+  assert.equal(nextTier("woodcutting", 3).id, "chop_ancient");
+  assert.equal(nextTier("woodcutting", 10), null); // tout débloqué
 });
 
 test("démarrer en auto choisit le meilleur palier maîtrisé", () => {

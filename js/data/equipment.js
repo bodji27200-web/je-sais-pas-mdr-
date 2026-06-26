@@ -74,6 +74,11 @@ export const EQUIPMENT = {
     levelReq: 4, icon: "🏹", image: "assets/equipment/oak_longbow.png",
     stats: { atk: 14, crit: 4, spd: -1 }, desc: "Plus lent à bander, mais chaque flèche fait mal.",
   },
+  ancient_longbow: {
+    id: "ancient_longbow", name: "Arc long ancestral", slot: "weapon", family: null, wtype: "longbow",
+    levelReq: 8, icon: "🏹", image: "assets/equipment/ancient_longbow.png",
+    stats: { atk: 21, crit: 6, spd: -1 }, desc: "Taillé dans un bois millénaire : portée et puissance accrues.",
+  },
   light_crossbow: {
     id: "light_crossbow", name: "Arbalète légère", slot: "weapon", family: null, wtype: "crossbow",
     levelReq: 5, icon: "🎯", image: "assets/equipment/light_crossbow.png",
@@ -95,6 +100,11 @@ export const EQUIPMENT = {
     id: "arcane_orb", name: "Orbe arcanique", slot: "weapon", family: null, wtype: "orb",
     levelReq: 5, icon: "🔮", image: "assets/equipment/arcane_orb.png",
     stats: { atk: 14, crit: 6 }, desc: "Une sphère qui amplifie le moindre éclat de magie.",
+  },
+  ancient_staff: {
+    id: "ancient_staff", name: "Bâton ancestral", slot: "weapon", family: null, wtype: "staff",
+    levelReq: 8, icon: "🪈", image: "assets/equipment/ancient_staff.png",
+    stats: { atk: 23, crit: 5 }, desc: "Un foyer arcanique gravé dans un bois ancien : magie décuplée.",
   },
 
   // --- Armes de l'Assassin (dague, lames jumelles) ---
@@ -154,6 +164,11 @@ export const EQUIPMENT = {
     levelReq: 3, icon: "⛑️", image: "assets/equipment/iron_helm.png",
     stats: { def: 8, hp: 28, spd: -1 }, desc: "Une protection sérieuse pour le crâne.",
   },
+  reinforced_helm: {
+    id: "reinforced_helm", name: "Heaume renforcé", slot: "head", family: "metal",
+    levelReq: 7, icon: "⛑️", image: "assets/equipment/reinforced_helm.png",
+    stats: { def: 12, hp: 42, spd: -1 }, desc: "Acier trempé au charbon : une protection de premier ordre.",
+  },
   iron_plate: {
     id: "iron_plate", name: "Plastron de fer", slot: "chest", family: "metal",
     levelReq: 4, icon: "🛡️", image: "assets/equipment/iron_plate.png",
@@ -170,6 +185,11 @@ export const EQUIPMENT = {
     id: "gem_amulet", name: "Amulette sertie", slot: "accessory", family: null,
     levelReq: 5, icon: "📿", image: "assets/equipment/gem_amulet.png",
     stats: { atk: 4, crit: 8 }, desc: "Une gemme taillée qui aiguise les coups critiques.",
+  },
+  silver_amulet: {
+    id: "silver_amulet", name: "Amulette d'argent", slot: "accessory", family: null,
+    levelReq: 9, icon: "📿", image: "assets/equipment/silver_amulet.png",
+    stats: { atk: 6, crit: 10, hp: 14 }, desc: "Un travail d'orfèvre : critiques affûtés et vitalité renforcée.",
   },
 };
 

@@ -1,7 +1,8 @@
-// Système de craft (instantané). Vérifie les prérequis, consomme les ressources,
-// produit l'objet.
+// Système de craft (instantané). Vérifie les prérequis (niveau de personnage ET
+// niveau du métier de transformation), consomme les ressources, produit l'objet,
+// et fait progresser le métier de transformation correspondant.
 
-import { getRecipe } from "../data/recipes.js";
+import { getRecipe, STATIONS } from "../data/recipes.js";
 import {
   resourceCount,
   removeResource,
@@ -9,11 +10,24 @@ import {
   addEquipmentInstance,
 } from "../core/state.js";
 import { makeInstance } from "../core/items.js";
+import { applyXp, jobXpToNext } from "../core/progression.js";
+
+// Niveau du métier de transformation d'une station (1 si non initialisé).
+export function professionLevel(state, stationId) {
+  const p = state.professions && state.professions[stationId];
+  return p ? p.level : 1;
+}
 
 // Le joueur peut-il lancer cette recette ? Renvoie { ok, reason }.
+// L'ordre des vérifications produit un message clair (la cause la plus haute).
 export function canCraft(state, recipe) {
   if (state.character.level < (recipe.levelReq || 0))
     return { ok: false, reason: `Niveau ${recipe.levelReq} requis` };
+  const profReq = recipe.profReq || 1;
+  if (professionLevel(state, recipe.station) < profReq) {
+    const st = STATIONS[recipe.station];
+    return { ok: false, reason: `${st ? st.name : "Métier"} niv. ${profReq}` };
+  }
   for (const input of recipe.inputs) {
     if (resourceCount(input.resource) < input.qty)
       return { ok: false, reason: "Ressources insuffisantes" };
@@ -24,6 +38,7 @@ export function canCraft(state, recipe) {
 // Combien de fois cette recette peut être réalisée avec l'inventaire actuel.
 export function craftableTimes(state, recipe) {
   if (state.character.level < (recipe.levelReq || 0)) return 0;
+  if (professionLevel(state, recipe.station) < (recipe.profReq || 1)) return 0;
   let times = Infinity;
   for (const input of recipe.inputs) {
     times = Math.min(times, Math.floor(resourceCount(input.resource) / input.qty));
@@ -52,6 +67,13 @@ export function craft(state, recipeId) {
     }
   }
 
+  // Progression du métier de transformation correspondant.
+  let profLevels = 0;
+  if (!state.professions) state.professions = {};
+  if (!state.professions[recipe.station]) state.professions[recipe.station] = { level: 1, xp: 0 };
+  const gainedXp = recipe.profXp || 5;
+  profLevels = applyXp(state.professions[recipe.station], gainedXp, jobXpToNext);
+
   state.counters.crafted += 1;
-  return { ok: true, output: out, instance };
+  return { ok: true, output: out, instance, station: recipe.station, profLevels, profXp: gainedXp };
 }

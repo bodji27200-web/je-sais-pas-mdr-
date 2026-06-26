@@ -35,7 +35,7 @@ import { updateObjectives, ensureObjectives, objectiveLabel } from "./systems/ob
 import { setMuted, isMuted, playHit, playWin, playLose, playDing } from "./core/audio.js";
 import { getResource } from "./data/resources.js";
 import { getEquipment } from "./data/equipment.js";
-import { getRecipe } from "./data/recipes.js";
+import { getRecipe, STATIONS } from "./data/recipes.js";
 import { $, toast, showModal, closeModal, esc, fmt, fmtDuration } from "./ui/dom.js";
 import {
   renderCreation,
@@ -401,6 +401,12 @@ const handlers = {
     const recipe = getRecipe(el.dataset.id);
     const outDef = recipe.output.type === "equipment" ? getEquipment(recipe.output.id) : getResource(recipe.output.id);
     toast("Fabriqué : " + outDef.name, "good");
+    // Montée de niveau du métier de transformation.
+    if (r.profLevels > 0) {
+      const st = STATIONS[r.station];
+      toast(`${st ? st.name : "Métier"} niveau supérieur !`, "good");
+      playDing();
+    }
     save();
     renderAll();
   },

@@ -427,12 +427,25 @@ export function renderCraft(state) {
     .map((station) => {
       const recipes = RECIPES.filter((r) => r.station === station.id);
       if (!recipes.length) return "";
+      const prof = (state.professions && state.professions[station.id]) || { level: 1, xp: 0 };
+      const xpNext = jobXpToNext(prof.level);
       const items = recipes.map((r) => renderRecipe(state, r)).join("");
-      return `<div class="craft-station"><h3 class="section-title">${station.icon} ${esc(station.name)}</h3><div class="recipe-grid">${items}</div></div>`;
+      return `
+        <div class="craft-station">
+          <div class="station-head">
+            <h3 class="section-title">${station.icon} ${esc(station.name)} <span class="muted">Niv. ${prof.level}</span></h3>
+            <div class="station-prog">
+              ${bar(prof.xp, xpNext, "xp")}
+              <span class="muted small">${fmt(prof.xp)}/${fmt(xpNext)} XP</span>
+            </div>
+          </div>
+          <p class="muted small">${esc(station.desc || "")}</p>
+          <div class="recipe-grid">${items}</div>
+        </div>`;
     })
     .join("");
 
-  return `<section class="panel"><h2>Atelier</h2><p class="muted">Transforme tes ressources en équipement.</p>${sections}</section>`;
+  return `<section class="panel"><h2>Atelier</h2><p class="muted">Transforme tes ressources en équipement. Chaque métier de transformation gagne un niveau en fabriquant, ce qui débloque des recettes plus avancées.</p>${sections}</section>`;
 }
 
 function renderRecipe(state, recipe) {

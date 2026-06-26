@@ -3,13 +3,24 @@
 // à versionner et à étendre.
 
 import { getClass } from "../data/classes.js";
+import { STATIONS } from "../data/recipes.js";
 import { makeInstance } from "./items.js";
+
+// Métiers de transformation (Fonte, Forge, etc.) : niveau propre qui monte en
+// fabriquant. Un par station de craft (data-driven). Niveau 1 au départ.
+export function initProfessions(existing = {}) {
+  const out = {};
+  for (const id of Object.keys(STATIONS)) {
+    out[id] = existing[id] || { level: 1, xp: 0 };
+  }
+  return out;
+}
 
 export const SAVE_KEY = "idle_rpg_save_v1";
 // Copie de sécurité écrite AVANT toute migration : si une migration tournait mal
 // dans une future version, on garde une trace de la sauvegarde d'origine.
 export const BACKUP_KEY = "idle_rpg_save_backup";
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 
 let state = null;
 
@@ -54,6 +65,8 @@ export function newGame(name, classId) {
       woodcutting: { level: 1, xp: 0 },
       mining: { level: 1, xp: 0 },
     },
+    // Métiers de transformation (montent en fabriquant) : un par station.
+    professions: initProfessions(),
     // Une seule activité de récolte active à la fois :
     // { jobId, tierId, cycleStart, auto }. `auto` suit le meilleur palier.
     activity: null,
@@ -121,6 +134,12 @@ function migrate(parsed) {
       if (act.auto === undefined) act.auto = true; // suit le meilleur palier par défaut
     }
     parsed.version = 4;
+  }
+  // v4 -> v5 : métiers de transformation à niveau propre (Fonte séparée de la
+  // Forge). On initialise les professions manquantes sans rien écraser.
+  if (parsed.version === 4) {
+    parsed.professions = initProfessions(parsed.professions || {});
+    parsed.version = 5;
   }
   return parsed.version === SAVE_VERSION ? parsed : null;
 }
