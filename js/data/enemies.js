@@ -1,6 +1,9 @@
 // Ennemis et boss. stats : { hp, atk, def, spd, crit }.
-// skills : compétences ennemies (voir data/skills.js) ; l'attaque de base est implicite.
-// drops : { item, type, min, max, chance } ; type "resource" ou "equipment".
+// role    : archétype de combat (informe l'IA : voir systems/combat.js).
+//           skirmisher | brute | bruiser | tank | caster | boss
+// passive : passive ennemie (effet dynamique en combat ; voir data/skills.js).
+// skills  : compétences ennemies (l'attaque de base est implicite).
+// drops   : { item, type, min, max, chance } ; type "resource" ou "equipment".
 // xp / gold : récompenses de victoire.
 
 export const ENEMIES = {
@@ -9,12 +12,14 @@ export const ENEMIES = {
     name: "Loup affamé",
     isBoss: false,
     level: 1,
+    role: "skirmisher",
     icon: "🐺",
     image: "assets/enemies/feral_wolf.png",
     sprite: "assets/sprites/feral_wolf.png",
-    stats: { hp: 55, atk: 12, def: 3, spd: 16, crit: 8 },
-    skills: ["feral_bite"],
-    xp: 16,
+    stats: { hp: 62, atk: 13, def: 3, spd: 17, crit: 10 },
+    skills: ["feral_bite", "rending_claws"],
+    passive: null,
+    xp: 18,
     gold: 4,
     drops: [{ item: "raw_hide", type: "resource", min: 1, max: 2, chance: 0.85 }],
   },
@@ -23,12 +28,14 @@ export const ENEMIES = {
     name: "Gobelin pillard",
     isBoss: false,
     level: 2,
+    role: "brute",
     icon: "👺",
     image: "assets/enemies/goblin_raider.png",
     sprite: "assets/sprites/goblin_raider.png",
-    stats: { hp: 70, atk: 14, def: 5, spd: 12, crit: 6 },
-    skills: ["goblin_smash"],
-    xp: 24,
+    stats: { hp: 88, atk: 16, def: 6, spd: 12, crit: 6 },
+    skills: ["goblin_smash", "goblin_throw"],
+    passive: "enrage",
+    xp: 26,
     gold: 8,
     drops: [
       { item: "coarse_cloth", type: "resource", min: 1, max: 2, chance: 0.8 },
@@ -40,13 +47,15 @@ export const ENEMIES = {
     name: "Sanglier sauvage",
     isBoss: false,
     level: 3,
+    role: "bruiser",
     icon: "🐗",
     image: "assets/enemies/wild_boar.png",
     sprite: "assets/sprites/wild_boar.png",
-    stats: { hp: 110, atk: 15, def: 8, spd: 9, crit: 4 },
-    skills: [],
-    xp: 32,
-    gold: 10,
+    stats: { hp: 150, atk: 18, def: 12, spd: 9, crit: 4 },
+    skills: ["boar_charge", "boar_gore"],
+    passive: "regeneration",
+    xp: 36,
+    gold: 11,
     drops: [
       { item: "raw_hide", type: "resource", min: 2, max: 3, chance: 0.9 },
       { item: "coarse_cloth", type: "resource", min: 0, max: 1, chance: 0.3 },
@@ -57,12 +66,14 @@ export const ENEMIES = {
     name: "Bandit des bois",
     isBoss: false,
     level: 4,
+    role: "skirmisher",
     icon: "🗡️",
     image: "assets/enemies/forest_bandit.png",
     sprite: "assets/sprites/forest_bandit.png",
-    stats: { hp: 95, atk: 18, def: 7, spd: 14, crit: 10 },
-    skills: ["goblin_smash"],
-    xp: 40,
+    stats: { hp: 112, atk: 21, def: 8, spd: 15, crit: 14 },
+    skills: ["bandit_shiv", "smoke_step"],
+    passive: null,
+    xp: 44,
     gold: 18,
     drops: [
       { item: "coarse_cloth", type: "resource", min: 1, max: 2, chance: 0.7 },
@@ -76,13 +87,15 @@ export const ENEMIES = {
     name: "Grôk, Chef Gobelin",
     isBoss: true,
     level: 6,
+    role: "boss",
     icon: "👹",
     image: "assets/enemies/goblin_chief_grok.png",
     sprite: "assets/sprites/goblin_chief_grok.png",
-    stats: { hp: 420, atk: 24, def: 12, spd: 11, crit: 9 },
-    skills: ["boss_cleave", "boss_roar"],
-    xp: 220,
-    gold: 80,
+    stats: { hp: 680, atk: 30, def: 16, spd: 12, crit: 12 },
+    skills: ["boss_cleave", "boss_roar", "boss_quake", "boss_guard"],
+    passive: "enrage",
+    xp: 240,
+    gold: 90,
     drops: [
       { item: "rough_gem", type: "resource", min: 1, max: 2, chance: 1 },
       { item: "iron_ingot", type: "resource", min: 2, max: 3, chance: 1 },

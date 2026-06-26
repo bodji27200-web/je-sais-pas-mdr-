@@ -48,15 +48,15 @@ export const SKILLS = {
   },
   endurance: {
     id: "endurance", name: "Endurance", type: "passive",
-    passive: { maxHpPct: 0.1, hpRegenPct: 0.04 },
-    desc: "PV max +10 % et régénère 4 % des PV chaque tour.",
+    passive: { maxHpPct: 0.1, hpRegenPct: 0.028 },
+    desc: "PV max +10 % et régénère ~3 % des PV chaque tour.",
   },
 
   // ===================== GARDIEN =====================
   shield_bash: {
-    id: "shield_bash", name: "Coup de bouclier", type: "active", power: 0.8, cooldown: 2,
+    id: "shield_bash", name: "Coup de bouclier", type: "active", power: 1.1, cooldown: 2,
     target: "enemy", anim: "heavy", onHit: [{ type: "atk_debuff", amount: 0.25, turns: 2 }],
-    desc: "Dégâts faibles (80 %) et réduit l'attaque ennemie de 25 % pendant 2 tours.",
+    desc: "Dégâts (110 %) et réduit l'attaque ennemie de 25 % pendant 2 tours.",
   },
   taunt_guard: {
     id: "taunt_guard", name: "Provocation", type: "active", power: 0, cooldown: 3,
@@ -66,8 +66,8 @@ export const SKILLS = {
   },
   living_armor: {
     id: "living_armor", name: "Armure vivante", type: "passive",
-    passive: { defPct: 0.18, maxHpPct: 0.05 },
-    desc: "Défense +18 % et PV max +5 %.",
+    passive: { defPct: 0.18, maxHpPct: 0.05, lifestealPct: 0.18 },
+    desc: "Défense +18 %, PV max +5 % et soigne 18 % des dégâts infligés (vol de vie).",
   },
 
   // ===================== ARCHER =====================
@@ -122,14 +122,53 @@ export const SKILLS = {
   },
 
   // ===================== ENNEMIS =====================
+  // -- Skirmisher (loup) : rapide, saigne ses proies.
   feral_bite: {
     id: "feral_bite", name: "Morsure féroce", type: "active", power: 1.4, cooldown: 3,
     target: "enemy", anim: "light", desc: "Une morsure sauvage (140 %).",
   },
+  rending_claws: {
+    id: "rending_claws", name: "Griffes lacérantes", type: "active", power: 1.0, cooldown: 2,
+    target: "enemy", anim: "light", onHit: [{ type: "bleed", pctAtk: 0.4, turns: 3 }],
+    desc: "Lacère la cible (100 %) et provoque un saignement.",
+  },
+
+  // -- Brute (gobelin) : frappe fort, jette des projectiles, enrage.
   goblin_smash: {
     id: "goblin_smash", name: "Coup de gourdin", type: "active", power: 1.6, cooldown: 2,
     target: "enemy", anim: "heavy", desc: "Un coup brutal (160 %).",
   },
+  goblin_throw: {
+    id: "goblin_throw", name: "Hache lancée", type: "active", power: 1.2, cooldown: 2,
+    target: "enemy", anim: "ranged", onHit: [{ type: "atk_debuff", amount: 0.2, turns: 2 }],
+    desc: "Lance une hache (120 %) et entaille le bras adverse (ATK -20 %).",
+  },
+
+  // -- Bruiser (sanglier) : charge dévastatrice, encorne et ralentit, régénère.
+  boar_charge: {
+    id: "boar_charge", name: "Charge", type: "active", power: 1.9, cooldown: 3,
+    target: "enemy", anim: "heavy", desc: "Une charge qui renverse tout (190 %).",
+  },
+  boar_gore: {
+    id: "boar_gore", name: "Encornage", type: "active", power: 1.0, cooldown: 2,
+    target: "enemy", anim: "heavy", onHit: [{ type: "slow", amount: 0.3, turns: 2 }],
+    desc: "Encorne (100 %) et ralentit la cible de 30 %.",
+  },
+
+  // -- Skirmisher (bandit) : poison et esquive.
+  bandit_shiv: {
+    id: "bandit_shiv", name: "Coup de surin", type: "active", power: 1.1, cooldown: 2,
+    target: "enemy", anim: "light", onHit: [{ type: "poison", pctAtk: 0.4, turns: 3 }],
+    desc: "Une lame empoisonnée (110 %) puis poison.",
+  },
+  smoke_step: {
+    id: "smoke_step", name: "Pas de fumée", type: "active", power: 0, cooldown: 4,
+    target: "self", anim: "buff",
+    self: [{ type: "guard", reduce: 0.6, turns: 1 }, { type: "spd_buff", amount: 0.25, turns: 2 }],
+    desc: "Esquive la prochaine attaque (-60 %) et gagne en vitesse.",
+  },
+
+  // -- Boss : panoplie complète (burst, buff, défense, enrage).
   boss_cleave: {
     id: "boss_cleave", name: "Fendoir du chef", type: "active", power: 2.0, cooldown: 3,
     target: "enemy", anim: "heavy", desc: "Une frappe dévastatrice (200 %).",
@@ -138,6 +177,29 @@ export const SKILLS = {
     id: "boss_roar", name: "Rugissement", type: "active", power: 0, cooldown: 5,
     target: "self", anim: "buff", self: [{ type: "atk_buff", amount: 0.4, turns: 3 }],
     desc: "Le chef hurle : attaque +40 % pendant 3 tours.",
+  },
+  boss_quake: {
+    id: "boss_quake", name: "Choc sismique", type: "active", power: 2.4, cooldown: 4,
+    target: "enemy", anim: "heavy", onHit: [{ type: "slow", amount: 0.25, turns: 2 }],
+    desc: "Martèle le sol (240 %) et déstabilise l'adversaire (VIT -25 %).",
+  },
+  boss_guard: {
+    id: "boss_guard", name: "Garde du chef", type: "active", power: 0, cooldown: 4,
+    target: "self", anim: "buff",
+    self: [{ type: "def_buff", amount: 0.5, turns: 2 }, { type: "guard", reduce: 0.4, turns: 1 }],
+    desc: "Se met en garde : défense +50 % et prochaine attaque réduite de 40 %.",
+  },
+
+  // --- Passives ennemies (effets dynamiques en combat) ---
+  enrage: {
+    id: "enrage", name: "Furie", type: "passive",
+    passive: { lowHpAtk: { threshold: 0.35, bonus: 0.5 } },
+    desc: "Sous 35 % de PV, attaque +50 %.",
+  },
+  regeneration: {
+    id: "regeneration", name: "Régénération", type: "passive",
+    passive: { hpRegenPct: 0.05 },
+    desc: "Régénère 5 % de ses PV max chaque tour.",
   },
 };
 

@@ -66,13 +66,14 @@ export function startCombat(state, enemyId) {
     enemy.name,
     { maxHp: enemy.stats.hp, atk: enemy.stats.atk, def: enemy.stats.def, spd: enemy.stats.spd, crit: enemy.stats.crit },
     ["basic_attack", ...(enemy.skills || [])],
-    null
+    enemy.passive || null
   );
   e.enemyId = enemy.id;
   e.icon = enemy.icon;
   e.image = enemy.image;
   e.sprite = enemy.sprite;
   e.isBoss = enemy.isBoss;
+  e.role = enemy.role || null;
 
   return {
     enemyId,
@@ -242,20 +243,97 @@ function useSkill(combat, actor, other, skillId) {
   });
 }
 
-// IA ennemie : buff si pertinent, sinon meilleure compétence offensive dispo.
-function chooseEnemySkill(enemy) {
+// IA ennemie « qui réfléchit » : évalue chaque compétence disponible et choisit
+// la meilleure selon la situation (PV, buffs/malus déjà en place, létalité).
+//
+// Principes (inspirés d'un vrai combat de rôle) :
+//  - se soigner / se défendre quand on est en danger ;
+//  - se renforcer (atk_buff) en ouverture, jamais en double ;
+//  - poser DoT / malus s'ils ne sont pas déjà actifs sur la cible ;
+//  - garder les gros bursts pour achever (cible à faibles PV) ;
+//  - sinon, taper au mieux (dégâts attendus, défense de la cible incluse).
+function hasBuffType(c, type) {
+  return c.buffs.some((b) => b.type === type);
+}
+function hasDot(c, type) {
+  return c.dots.some((d) => d.type === type);
+}
+
+// Dégâts attendus d'une compétence offensive contre `target` (défense incluse).
+function expectedDamage(actor, target, skill) {
+  const hits = skill.hits || 1;
+  const perHit = effectiveAtk(actor) * (skill.power || 0) * (1 - defReduction(effectiveDef(target)));
+  return perHit * hits;
+}
+
+function scoreEnemySkill(combat, id) {
+  const enemy = combat.enemy;
+  const player = combat.player;
+  const s = getSkill(id);
+  if (!s) return -Infinity;
+  const hpPct = enemy.hp / enemy.maxHp;
+
+  // --- Compétences sur soi (soin / défense / renforcement) ---
+  if (s.self && (!s.power || s.power === 0)) {
+    let score = 0;
+    for (const eff of s.self) {
+      if (eff.type === "heal") {
+        // D'autant plus prioritaire qu'on est bas ; inutile à PV pleins.
+        score += (1 - hpPct) * 220 - 20;
+      } else if (eff.type === "shield" || eff.type === "guard" || eff.type === "def_buff") {
+        // Défensif : utile quand on est en danger ; redondant si déjà actif.
+        const danger = hpPct < 0.5 ? 1 : 0.35;
+        const redundant = (eff.type === "def_buff" && hasBuffType(enemy, "def_buff")) || (eff.type === "guard" && enemy.guard);
+        score += danger * 120 - (redundant ? 200 : 0);
+      } else if (eff.type === "atk_buff") {
+        // Mise en place offensive : tôt dans le combat, une seule fois.
+        score += hasBuffType(enemy, "atk_buff") ? -200 : 60 + hpPct * 40;
+      } else if (eff.type === "spd_buff") {
+        score += hasBuffType(enemy, "spd_buff") ? -100 : 40;
+      }
+    }
+    return score;
+  }
+
+  // --- Compétences offensives ---
+  let score = expectedDamage(enemy, player, s);
+  const lethal = score >= player.hp; // ce coup peut tuer
+  const playerLow = player.hp / player.maxHp < 0.4;
+
+  // Bonus d'achèvement : on sort le burst quand ça peut conclure.
+  if (lethal) score += 1000;
+  else if (playerLow && (s.power || 0) >= 1.6) score += 120;
+
+  // Effets « onHit » : valoriser DoT/malus pas encore actifs (sinon gaspillage).
+  for (const eff of s.onHit || []) {
+    if (eff.type === "poison" || eff.type === "bleed") score += hasDot(player, eff.type) ? -40 : 70;
+    else if (eff.type === "atk_debuff") score += hasBuffType(player, "atk_debuff") ? -30 : 55;
+    else if (eff.type === "slow") score += hasBuffType(player, "slow") ? -30 : 45;
+  }
+
+  // Légère préférence pour ne pas « gaspiller » un gros cooldown hors fenêtre.
+  if ((s.cooldown || 0) >= 3 && !lethal && !playerLow) score -= 25;
+
+  return score;
+}
+
+function chooseEnemySkill(combat) {
+  const enemy = combat.enemy;
   const ready = (id) => !enemy.cooldowns[id] || enemy.cooldowns[id] <= 0;
   const available = enemy.skills.filter(ready);
-  const buffSkill = available.find((id) => {
-    const s = getSkill(id);
-    return s && s.self && s.self.some((e) => e.type === "atk_buff");
-  });
-  const alreadyBuffed = enemy.buffs.some((b) => b.type === "atk_buff");
-  if (buffSkill && !alreadyBuffed && Math.random() < 0.5) return buffSkill;
-  const damaging = available
-    .filter((id) => (getSkill(id)?.power || 0) > 0)
-    .sort((a, b) => (getSkill(b).power || 0) - (getSkill(a).power || 0));
-  return damaging[0] || "basic_attack";
+  if (!available.length) return "basic_attack";
+
+  let best = "basic_attack";
+  let bestScore = scoreEnemySkill(combat, "basic_attack");
+  for (const id of available) {
+    // Petit aléa (±6 %) : l'IA reste lisible mais pas parfaitement robotique.
+    const score = scoreEnemySkill(combat, id) * (0.97 + Math.random() * 0.06);
+    if (score > bestScore) {
+      bestScore = score;
+      best = id;
+    }
+  }
+  return best;
 }
 
 // Entretien après chaque action du joueur : DoT, cooldowns, buffs, régén.
@@ -277,11 +355,14 @@ function upkeep(combat) {
       }
     }
   }
-  // Régénération passive du joueur (ex. Endurance).
-  const p = combat.player;
-  if (combat.status === "active" && p.hp > 0 && p.pp.hpRegenPct && p.hp < p.maxHp) {
-    const heal = Math.round(p.maxHp * p.pp.hpRegenPct);
-    if (heal > 0) { p.hp = Math.min(p.maxHp, p.hp + heal); }
+  // Régénération passive (joueur ou ennemi : Endurance, Régénération...).
+  if (combat.status === "active") {
+    for (const c of [combat.player, combat.enemy]) {
+      if (c.hp > 0 && c.pp.hpRegenPct && c.hp < c.maxHp) {
+        const heal = Math.round(c.maxHp * c.pp.hpRegenPct);
+        if (heal > 0) c.hp = Math.min(c.maxHp, c.hp + heal);
+      }
+    }
   }
   combat.turn += 1;
 }
@@ -312,7 +393,7 @@ export function resolveRound(state, combat, playerSkillId) {
   // Tours de l'ennemi tant que c'est son tour (≤ MAX_CONSEC).
   let eActed = 0;
   while (combat.status === "active" && combat.enemy.nextAt <= combat.player.nextAt + 1e-6 && eActed < MAX_CONSEC) {
-    useSkill(combat, combat.enemy, combat.player, chooseEnemySkill(combat.enemy));
+    useSkill(combat, combat.enemy, combat.player, chooseEnemySkill(combat));
     combat.enemy.nextAt += SPEED_UNIT / effectiveSpd(combat.enemy);
     eActed++;
     checkDeaths(state, combat);
@@ -322,7 +403,7 @@ export function resolveRound(state, combat, playerSkillId) {
   if (eActed === 0) {
     combat.pConsec += 1;
     if (combat.status === "active" && combat.pConsec >= MAX_CONSEC) {
-      useSkill(combat, combat.enemy, combat.player, chooseEnemySkill(combat.enemy));
+      useSkill(combat, combat.enemy, combat.player, chooseEnemySkill(combat));
       combat.enemy.nextAt += SPEED_UNIT / effectiveSpd(combat.enemy);
       combat.pConsec = 0;
       checkDeaths(state, combat);
