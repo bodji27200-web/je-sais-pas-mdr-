@@ -13,7 +13,7 @@ import { getSkill } from "../data/skills.js";
 import { getClass } from "../data/classes.js";
 import { getEquipment } from "../data/equipment.js";
 import { getResource } from "../data/resources.js";
-import { getDerivedStats, gainCharXp, clampHp } from "../core/character.js";
+import { getDerivedStats, gainCharXp, clampHp, getActiveSpec } from "../core/character.js";
 import { rollAmount } from "../core/progression.js";
 import { addGold, addResource, addEquipmentInstance } from "../core/state.js";
 import { makeInstance, rollRarity, enemyLuck, rollGearDrop } from "../core/items.js";
@@ -48,6 +48,22 @@ function makeCombatant(name, stats, skillIds, passiveId) {
   };
 }
 
+// Fusionne des bonus de passive dans le « pp » d'un combattant.
+// - champs numériques (lifestealPct, hpRegenPct, skillPowerPct...) : additionnés.
+// - champs objet (lowHpAtk, execute, vsDebuff) : conservés si absents, sinon
+//   on garde le meilleur bonus.
+function mergePp(pp, extra) {
+  for (const k of Object.keys(extra)) {
+    const v = extra[k];
+    if (typeof v === "number") pp[k] = (pp[k] || 0) + v;
+    else if (v && typeof v === "object") {
+      if (!pp[k]) pp[k] = { ...v };
+      else if ((v.bonus || 0) > (pp[k].bonus || 0)) pp[k] = { ...v };
+    }
+  }
+  return pp;
+}
+
 export function startCombat(state, enemyId) {
   const enemy = getEnemy(enemyId);
   if (!enemy) return null;
@@ -55,12 +71,15 @@ export function startCombat(state, enemyId) {
   const ds = getDerivedStats(state);
   const cls = getClass(state.character.classId);
 
+  const spec = getActiveSpec(state);
   const player = makeCombatant(
     state.character.name,
     { maxHp: ds.maxHp, hp: Math.max(1, Math.round(state.character.hpCurrent)), atk: ds.atk, def: ds.def, spd: ds.spd, crit: ds.crit },
-    ["basic_attack", ...cls.skills],
+    ["basic_attack", ...cls.skills, ...((spec && spec.grants) || [])],
     cls.passive
   );
+  // Passive de spécialisation : fusionnée aux effets de combat de la classe.
+  if (spec && spec.passive) mergePp(player.pp, spec.passive);
 
   const e = makeCombatant(
     enemy.name,

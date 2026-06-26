@@ -3,6 +3,7 @@
 import { getClass } from "../data/classes.js";
 import { getEquipment } from "../data/equipment.js";
 import { getSkill } from "../data/skills.js";
+import { getSpec, SPEC_UNLOCK_LEVEL, respecCost } from "../data/specializations.js";
 import {
   addEquipmentInstance,
   removeEquipmentInstance,
@@ -84,6 +85,28 @@ export function getDerivedStats(state) {
     if (pp.critFlat) stats.crit = (stats.crit || 0) + pp.critFlat;
   }
 
+  // Spécialisation : modificateurs permanents + maîtrise d'arme.
+  const spec = getActiveSpec(state);
+  if (spec) {
+    const m = spec.statMods || {};
+    if (m.hpPct) stats.hp *= 1 + m.hpPct;
+    if (m.defPct) stats.def *= 1 + m.defPct;
+    if (m.atkPct) stats.atk *= 1 + m.atkPct;
+    if (m.spdPct) stats.spd *= 1 + m.spdPct;
+    if (m.critFlat) stats.crit = (stats.crit || 0) + m.critFlat;
+
+    // Maîtrise : bonus si l'arme de prédilection de la voie est équipée.
+    const wInst = ch.equipment.weapon;
+    const wtpl = wInst ? getEquipment(wInst.baseId) : null;
+    if (spec.mastery && wtpl && wtpl.wtype === spec.mastery.wtype) {
+      const k = spec.mastery;
+      if (k.atkPct) stats.atk *= 1 + k.atkPct;
+      if (k.defPct) stats.def *= 1 + k.defPct;
+      if (k.spdPct) stats.spd *= 1 + k.spdPct;
+      if (k.critFlat) stats.crit = (stats.crit || 0) + k.critFlat;
+    }
+  }
+
   return {
     maxHp: Math.max(1, Math.round(stats.hp)),
     atk: Math.max(1, Math.round(stats.atk)),
@@ -91,6 +114,50 @@ export function getDerivedStats(state) {
     spd: Math.max(1, Math.round(stats.spd)),
     crit: Math.max(0, Math.round(stats.crit * 10) / 10),
   };
+}
+
+// --- Spécialisations ---
+
+// Spécialisation active (ou null si non choisie / id inconnu).
+export function getActiveSpec(state) {
+  const id = state.character.specId;
+  if (!id) return null;
+  const spec = getSpec(id);
+  // Sécurité : la voie doit appartenir à la classe du personnage.
+  return spec && spec.classId === state.character.classId ? spec : null;
+}
+
+// La spécialisation est-elle débloquée (niveau atteint) ?
+export function specUnlocked(state) {
+  return state.character.level >= SPEC_UNLOCK_LEVEL;
+}
+
+// Coût du prochain changement de voie (0 si premier choix gratuit).
+export function nextRespecCost(state) {
+  if (!state.character.specId) return 0;
+  return respecCost(state.character.specChanges || 0);
+}
+
+// Choisit / change de voie. Premier choix gratuit ; les suivants coûtent de l'or.
+// Renvoie { ok, error, name, paid }.
+export function chooseSpec(state, specId) {
+  if (!specUnlocked(state))
+    return { ok: false, error: `Spécialisation débloquée au niveau ${SPEC_UNLOCK_LEVEL}.` };
+  const spec = getSpec(specId);
+  if (!spec || spec.classId !== state.character.classId)
+    return { ok: false, error: "Voie indisponible pour cette classe." };
+  if (state.character.specId === specId)
+    return { ok: false, error: "Cette voie est déjà la tienne." };
+
+  const cost = nextRespecCost(state);
+  if (cost > 0) {
+    if (state.gold < cost) return { ok: false, error: `Il te faut ${cost} or pour changer de voie.` };
+    state.gold -= cost;
+    state.character.specChanges = (state.character.specChanges || 0) + 1;
+  }
+  state.character.specId = specId;
+  clampHp(state);
+  return { ok: true, name: spec.name, paid: cost };
 }
 
 export function clampHp(state) {

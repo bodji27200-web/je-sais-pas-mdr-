@@ -6,7 +6,7 @@ import { getClass } from "../data/classes.js";
 import { makeInstance } from "./items.js";
 
 const SAVE_KEY = "idle_rpg_save_v1";
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 let state = null;
 
@@ -44,6 +44,8 @@ export function newGame(name, classId) {
       xp: 0,
       hpCurrent: cls.baseStats.hp, // ajusté ensuite par les stats dérivées
       equipment: { weapon: null, head: null, chest: null, legs: null, accessory: null },
+      specId: null, // voie de spécialisation (choisie au niveau 10)
+      specChanges: 0, // nombre de changements de voie payés (coût croissant)
     },
     jobs: {
       woodcutting: { level: 1, xp: 0 },
@@ -95,6 +97,14 @@ function migrate(parsed) {
       if (typeof val === "string") slots[slot] = makeInstance(val, "common");
     }
     parsed.version = 2;
+  }
+  // v2 -> v3 : introduction des spécialisations (voie choisie au niveau 10).
+  if (parsed.version === 2) {
+    if (parsed.character) {
+      if (parsed.character.specId === undefined) parsed.character.specId = null;
+      if (parsed.character.specChanges === undefined) parsed.character.specChanges = 0;
+    }
+    parsed.version = 3;
   }
   return parsed.version === SAVE_VERSION ? parsed : null;
 }

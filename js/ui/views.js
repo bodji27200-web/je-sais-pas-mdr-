@@ -15,7 +15,8 @@ import { RECIPES, STATIONS } from "../data/recipes.js";
 import { ENEMIES, getEnemy } from "../data/enemies.js";
 import { ZONES, allZones } from "../data/zones.js";
 import { enemyUnlock, zoneProgress } from "../systems/zoneprog.js";
-import { getDerivedStats, canWieldWeapon } from "../core/character.js";
+import { getDerivedStats, canWieldWeapon, getActiveSpec, specUnlocked, nextRespecCost } from "../core/character.js";
+import { specsForClass, SPEC_UNLOCK_LEVEL } from "../data/specializations.js";
 import { charXpToNext, jobXpToNext } from "../core/progression.js";
 import { activityProgress, activityRemainingMs } from "../systems/jobs.js";
 import { craftableTimes, canCraft } from "../systems/crafting.js";
@@ -192,7 +193,66 @@ export function renderCharacter(state) {
         ${activeSkills}
         ${passive ? `<li><strong>${esc(passive.name)}</strong> <span class="tag">Passive</span> — <span class="muted">${esc(passive.desc)}</span></li>` : ""}
       </ul>
+      ${renderSpecSection(state)}
     </section>`;
+}
+
+// Décrit en clair les bonus d'une spécialisation (stats permanentes, passive,
+// maîtrise, compétence accordée).
+function specBonusLines(spec) {
+  const out = [];
+  const m = spec.statMods || {};
+  const pctLbl = { atkPct: "ATK", defPct: "DEF", hpPct: "PV", spdPct: "VIT" };
+  for (const k of Object.keys(pctLbl)) if (m[k]) out.push(`${m[k] > 0 ? "+" : ""}${Math.round(m[k] * 100)} % ${pctLbl[k]}`);
+  if (m.critFlat) out.push(`+${m.critFlat} % crit`);
+  const p = spec.passive || {};
+  if (p.lifestealPct) out.push(`Vol de vie ${Math.round(p.lifestealPct * 100)} %`);
+  if (p.hpRegenPct) out.push(`Régén. ${Math.round(p.hpRegenPct * 100)} %/tour`);
+  if (p.skillPowerPct) out.push(`Compétences +${Math.round(p.skillPowerPct * 100)} %`);
+  if (p.lowHpAtk) out.push(`ATK +${Math.round(p.lowHpAtk.bonus * 100)} % sous ${Math.round(p.lowHpAtk.threshold * 100)} % PV`);
+  if (p.execute) out.push(`+${Math.round(p.execute.bonus * 100)} % dégâts sous ${Math.round(p.execute.threshold * 100)} % PV cible`);
+  if (p.vsDebuff) out.push(`+${Math.round(p.vsDebuff.bonus * 100)} % dégâts sur cible affaiblie`);
+  return out;
+}
+
+function renderSpecCard(state, spec, active, cost) {
+  const skill = (spec.grants || []).map((id) => getSkill(id)).filter(Boolean)[0];
+  const bonuses = specBonusLines(spec).map((b) => `<span class="spec-bonus">${esc(b)}</span>`).join("");
+  const mLbl = spec.mastery ? `Maîtrise ${esc(spec.mastery.wtype)} : ${specBonusLines({ statMods: spec.mastery }).join(" · ") || "bonus"}` : "";
+  let btn;
+  if (active) btn = `<span class="tag spec-current">Voie actuelle</span>`;
+  else if (cost > 0) btn = `<button class="btn tiny" data-act="choose-spec" data-spec="${spec.id}">Changer · ${fmt(cost)} 🪙</button>`;
+  else btn = `<button class="btn tiny primary" data-act="choose-spec" data-spec="${spec.id}">Choisir</button>`;
+  return `
+    <div class="spec-card ${active ? "active" : ""}">
+      <div class="spec-head"><strong>${esc(spec.name)}</strong>${btn}</div>
+      <p class="muted small">${esc(spec.desc)}</p>
+      <div class="spec-bonuses">${bonuses}</div>
+      ${skill ? `<p class="muted small">⚡ <strong>${esc(skill.name)}</strong> — ${esc(skill.desc)}</p>` : ""}
+      ${mLbl ? `<p class="muted small">🏅 ${mLbl}</p>` : ""}
+    </div>`;
+}
+
+// Section « Voie » : verrouillée avant le niveau 10, sinon choix/affichage de la
+// spécialisation (premier choix gratuit, changements payants).
+function renderSpecSection(state) {
+  if (!specUnlocked(state)) {
+    const lvl = state.character.level;
+    return `
+      <h3 class="section-title">Voie</h3>
+      <p class="muted">🔒 Spécialisation débloquée au <strong>niveau ${SPEC_UNLOCK_LEVEL}</strong> (niveau actuel : ${lvl}). Trois voies par classe, chacune avec ses bonus, sa compétence et sa maîtrise d'arme.</p>`;
+  }
+  const specs = specsForClass(state.character.classId);
+  const active = getActiveSpec(state);
+  const cost = nextRespecCost(state);
+  const intro = active
+    ? `Voie actuelle : <strong>${esc(active.name)}</strong>. Changer de voie coûte de l'or (coût croissant).`
+    : `Choisis ta voie — <strong>le premier choix est gratuit</strong>.`;
+  const cards = specs.map((s) => renderSpecCard(state, s, active && active.id === s.id, cost)).join("");
+  return `
+    <h3 class="section-title">Voie</h3>
+    <p class="muted small">${intro}</p>
+    <div class="spec-grid">${cards}</div>`;
 }
 
 function familyTag(item) {
