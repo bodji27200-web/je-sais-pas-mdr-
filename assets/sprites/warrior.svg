@@ -1,37 +1,31 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 40" shape-rendering="crispEdges" width="64" height="80">
-  <!-- Guerrier en pied, face à droite. Palette limitée, style pixel. -->
-  <!-- Bouclier (bras arrière) -->
-  <rect x="2" y="16" width="9" height="13" fill="#2f4f78"/>
-  <rect x="2" y="16" width="9" height="2" fill="#e0b257"/>
-  <rect x="2" y="27" width="9" height="2" fill="#e0b257"/>
-  <rect x="2" y="16" width="2" height="13" fill="#21405f"/>
-  <rect x="5" y="20" width="3" height="4" fill="#e0b257"/>
-  <!-- Jambes / bottes -->
-  <rect x="12" y="27" width="5" height="8" fill="#586074"/>
-  <rect x="19" y="27" width="5" height="8" fill="#4d556a"/>
-  <rect x="11" y="34" width="7" height="5" fill="#3a2c20"/>
-  <rect x="19" y="34" width="7" height="5" fill="#31261c"/>
-  <!-- Torse / armure -->
-  <rect x="10" y="15" width="15" height="13" fill="#7c869b"/>
-  <rect x="12" y="17" width="7" height="8" fill="#8d97ab"/>
-  <rect x="10" y="25" width="15" height="3" fill="#e0b257"/>
-  <!-- Épaulières -->
-  <rect x="8" y="14" width="6" height="5" fill="#5b6376"/>
-  <rect x="21" y="14" width="6" height="5" fill="#5b6376"/>
-  <!-- Cou -->
-  <rect x="15" y="12" width="5" height="4" fill="#d8a066"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 64" width="96" height="128">
+  <!-- Guerrier (flat, propre), face à droite -->
+  <ellipse cx="24" cy="61" rx="15" ry="3.4" fill="#000" opacity="0.18"/>
+  <!-- Bouclier -->
+  <ellipse cx="12.5" cy="37" rx="8" ry="11" fill="#3f5e8c" stroke="#2a3f5e" stroke-width="1.4"/>
+  <ellipse cx="12.5" cy="37" rx="5" ry="7.5" fill="none" stroke="#e0b257" stroke-width="1.6"/>
+  <!-- Jambes + bottes -->
+  <rect x="19" y="45" width="5.5" height="12" rx="2.6" fill="#44597c"/>
+  <rect x="25.5" y="45" width="5.5" height="12" rx="2.6" fill="#3a4d6c"/>
+  <rect x="18.5" y="54" width="7" height="5" rx="2.4" fill="#283a59"/>
+  <rect x="25" y="54" width="7" height="5" rx="2.4" fill="#22324d"/>
+  <!-- Torse -->
+  <rect x="16.5" y="28" width="16" height="20" rx="6" fill="#6d86ab"/>
+  <rect x="19.5" y="31" width="10" height="13" rx="4" fill="#b7c4d6"/>
+  <rect x="16.5" y="43" width="16" height="3.4" rx="1.5" fill="#e0b257"/>
+  <!-- Épaules -->
+  <circle cx="18" cy="30" r="4.4" fill="#44597c"/>
+  <circle cx="31" cy="30" r="4.4" fill="#44597c"/>
+  <!-- Cou / visage -->
+  <rect x="21.5" y="22.5" width="5" height="5" fill="#e7b58a"/>
   <!-- Casque -->
-  <rect x="13" y="4" width="10" height="10" fill="#7c869b"/>
-  <rect x="13" y="4" width="10" height="2" fill="#5b6376"/>
-  <rect x="15" y="2" width="6" height="3" fill="#e0b257"/>
-  <rect x="14" y="8" width="9" height="2" fill="#14121c"/>
-  <rect x="15" y="10" width="6" height="2" fill="#d8a066"/>
-  <!-- Bras avant + main -->
-  <rect x="23" y="17" width="4" height="7" fill="#5b6376"/>
-  <rect x="24" y="22" width="4" height="4" fill="#d8a066"/>
-  <!-- Épée -->
-  <rect x="26" y="2" width="3" height="19" fill="#d7dde8"/>
-  <rect x="26" y="2" width="1" height="19" fill="#aeb7c6"/>
-  <rect x="23" y="20" width="8" height="2" fill="#e0b257"/>
-  <rect x="27" y="22" width="1" height="4" fill="#3a2c20"/>
+  <path d="M16.5 21 a8 8 0 0 1 16 0 v3 h-16 z" fill="#8fa0bb"/>
+  <path d="M16.5 21 a8 8 0 0 1 16 0 v1.4 h-16 z" fill="#b7c4d6"/>
+  <rect x="18" y="20" width="13" height="2.6" rx="1" fill="#26344e"/>
+  <rect x="22.5" y="9" width="3" height="5.5" rx="1.5" fill="#c0414a"/>
+  <!-- Bras avant + épée -->
+  <rect x="29.5" y="33" width="4.5" height="9" rx="2.2" fill="#6d86ab"/>
+  <polygon points="33,7 37,12 35,38 33,38" fill="#d9e0ea"/>
+  <polygon points="33,7 35,11 34,38 33,38" fill="#aeb9c9"/>
+  <rect x="29.5" y="36" width="9.5" height="3.2" rx="1.4" fill="#e0b257"/>
 </svg>

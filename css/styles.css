@@ -424,26 +424,17 @@ a { color: var(--gold); }
 .arena {
   position: relative;
   width: 100%;
-  height: clamp(220px, 40vh, 380px);
+  height: clamp(240px, 44vh, 420px);
   border-radius: var(--radius);
   overflow: hidden;
   border: 1px solid var(--border);
-  background: linear-gradient(180deg, #15203a 0%, #0c1322 60%, #0a0e18 100%);
+  background: #9fd8f2; /* secours si le décor ne charge pas */
   margin-bottom: 12px;
-  display: flex;
-  align-items: flex-end;
   isolation: isolate;
 }
 .arena-bg-img {
   position: absolute; inset: 0; width: 100%; height: 100%;
   object-fit: cover; z-index: 0;
-  filter: brightness(0.62) saturate(0.92);
-}
-.arena-ground {
-  position: absolute; left: 0; right: 0; bottom: 0; height: 24%;
-  z-index: 1;
-  background: linear-gradient(180deg, rgba(8,6,12,0) 0%, rgba(8,6,12,0.5) 55%, rgba(5,4,9,0.82) 100%);
-  box-shadow: inset 0 16px 28px -16px rgba(0,0,0,0.85);
 }
 .arena.arena-shake { animation: arenaShake 0.3s ease; }
 @keyframes arenaShake {
@@ -453,60 +444,59 @@ a { color: var(--gold); }
   75% { transform: translateX(-3px); }
 }
 
-.team {
-  position: relative; z-index: 2;
-  display: flex; align-items: flex-end; gap: 14px;
-  padding: 0 4% 3%;
-  flex: 1; min-width: 0;
-}
-.team-left { justify-content: flex-start; }
-.team-right { justify-content: flex-end; }
-
+/* Scène : persos posés sur le sol du décor */
+.arena-stage { position: absolute; inset: 0; z-index: 2; }
 .fighter {
-  position: relative;
+  position: absolute; bottom: 27%;
   display: flex; flex-direction: column; align-items: center;
-  width: 46%; max-width: 200px;
+  width: 30%; max-width: 150px;
   will-change: transform;
 }
-.fighter-status {
-  width: 100%; max-width: 168px;
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
-  margin-bottom: 4px; z-index: 3;
-}
-.fighter-name {
-  font-family: "Cinzel", serif; font-size: 0.78rem; color: var(--text);
-  text-shadow: 0 1px 3px #000; white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis; max-width: 100%;
-}
-.hpbar {
-  width: 100%; height: 9px; border-radius: 6px;
-  background: #0c0913; border: 1px solid rgba(0,0,0,0.6);
-  overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.5);
-}
-.hpbar-fill { height: 100%; transition: width 0.3s ease; background: linear-gradient(90deg, var(--hp2), var(--hp1)); }
-.hpbar-fill.enemy { background: linear-gradient(90deg, #7a1f1f, #d34b3b); }
-.hp-num { font-size: 0.7rem; color: var(--muted); font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px #000; }
-.states { display: flex; gap: 4px; }
-
+.fighter.hero { left: 8%; }
+.fighter.enemy { right: 8%; }
 .fighter-sprite {
   position: relative; width: 100%;
-  min-height: clamp(100px, 22vh, 176px);
   display: flex; justify-content: center; align-items: flex-end;
   will-change: transform, filter;
 }
 .sprite-emoji {
-  position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
-  font-size: 3.4rem; z-index: 0; filter: drop-shadow(0 6px 6px rgba(0,0,0,0.6));
+  position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+  font-size: 3rem; z-index: 0; filter: drop-shadow(0 6px 6px rgba(0,0,0,0.45));
 }
 .fighter.enemy .sprite-emoji { transform: translateX(-50%) scaleX(-1); }
 .sprite-anim { display: flex; justify-content: center; align-items: flex-end; animation: idleBob 2.6s ease-in-out infinite; }
 .fighter.enemy .sprite-anim { animation-delay: -1.3s; }
 .sprite-img {
-  height: clamp(100px, 22vh, 176px); width: auto; max-width: 100%;
-  object-fit: contain; image-rendering: pixelated; z-index: 1;
-  filter: drop-shadow(0 8px 6px rgba(0,0,0,0.55));
+  height: clamp(96px, 24vh, 168px); width: auto; max-width: 100%;
+  object-fit: contain; z-index: 1;
+  filter: drop-shadow(0 6px 5px rgba(0,0,0,0.4));
 }
 .fighter.enemy .sprite-img { transform: scaleX(-1); } /* l'ennemi fait face au héros */
+
+/* Grosses barres de vie (pilules, style SimpleMMO) */
+.arena-hp {
+  position: absolute; left: 0; right: 0; bottom: 5%;
+  z-index: 3; display: flex; justify-content: center; gap: 10px; padding: 0 5%;
+}
+.hp-pill {
+  position: relative; flex: 1; max-width: 44%; height: 26px;
+  border-radius: 16px; overflow: hidden;
+  background: rgba(12, 9, 19, 0.5);
+  border: 2px solid rgba(0,0,0,0.4);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+.hp-pill-fill {
+  position: absolute; inset: 0; height: 100%;
+  transition: width 0.35s ease;
+  background: linear-gradient(180deg, #ff6f6a, #d8403a);
+}
+.hp-pill-fill.enemy { background: linear-gradient(180deg, #ff6f6a, #c4322d); }
+.hp-pill-text {
+  position: relative; z-index: 1;
+  display: flex; align-items: center; justify-content: center; height: 100%;
+  font-family: "Cinzel", serif; font-size: 0.8rem; color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.85); font-variant-numeric: tabular-nums;
+}
 
 @keyframes idleBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
 
@@ -705,9 +695,12 @@ a { color: var(--gold); }
 
 /* Arène en largeur réduite (mobile / portrait) */
 @media (max-width: 560px) {
-  .arena { height: clamp(200px, 34vh, 300px); }
-  .sprite-img { height: clamp(84px, 18vh, 130px); }
-  .sprite-emoji { font-size: 2.6rem; }
-  .fighter { width: 48%; }
-  .fighter-name { font-size: 0.72rem; }
+  .arena { height: clamp(230px, 40vh, 340px); }
+  .sprite-img { height: clamp(82px, 20vh, 130px); }
+  .sprite-emoji { font-size: 2.5rem; }
+  .fighter { width: 34%; }
+  .fighter.hero { left: 5%; }
+  .fighter.enemy { right: 5%; }
+  .hp-pill { height: 22px; }
+  .hp-pill-text { font-size: 0.72rem; }
 }

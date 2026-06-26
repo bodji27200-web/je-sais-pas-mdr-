@@ -1,30 +1,31 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 40" shape-rendering="crispEdges" width="64" height="80">
-  <!-- Gobelin pillard, face à droite. -->
-  <!-- Jambes / pieds -->
-  <rect x="11" y="29" width="5" height="7" fill="#4d722f"/>
-  <rect x="17" y="29" width="5" height="7" fill="#446628"/>
-  <rect x="10" y="35" width="6" height="4" fill="#2c1c12"/>
-  <rect x="17" y="35" width="6" height="4" fill="#241710"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 64" width="96" height="128">
+  <!-- Gobelin pillard (flat, propre), face à droite -->
+  <ellipse cx="24" cy="61" rx="13" ry="3.2" fill="#000" opacity="0.18"/>
+  <!-- Jambes -->
+  <rect x="18" y="46" width="5" height="11" rx="2.4" fill="#4d722f"/>
+  <rect x="24" y="46" width="5" height="11" rx="2.4" fill="#446628"/>
+  <rect x="17.5" y="54" width="6.5" height="5" rx="2.2" fill="#2c1c12"/>
+  <rect x="24" y="54" width="6.5" height="5" rx="2.2" fill="#241710"/>
   <!-- Pagne -->
-  <rect x="10" y="24" width="13" height="7" fill="#6b4a2a"/>
+  <path d="M16 40 h16 l-2 9 h-12 z" fill="#6b4a2a"/>
   <!-- Torse -->
-  <rect x="11" y="16" width="11" height="9" fill="#6f9544"/>
-  <rect x="12" y="17" width="5" height="6" fill="#7fae54"/>
-  <!-- Bras arrière -->
-  <rect x="9" y="17" width="3" height="8" fill="#5c8038"/>
-  <!-- Bras avant + main + dague -->
-  <rect x="21" y="17" width="3" height="7" fill="#6f9544"/>
-  <rect x="22" y="22" width="3" height="3" fill="#7fae54"/>
-  <rect x="24" y="14" width="2" height="9" fill="#cfd6e0"/>
-  <rect x="23" y="22" width="4" height="2" fill="#8a6d2f"/>
+  <rect x="16.5" y="30" width="15" height="13" rx="6" fill="#6f9544"/>
+  <ellipse cx="24" cy="35" rx="5" ry="5" fill="#7fae54"/>
+  <!-- Bras -->
+  <rect x="13" y="31" width="4.5" height="10" rx="2.2" fill="#5c8038"/>
+  <rect x="30.5" y="31" width="4.5" height="9" rx="2.2" fill="#6f9544"/>
+  <!-- Dague -->
+  <polygon points="35,17 38,20 36.5,33 34.5,33" fill="#cfd6e0"/>
+  <rect x="32.5" y="32" width="6" height="2.6" rx="1.2" fill="#8a6d2f"/>
   <!-- Tête -->
-  <rect x="13" y="7" width="9" height="9" fill="#7fae54"/>
-  <!-- Grande oreille -->
-  <polygon points="13,9 5,6 12,14" fill="#6f9544"/>
-  <polygon points="22,9 28,7 23,13" fill="#6f9544"/>
-  <!-- Œil + nez + croc -->
-  <rect x="18" y="10" width="3" height="2" fill="#ffd84a"/>
-  <rect x="19" y="10" width="1" height="2" fill="#2a1500"/>
-  <polygon points="22,12 25,13 22,15" fill="#5c8038"/>
-  <rect x="18" y="15" width="1" height="2" fill="#eef3df"/>
+  <circle cx="24" cy="22" r="8.5" fill="#7fae54"/>
+  <!-- Oreilles -->
+  <path d="M16 21 L7 17 L16 27 Z" fill="#6f9544"/>
+  <path d="M32 21 L41 17 L32 27 Z" fill="#6f9544"/>
+  <!-- Yeux + nez + croc -->
+  <circle cx="26" cy="21" r="2" fill="#ffd84a"/>
+  <circle cx="26.5" cy="21" r="0.9" fill="#241500"/>
+  <circle cx="21" cy="21.5" r="1.4" fill="#fff2c0"/>
+  <path d="M28 24 Q31 25 28 28 Z" fill="#5c8038"/>
+  <path d="M22 27 l1.4 3 l1.4 -3 z" fill="#f2f4e2"/>
 </svg>

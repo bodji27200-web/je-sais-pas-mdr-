@@ -457,25 +457,25 @@ function zoneForEnemy(enemyId) {
   return allZones()[0];
 }
 
-// Un combattant dans l'arène. `side` : "hero" (gauche) ou "enemy" (droite).
-// Couches imbriquées pour des animations qui ne se gênent pas :
-//   .fighter (déplacement attaquant) > .fighter-sprite (recul/flash défenseur)
-//   > .sprite-anim (idle continu).
-function renderFighter(side, name, c, spritePath, emoji) {
-  const idbase = side === "hero" ? "player" : "enemy";
-  const hpCls = side === "hero" ? "hp" : "hp enemy";
+// Un combattant posé dans la scène. `side` : "hero" (gauche) / "enemy" (droite).
+// Couches : .fighter (déplacement attaquant) > .fighter-sprite (recul/flash)
+// > .sprite-anim (idle). Le sprite « pose » les pieds sur le sol du décor.
+function renderFighter(side, spritePath, emoji) {
   return `
     <div class="fighter ${side}" id="bt-${side}">
-      <div class="fighter-status">
-        <span class="fighter-name">${esc(name)}</span>
-        <div class="hpbar"><div class="hpbar-fill ${hpCls}" id="bt-${idbase}-fill" style="width:${pct(c.hp, c.maxHp)}%"></div></div>
-        <span class="hp-num" id="bt-${idbase}-num">${fmt(c.hp)}/${fmt(c.maxHp)}</span>
-        <div class="states" id="bt-${idbase}-states"></div>
-      </div>
       <div class="fighter-sprite">
         <span class="sprite-emoji">${emoji || "❔"}</span>
         <div class="sprite-anim">${chainImg(spritePath, "sprite-img", "this.style.display='none'")}</div>
       </div>
+    </div>`;
+}
+
+// Grosse barre de vie en pilule (style SimpleMMO). idbase : "player" / "enemy".
+function renderHpPill(idbase, c) {
+  return `
+    <div class="hp-pill ${idbase}">
+      <div class="hp-pill-fill ${idbase}" id="bt-${idbase}-fill" style="width:${pct(c.hp, c.maxHp)}%"></div>
+      <span class="hp-pill-text" id="bt-${idbase}-num">${fmt(c.hp)}/${fmt(c.maxHp)}</span>
     </div>`;
 }
 
@@ -484,10 +484,10 @@ export function renderBattle(state, combat) {
   const e = combat.enemy;
   const zone = zoneForEnemy(combat.enemyId);
   const heroClass = getClass(state.character.classId);
+  const bg = zone.arena || zone.image; // décor de biome (image statique, swappable)
 
   // Décor + sprites créés UNE FOIS ici ; barres/log/contrôles/anims mis à jour
   // ensuite de façon ciblée (jamais de recréation -> pas de scintillement).
-  // Structure en "équipes" gauche/droite : prête pour 2e joueur/familier/multi.
   return `
     <section class="panel battle">
       <div class="arena-header">
@@ -495,17 +495,18 @@ export function renderBattle(state, combat) {
         <span class="arena-turn">Tour <strong id="bt-turn">${combat.turn}</strong></span>
       </div>
       <div class="arena" id="bt-arena">
-        ${chainImg(zone.image, "arena-bg-img", "this.remove()")}
-        <div class="arena-ground"></div>
-        <div class="team team-left">
-          ${renderFighter("hero", p.name, p, heroClass.sprite, classEmoji(heroClass.id))}
+        ${chainImg(bg, "arena-bg-img", "this.remove()")}
+        <div class="arena-stage">
+          ${renderFighter("hero", heroClass.sprite, classEmoji(heroClass.id))}
+          ${renderFighter("enemy", e.sprite, e.icon)}
         </div>
-        <div class="team team-right">
-          ${renderFighter("enemy", e.name, e, e.sprite, e.icon)}
+        <div class="arena-hp">
+          ${renderHpPill("player", p)}
+          ${renderHpPill("enemy", e)}
         </div>
       </div>
       <div id="bt-controls">${renderBattleControls(state, combat)}</div>
-      <details class="battle-log-wrap" id="bt-log-wrap" open>
+      <details class="battle-log-wrap" id="bt-log-wrap">
         <summary>📜 Journal de combat</summary>
         <div class="battle-log" id="battle-log">${renderBattleLog(combat)}</div>
       </details>
