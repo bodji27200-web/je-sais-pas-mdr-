@@ -16,36 +16,74 @@ export const OUT_OF_COMBAT_REGEN_PER_SEC = 0.03;
 
 const STAT_KEYS = ["hp", "atk", "def", "spd", "crit"];
 
-// Calcule les stats finales : base de classe + croissance + équipement + passive.
+// Slots d'armure pris en compte pour les bonus de famille (set 3 pièces).
+const ARMOR_SLOTS = ["head", "chest", "legs"];
+
+// Bonus de set 3 pièces par famille (identité forte des armures).
+// Modifiable ici (data-driven d'esprit : un seul endroit).
+export const SET_BONUS = {
+  cloth: { atkMult: 0.12, crit: 3, label: "+12 % ATK · +3 % crit" },
+  leather: { spdMult: 0.1, crit: 5, label: "+10 % VIT · +5 % crit" },
+  metal: { hpMult: 0.12, defMult: 0.12, label: "+12 % PV · +12 % DEF" },
+};
+
+// Compte les familles d'armure équipées (slots tête/torse/jambes).
+export function familyCounts(state) {
+  const c = { cloth: 0, leather: 0, metal: 0 };
+  for (const slot of ARMOR_SLOTS) {
+    const inst = state.character.equipment[slot];
+    if (!inst) continue;
+    const tpl = getEquipment(inst.baseId);
+    if (tpl && tpl.family && c[tpl.family] !== undefined) c[tpl.family] += 1;
+  }
+  return c;
+}
+
+// Famille de set actif (>= 3 pièces), ou null.
+export function activeSet(state) {
+  const c = familyCounts(state);
+  for (const fam of Object.keys(c)) if (c[fam] >= 3) return fam;
+  return null;
+}
+
+// Calcule les stats finales : base + croissance + équipement + set + passive.
 export function getDerivedStats(state) {
   const ch = state.character;
   const cls = getClass(ch.classId);
   const stats = {};
   for (const k of STAT_KEYS) {
-    const base = cls.baseStats[k] || 0;
-    const growth = (cls.growth[k] || 0) * (ch.level - 1);
-    stats[k] = base + growth;
+    stats[k] = (cls.baseStats[k] || 0) + (cls.growth[k] || 0) * (ch.level - 1);
   }
 
-  // Bonus d'équipement : stats effectives (tirage × renforcement) de chaque slot.
+  // Bonus d'équipement (stats effectives = tirage × renforcement).
   for (const slot of Object.keys(ch.equipment)) {
     const inst = ch.equipment[slot];
     if (!inst || !inst.stats) continue;
     const es = effectiveStats(inst);
-    for (const k of Object.keys(es)) {
-      stats[k] = (stats[k] || 0) + es[k];
-    }
+    for (const k of Object.keys(es)) stats[k] = (stats[k] || 0) + es[k];
   }
 
-  // Passive de classe (ex. Endurance : +10 % PV max).
-  if (cls.passive) {
-    const passive = getSkill(cls.passive);
-    if (passive && passive.passive && passive.passive.maxHpPct) {
-      stats.hp = Math.round(stats.hp * (1 + passive.passive.maxHpPct));
-    }
+  // Bonus de set 3 pièces (multiplicatif sur les totaux).
+  const set = activeSet(state);
+  if (set) {
+    const b = SET_BONUS[set];
+    if (b.atkMult) stats.atk *= 1 + b.atkMult;
+    if (b.hpMult) stats.hp *= 1 + b.hpMult;
+    if (b.defMult) stats.def *= 1 + b.defMult;
+    if (b.spdMult) stats.spd *= 1 + b.spdMult;
+    if (b.crit) stats.crit = (stats.crit || 0) + b.crit;
   }
 
-  // Arrondis propres + planchers.
+  // Passive de classe (parties permanentes des stats).
+  const pp = cls.passive ? getSkill(cls.passive)?.passive : null;
+  if (pp) {
+    if (pp.maxHpPct) stats.hp *= 1 + pp.maxHpPct;
+    if (pp.defPct) stats.def *= 1 + pp.defPct;
+    if (pp.atkPct) stats.atk *= 1 + pp.atkPct;
+    if (pp.spdPct) stats.spd *= 1 + pp.spdPct;
+    if (pp.critFlat) stats.crit = (stats.crit || 0) + pp.critFlat;
+  }
+
   return {
     maxHp: Math.max(1, Math.round(stats.hp)),
     atk: Math.max(1, Math.round(stats.atk)),
