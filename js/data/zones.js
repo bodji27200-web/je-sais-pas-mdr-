@@ -15,6 +15,17 @@ export const ZONES = {
       "Le repaire du chef gobelin Grôk se trouve en son cœur.",
     enemies: ["feral_wolf", "goblin_raider", "wild_boar", "forest_bandit"],
     boss: "goblin_chief_grok",
+    // Progression ORDONNÉE : chaque palier se débloque par le niveau du
+    // personnage ET en ayant vaincu le palier précédent `prevKills` fois.
+    // `clearKills` = nombre de victoires qui « valide » le palier (progression).
+    progression: [
+      { enemy: "feral_wolf", level: 1, prevKills: 0, clearKills: 3 },
+      { enemy: "goblin_raider", level: 2, prevKills: 3, clearKills: 3 },
+      { enemy: "wild_boar", level: 3, prevKills: 3, clearKills: 3 },
+      { enemy: "forest_bandit", level: 5, prevKills: 3, clearKills: 3 },
+    ],
+    // Boss : niveau requis + dernier palier vaincu prevKills fois.
+    bossUnlock: { level: 6, prevKills: 3 },
   },
 };
 

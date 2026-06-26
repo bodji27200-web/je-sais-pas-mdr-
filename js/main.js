@@ -28,6 +28,7 @@ import { upgradeItem, dismantleItem, dismantleReward, needsDismantleConfirm } fr
 import { findEquipmentInstance } from "./core/state.js";
 import { getRarity } from "./data/rarities.js";
 import { startCombat, resolveRound } from "./systems/combat.js";
+import { enemyUnlock } from "./systems/zoneprog.js";
 import { updateObjectives, ensureObjectives, objectiveLabel } from "./systems/objectives.js";
 import { setMuted, isMuted, playHit, playWin, playLose, playDing } from "./core/audio.js";
 import { getResource } from "./data/resources.js";
@@ -421,6 +422,12 @@ const handlers = {
   },
   fight: (el) => {
     const state = getState();
+    // Sécurité : on ne lance pas un combat verrouillé (progression de zone).
+    const u = enemyUnlock(state, el.dataset.id);
+    if (!u.unlocked) {
+      toast("Verrouillé : " + u.reasons.join(" · "), "warn");
+      return;
+    }
     if (state.character.hpCurrent < 1) state.character.hpCurrent = 1;
     clearTimeout(combatBusyTimer);
     combatBusy = false; // repart propre (au cas où on relance pendant une anim)

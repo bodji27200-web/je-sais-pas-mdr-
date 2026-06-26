@@ -8,12 +8,13 @@ import { getSkill } from "../data/skills.js";
 import { JOBS } from "../data/jobs.js";
 import { RESOURCES, getResource } from "../data/resources.js";
 import { EQUIPMENT, getEquipment, SLOTS, ARMOR_FAMILIES } from "../data/equipment.js";
-import { statScore, effectiveStats, MAX_UPGRADE } from "../core/items.js";
+import { effectiveStats, MAX_UPGRADE } from "../core/items.js";
 import { getRarity } from "../data/rarities.js";
 import { upgradeCost, canUpgrade, dismantleReward } from "../systems/gear.js";
 import { RECIPES, STATIONS } from "../data/recipes.js";
 import { ENEMIES, getEnemy } from "../data/enemies.js";
 import { ZONES, allZones } from "../data/zones.js";
+import { enemyUnlock, zoneProgress } from "../systems/zoneprog.js";
 import { getDerivedStats } from "../core/character.js";
 import { charXpToNext, jobXpToNext } from "../core/progression.js";
 import { activityProgress, activityRemainingMs } from "../systems/jobs.js";
@@ -22,6 +23,13 @@ import { OBJECTIVES } from "../systems/objectives.js";
 
 const STAT_LABELS = { maxHp: "PV max", atk: "Attaque", def: "Défense", spd: "Vitesse", crit: "Critique" };
 const STAT_ICONS = { maxHp: "❤️", atk: "⚔️", def: "🛡️", spd: "💨", crit: "🎯" };
+const STAT_TIP = {
+  maxHp: "Quantité totale de dégâts que tu peux encaisser.",
+  atk: "Base de tes dégâts infligés.",
+  def: "Réduit chaque attaque reçue (rendements décroissants, plafonné à 75 % : jamais 0 dégât).",
+  spd: "La Vitesse détermine la fréquence des actions. Un personnage plus rapide peut agir davantage qu'un personnage lent (jusqu'à 2 fois d'affilée).",
+  crit: "Chance d'infliger un coup critique (×1,6 dégâts).",
+};
 
 // ---------------------------------------------------------------------------
 // Création de personnage
@@ -134,7 +142,7 @@ export function renderCharacter(state) {
   const ds = getDerivedStats(state);
 
   const stats = ["maxHp", "atk", "def", "spd", "crit"]
-    .map((k) => `<div class="stat"><span class="stat-ico">${STAT_ICONS[k]}</span><span class="stat-lbl">${STAT_LABELS[k]}</span><span class="stat-val">${k === "crit" ? ds[k] + " %" : fmt(ds[k])}</span></div>`)
+    .map((k) => `<div class="stat" title="${esc(STAT_TIP[k])}"><span class="stat-ico">${STAT_ICONS[k]}</span><span class="stat-lbl">${STAT_LABELS[k]}</span><span class="stat-val">${k === "crit" ? ds[k] + " %" : fmt(ds[k])}</span></div>`)
     .join("");
 
   const slots = Object.keys(SLOTS)
@@ -209,6 +217,20 @@ function statLine(stats) {
 }
 
 const STAT_SHORT = { hp: "PV", atk: "ATK", def: "DEF", spd: "VIT", crit: "CRIT" };
+
+// Comparaison honnête stat par stat (candidat vs pièce équipée). Pas de « score »
+// unique : on montre les vraies différences, au joueur de décider selon son build.
+function compareLine(a, b) {
+  if (!b) return '<span class="muted">aucune pièce équipée</span>';
+  const parts = [];
+  for (const k of ["atk", "def", "hp", "spd", "crit"]) {
+    const d = (a[k] || 0) - (b[k] || 0);
+    if (!d) continue;
+    const color = d > 0 ? "#5fcf95" : "#e08a86";
+    parts.push(`<span style="color:${color}">${d > 0 ? "+" : ""}${d} ${STAT_SHORT[k]}</span>`);
+  }
+  return parts.length ? `vs équipé : ${parts.join(" · ")}` : "équivalent à l'équipé";
+}
 
 // Badge « +N » de renforcement à côté du nom (rien si +0).
 function upgradeSuffix(inst) {
@@ -382,7 +404,7 @@ export function renderInventory(state) {
     if (sa !== sb) return sa - sb;
     const ra = getRarity(a.rarity).rank, rb = getRarity(b.rarity).rank;
     if (ra !== rb) return rb - ra;
-    return statScore(b.stats) - statScore(a.stats);
+    return (tb?.levelReq || 0) - (ta?.levelReq || 0);
   });
   const eqHtml = instances.length
     ? instances
@@ -391,11 +413,9 @@ export function renderInventory(state) {
           if (!item) return "";
           const r = getRarity(inst.rarity);
           const canEquip = state.character.level >= (item.levelReq || 0);
-          // Flèche d'upgrade : la pièce (renforcement compris) bat-elle l'équipée ?
+          // Comparaison HONNÊTE (stat par stat) avec la pièce équipée du même slot.
           const equipped = state.character.equipment[item.slot];
-          const isUpgrade =
-            canEquip &&
-            statScore(effectiveStats(inst)) > statScore(equipped ? effectiveStats(equipped) : {});
+          const cmp = compareLine(effectiveStats(inst), equipped ? effectiveStats(equipped) : null);
 
           // Ligne de renforcement : aperçu avant/après + coût, ou « max ».
           const cost = upgradeCost(inst);
@@ -411,7 +431,7 @@ export function renderInventory(state) {
               <div class="inv-gear-info">
                 <div class="gear-title"><strong style="color:${r.color}">${esc(item.name)}</strong>${upgradeSuffix(inst)}${rarityTag(inst)}${familyTag(item)}</div>
                 <span class="muted small">${SLOTS[item.slot]} · ${statLine(effectiveStats(inst))}</span>
-                <span class="muted small">${item.levelReq ? "Niv. " + item.levelReq : "Aucun prérequis"}${isUpgrade ? ' · <span class="upgrade">▲ amélioration</span>' : ""}</span>
+                <span class="muted small">${item.levelReq ? "Niv. " + item.levelReq : "Aucun prérequis"} · ${cmp}</span>
                 ${upLine}
               </div>
               <div class="inv-gear-actions">
@@ -439,25 +459,37 @@ export function renderInventory(state) {
 // ---------------------------------------------------------------------------
 export function renderZones(state) {
   const zone = Object.values(ZONES)[0];
+  const prog = zoneProgress(state, zone.id);
+  const defeated = (id) => (state.counters && state.counters.defeated && state.counters.defeated[id]) || 0;
+
   const enemies = zone.enemies
     .map((id) => {
       const e = getEnemy(id);
+      const u = enemyUnlock(state, id);
+      const kills = defeated(id);
+      const btn = u.unlocked
+        ? `<button class="btn tiny" data-act="fight" data-id="${e.id}">Combattre</button>`
+        : `<button class="btn tiny" disabled>Verrouillé</button>`;
+      const sub = u.unlocked
+        ? `Niv. ${e.level} · PV ${e.stats.hp}${kills ? ` · vaincu ×${kills}` : ""}`
+        : `Requis : ${esc(u.reasons.join(" · "))}`;
       return `
-        <div class="enemy-card">
+        <div class="enemy-card ${u.unlocked ? "" : "locked"}">
           ${sigil(e.image, e.icon)}
-          <div class="enemy-info"><strong>${esc(e.name)}</strong><span class="muted small">Niv. ${e.level} · ❤️ ${e.stats.hp}</span></div>
-          <button class="btn tiny" data-act="fight" data-id="${e.id}">Combattre</button>
+          <div class="enemy-info"><strong>${esc(e.name)}</strong><span class="muted small">${sub}</span></div>
+          ${btn}
         </div>`;
     })
     .join("");
 
   const boss = getEnemy(zone.boss);
-  const bossCard = `
-    <div class="enemy-card boss">
-      ${sigil(boss.image, boss.icon, "lg")}
-      <div class="enemy-info"><strong>${esc(boss.name)}</strong> <span class="tag boss-tag">BOSS</span><span class="muted small">Niv. ${boss.level} · ❤️ ${boss.stats.hp}</span></div>
-      <button class="btn ${state.flags.bossDefeated ? "" : "primary"}" data-act="fight" data-id="${boss.id}">${state.flags.bossDefeated ? "Réaffronter" : "Affronter"}</button>
-    </div>`;
+  const bu = enemyUnlock(state, zone.boss);
+  const bossBtn = bu.unlocked
+    ? `<button class="btn ${state.flags.bossDefeated ? "" : "primary"}" data-act="fight" data-id="${boss.id}">${state.flags.bossDefeated ? "Réaffronter" : "Affronter"}</button>`
+    : `<button class="btn" disabled>Verrouillé</button>`;
+  const bossSub = bu.unlocked
+    ? `Niv. ${boss.level} · PV ${boss.stats.hp}`
+    : `Requis : ${esc(bu.reasons.join(" · "))}`;
 
   return `
     <section class="panel">
@@ -465,11 +497,19 @@ export function renderZones(state) {
         ${sigil(zone.image, zone.icon, "lg")}
         <div><h2>${esc(zone.name)}</h2><p class="muted">${esc(zone.desc)}</p><p class="muted small">Niveau conseillé : ${zone.recommendedLevel}+</p></div>
       </div>
+      <div class="zone-prog">
+        <div class="bar"><div class="bar-fill xp" style="width:${prog}%"></div></div>
+        <span class="muted small">Progression de la zone : ${prog}%${prog >= 100 ? " — terminée" : ""}</span>
+      </div>
       <h3 class="section-title">Ennemis</h3>
       <div class="enemy-list">${enemies}</div>
       <h3 class="section-title">Boss</h3>
-      ${bossCard}
-      <p class="muted small hint">💡 Tes PV se régénèrent au fil du temps hors combat.</p>
+      <div class="enemy-card boss ${bu.unlocked ? "" : "locked"}">
+        ${sigil(boss.image, boss.icon, "lg")}
+        <div class="enemy-info"><strong>${esc(boss.name)}</strong> <span class="tag boss-tag">BOSS</span><span class="muted small">${bossSub}</span></div>
+        ${bossBtn}
+      </div>
+      <p class="muted small hint">Tes PV se régénèrent au fil du temps hors combat.</p>
     </section>`;
 }
 
