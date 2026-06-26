@@ -32,6 +32,8 @@ import { getRarity } from "./data/rarities.js";
 import { startCombat, resolveRound } from "./systems/combat.js";
 import { enemyUnlock } from "./systems/zoneprog.js";
 import { hatchEgg, equipFamiliar, feedFamiliar } from "./systems/familiars.js";
+import { checkNewAchievements } from "./systems/achievements.js";
+import { getGuide } from "./data/guides.js";
 import { updateObjectives, ensureObjectives, objectiveLabel } from "./systems/objectives.js";
 import { setMuted, isMuted, playHit, playWin, playLose, playDing } from "./core/audio.js";
 import { getResource } from "./data/resources.js";
@@ -56,6 +58,8 @@ import {
   renderIntent,
   renderStates,
   renderObjectives,
+  renderGuide,
+  renderAchievements,
   topbarActivityInner,
 } from "./ui/views.js";
 
@@ -123,7 +127,9 @@ function renderAll() {
     return;
   }
   $("#topbar").innerHTML =
-    renderTopbar(state) + `<button class="gear-btn" data-act="open-options" title="Options">⚙</button>`;
+    renderTopbar(state) +
+    `<button class="gear-btn help-btn" data-act="open-guide" title="Aide / Guide">?</button>` +
+    `<button class="gear-btn" data-act="open-options" title="Options">⚙</button>`;
   $("#tabs").innerHTML = renderTabs();
   $("#objectives").innerHTML = currentCombat ? "" : renderObjectives(state);
   $("#screen").innerHTML = renderScreen();
@@ -204,15 +210,33 @@ function lockCombat() {
   }, ms);
 }
 
-// Vérifie les objectifs et notifie ceux nouvellement accomplis.
+// Vérifie quêtes + succès et notifie ceux nouvellement accomplis.
 function checkObjectives() {
   const state = getState();
   if (!state) return;
   const newly = updateObjectives(state);
   for (const id of newly) {
-    toast("Objectif accompli : " + objectiveLabel(id), "good");
+    toast("Quête accomplie : " + objectiveLabel(id), "good");
     playDing();
   }
+  for (const ach of checkNewAchievements(state)) {
+    toast((ach.badge ? "🏅 Badge : " : "★ Succès : ") + ach.name, "good");
+    playDing();
+  }
+}
+
+// Affiche le guide contextuel d'un système à sa PREMIÈRE ouverture (une fois).
+function maybeShowGuide(tabId) {
+  const state = getState();
+  if (!state) return;
+  const guide = getGuide(tabId);
+  if (!guide) return;
+  if (!state.tutorials) state.tutorials = { seen: {}, enabled: true };
+  if (state.tutorials.enabled === false) return;
+  if (state.tutorials.seen[tabId]) return;
+  state.tutorials.seen[tabId] = true;
+  save();
+  showModal(renderGuide(tabId));
 }
 
 // Notifie une seule fois quand la spécialisation se débloque (niveau 10).
@@ -401,6 +425,7 @@ const handlers = {
     currentCombat = null;
     currentTab = el.dataset.tab;
     renderAll();
+    maybeShowGuide(currentTab); // guide contextuel à la première ouverture
   },
   "select-zone": (el) => {
     currentZoneId = el.dataset.zone;
@@ -554,15 +579,36 @@ const handlers = {
     renderAll();
   },
   "open-options": () => {
+    const state = getState();
+    const tuto = !state || !state.tutorials || state.tutorials.enabled !== false;
     showModal(`
       <h2>Options</h2>
       <p class="muted small">Sauvegarde automatique active (navigateur).</p>
       <div class="end-actions">
+        <button class="btn" data-act="open-achievements">★ Succès</button>
         <button class="btn" data-act="toggle-sound">${isMuted() ? "🔇 Son : coupé" : "🔊 Son : activé"}</button>
+        <button class="btn" data-act="toggle-tutorials">${tuto ? "Guides : activés" : "Guides : désactivés"}</button>
         <button class="btn danger" data-act="reset-save">Nouvelle partie</button>
         <button class="btn" data-act="close-modal">Fermer</button>
       </div>
     `);
+  },
+  "open-achievements": () => {
+    showModal(renderAchievements(getState()));
+  },
+  "open-guide": () => {
+    // Rouvre le guide de l'onglet courant (ou explique qu'il n'y en a pas).
+    const guide = getGuide(currentTab);
+    if (guide) showModal(renderGuide(currentTab));
+    else toast("Aucun guide pour cet écran.", "info");
+  },
+  "toggle-tutorials": () => {
+    const state = getState();
+    if (!state) return;
+    if (!state.tutorials) state.tutorials = { seen: {}, enabled: true };
+    state.tutorials.enabled = state.tutorials.enabled === false ? true : false;
+    save();
+    handlers["open-options"]();
   },
   "toggle-sound": () => {
     const state = getState();

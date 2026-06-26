@@ -318,6 +318,17 @@ a { color: var(--gold); }
 .zone-chip .zone-done { color: var(--good); }
 .zone-chip .lock { font-size: 0.72rem; }
 
+/* Guides, succès, quêtes — Lot 12 */
+.help-btn { font-weight: 700; }
+.guide-list { margin: 8px 0; padding-left: 18px; line-height: 1.5; }
+.guide-list li { margin: 6px 0; }
+.ach-list { list-style: none; padding: 0; margin: 4px 0 10px; display: flex; flex-direction: column; gap: 6px; }
+.ach { display: flex; gap: 8px; align-items: flex-start; opacity: 0.6; }
+.ach.done { opacity: 1; }
+.ach-mark { color: var(--gold); font-size: 1rem; line-height: 1.2; }
+.obj.active { color: var(--text); }
+.obj-hint { display: block; margin-left: 22px; font-size: 0.78rem; color: var(--gold); }
+
 /* Familiers — Lot 11 */
 .egg-list { display: flex; flex-wrap: wrap; gap: 10px; }
 .egg-card { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid var(--border-soft); border-radius: 10px; background: rgba(0,0,0,0.18); }

@@ -21,7 +21,7 @@ export const SAVE_KEY = "idle_rpg_save_v1";
 // Copie de sécurité écrite AVANT toute migration : si une migration tournait mal
 // dans une future version, on garde une trace de la sauvegarde d'origine.
 export const BACKUP_KEY = "idle_rpg_save_backup";
-export const SAVE_VERSION = 8;
+export const SAVE_VERSION = 9;
 
 let state = null;
 
@@ -82,6 +82,9 @@ export function newGame(name, classId) {
     // Familiers (Lot 11) : collection, œufs, équipé, essence. Un œuf commun offert
     // pour découvrir le système.
     familiars: { owned: {}, eggs: { common: 1 }, equipped: null, essence: 0 },
+    // Guides contextuels vus + succès notifiés (Lot 12).
+    tutorials: { seen: {}, enabled: true },
+    achievements: { seen: {} },
     flags: { bossDefeated: false },
     objectives: {
       woodcut: false,
@@ -190,6 +193,15 @@ function migrate(parsed) {
       if (!Object.keys(f.eggs).length && !Object.keys(f.owned).length) f.eggs.common = 1;
     }
     parsed.version = 8;
+  }
+  // v8 -> v9 : guides contextuels + succès (notifications une fois).
+  if (parsed.version === 8) {
+    if (!parsed.tutorials) parsed.tutorials = { seen: {}, enabled: true };
+    if (!parsed.tutorials.seen) parsed.tutorials.seen = {};
+    if (parsed.tutorials.enabled === undefined) parsed.tutorials.enabled = true;
+    if (!parsed.achievements) parsed.achievements = { seen: {} };
+    if (!parsed.achievements.seen) parsed.achievements.seen = {};
+    parsed.version = 9;
   }
   return parsed.version === SAVE_VERSION ? parsed : null;
 }

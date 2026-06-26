@@ -202,6 +202,9 @@ sont rafraîchis de façon ciblée. **Contrainte forte à préserver.**
 11. ✅ Familiers (collection, œufs, lien, soutien léger en combat + arène, écran
    dédié, 11 SVG). Migration v7→v8. Tests : 8 cas (distribution, doublons,
    équipement, lien, plafond d'XP, passif en combat).
+12. ✅ Guides contextuels (1×/système, réouvrables, désactivables), quêtes de
+   découverte (récompenses, indices adaptés à la classe), succès/badges (14,
+   évalués en direct). Migration v8→v9. Tests : 8 cas.
 10. 2 nouvelles zones, 5 ennemis chacune, boss à phases.
 11. Familiers (première version complète).
 12. Guides contextuels, quêtes de découverte, succès.

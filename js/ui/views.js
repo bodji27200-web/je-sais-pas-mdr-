@@ -28,7 +28,10 @@ import { specsForClass, SPEC_UNLOCK_LEVEL } from "../data/specializations.js";
 import { charXpToNext, jobXpToNext } from "../core/progression.js";
 import { activityProgress, activityRemainingMs, activeTier } from "../systems/jobs.js";
 import { craftableTimes, canCraft } from "../systems/crafting.js";
-import { OBJECTIVES } from "../systems/objectives.js";
+import { OBJECTIVES, objectiveHint, rewardLabel } from "../systems/objectives.js";
+import { getGuide } from "../data/guides.js";
+import { evaluateAchievements, unlockedCount } from "../systems/achievements.js";
+import { ACHIEVEMENTS } from "../data/achievements.js";
 
 const STAT_LABELS = { maxHp: "PV max", atk: "Attaque", def: "Défense", spd: "Vitesse", crit: "Critique" };
 const STAT_ICONS = { maxHp: "❤️", atk: "⚔️", def: "🛡️", spd: "💨", crit: "🎯" };
@@ -82,13 +85,20 @@ function classEmoji(id) {
 export function renderObjectives(state) {
   const o = state.objectives || {};
   if (OBJECTIVES.every((ob) => o[ob.id])) return ""; // tout accompli -> on masque
+  // La première quête non accomplie reçoit un indice (comment la réussir).
+  const firstOpen = OBJECTIVES.find((ob) => !o[ob.id]);
   const items = OBJECTIVES.map((ob) => {
     const done = !!o[ob.id];
-    return `<li class="obj ${done ? "done" : ""}"><span class="obj-mark">${done ? "✓" : "○"}</span>${esc(ob.label)}</li>`;
+    const active = ob === firstOpen;
+    const rl = rewardLabel(ob.reward);
+    return `<li class="obj ${done ? "done" : ""}${active ? " active" : ""}">
+        <span class="obj-mark">${done ? "✓" : "○"}</span>${esc(ob.label)}${rl ? ` <span class="muted small">(${esc(rl)})</span>` : ""}
+        ${active ? `<span class="obj-hint">${esc(objectiveHint(state, ob.id))}</span>` : ""}
+      </li>`;
   }).join("");
   return `
     <div class="objectives-card">
-      <span class="obj-title">⚜ Premiers pas</span>
+      <span class="obj-title">⚜ Quêtes de découverte</span>
       <ul class="obj-list">${items}</ul>
     </div>`;
 }
@@ -739,6 +749,44 @@ export function renderInventory(state) {
       <h3 class="section-title">Équipement</h3>
       <div class="gear-list">${eqHtml}</div>
     </section>`;
+}
+
+// ---------------------------------------------------------------------------
+// Guides contextuels & Succès (Lot 12)
+// ---------------------------------------------------------------------------
+export function renderGuide(guideId) {
+  const g = getGuide(guideId);
+  if (!g) return "";
+  const lines = g.lines.map((l) => `<li>${esc(l)}</li>`).join("");
+  return `
+    <h2>Guide — ${esc(g.title)}</h2>
+    <ul class="guide-list">${lines}</ul>
+    <p class="muted small">Tu peux rouvrir ce guide via le bouton d'aide, ou désactiver les guides dans les options.</p>
+    <div class="end-actions"><button class="btn primary" data-act="close-modal">Compris</button></div>`;
+}
+
+export function renderAchievements(state) {
+  const list = evaluateAchievements(state);
+  const cats = [...new Set(ACHIEVEMENTS.map((a) => a.cat))];
+  const sections = cats
+    .map((cat) => {
+      const rows = list
+        .filter((a) => a.cat === cat)
+        .map((a) => {
+          const pr = a.progress && !a.unlocked ? ` <span class="muted small">(${a.progress.cur}/${a.progress.max})</span>` : "";
+          return `<li class="ach ${a.unlocked ? "done" : ""}">
+              <span class="ach-mark">${a.unlocked ? "★" : "☆"}</span>
+              <span><strong>${esc(a.name)}</strong>${a.badge ? ' <span class="tag tiny">Badge</span>' : ""}${pr}<br><span class="muted small">${esc(a.desc)}</span></span>
+            </li>`;
+        })
+        .join("");
+      return `<h3 class="section-title">${esc(cat)}</h3><ul class="ach-list">${rows}</ul>`;
+    })
+    .join("");
+  return `
+    <h2>Succès — ${unlockedCount(state)}/${ACHIEVEMENTS.length}</h2>
+    ${sections}
+    <div class="end-actions"><button class="btn" data-act="close-modal">Fermer</button></div>`;
 }
 
 // ---------------------------------------------------------------------------
