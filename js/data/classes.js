@@ -32,8 +32,8 @@ export const CLASSES = {
     desc:
       "Meilleure défense de base et beaucoup de PV, mais attaque et vitesse " +
       "faibles. Spécialisé dans la réduction des dégâts et la provocation.",
-    baseStats: { hp: 165, atk: 9, def: 15, spd: 7, crit: 3 },
-    growth: { hp: 27, atk: 2, def: 3.2, spd: 0.5, crit: 0.1 },
+    baseStats: { hp: 165, atk: 12, def: 15, spd: 7, crit: 3 },
+    growth: { hp: 27, atk: 2.6, def: 3.2, spd: 0.5, crit: 0.1 },
     skills: ["shield_bash", "taunt_guard"],
     passive: "living_armor",
     weapons: ["sword", "mace", "spear", "shield"],
