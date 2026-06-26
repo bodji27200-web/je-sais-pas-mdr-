@@ -29,10 +29,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Assemble site (exclut .git / .github)
+      - name: Assemble site (exclut .git / .github / outils de dev)
         run: |
           mkdir -p _site
-          rsync -a --exclude='.git' --exclude='.github' --exclude='_site' ./ _site/
+          rsync -a \
+            --exclude='.git' --exclude='.github' --exclude='_site' \
+            --exclude='tests' --exclude='node_modules' \
+            --exclude='package.json' --exclude='package-lock.json' \
+            ./ _site/
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

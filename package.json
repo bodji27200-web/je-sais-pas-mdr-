@@ -1,0 +1,10 @@
+{
+  "name": "les-royaumes-oublies",
+  "version": "0.1.0",
+  "description": "Idle RPG fantasy jouable dans le navigateur (site statique). Ce package.json ne sert qu'aux tests logiques (Node natif, aucune dépendance).",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  }
+}

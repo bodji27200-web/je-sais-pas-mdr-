@@ -1,0 +1,138 @@
+# Architecture & Audit technique
+
+> Document de référence du chantier « RPG idle stratégique ». Décrit l'état réel
+> du dépôt, les systèmes existants et les points d'extension. Mis à jour à chaque
+> lot. **Lot 1 — audit initial.**
+
+## Vue d'ensemble
+
+Jeu **100 % statique** (HTML + CSS + modules ES, aucun build). Déployé sur GitHub
+Pages. Architecture **data-driven** : le contenu vit dans `js/data/*.js`, le moteur
+dans `js/core` et `js/systems`, le rendu dans `js/ui`. Ajouter du contenu = éditer
+des données, sans toucher au moteur.
+
+```
+index.html              Point d'entrée (charge js/main.js en module)
+css/styles.css          Thème dark fantasy (787 lignes) — NE PAS refaire
+js/
+  data/                 CONTENU pur (objets + getters)
+    classes.js          5 classes jouables (stats de base, croissance, armes, passive)
+    skills.js           Compétences joueur/ennemi/spécialisation (actives + passives)
+    specializations.js  15 voies (3/classe, niv. 10) : statMods, passive, grants, mastery
+    jobs.js             2 métiers (bûcheronnage, minage) — actions chronométrées
+    resources.js        11 ressources (matières, intermédiaires, butin)
+    equipment.js        25 équipements (armes par classe + 3 familles d'armure)
+    recipes.js          Recettes (4 stations : forge/tannerie/couture/joaillerie)
+    enemies.js          4 ennemis + 1 boss (Forêt des Murmures)
+    zones.js            1 zone avec progression ordonnée + déblocage du boss
+    rarities.js         5 raretés (commun -> légendaire), poids + sensibilité chance
+  core/                 Moteur transverse
+    state.js            État global, sauvegarde localStorage, MIGRATIONS (v1->v3)
+    character.js        Stats dérivées, équipement, sets, spécialisation, XP perso
+    items.js            Instances uniques d'objets, raretés, variance, loot
+    progression.js      Courbes d'XP (perso + métier), applyXp, rollAmount
+    audio.js            Sons synthétisés (WebAudio) — navigateur uniquement
+  systems/              Règles de jeu
+    jobs.js             Récolte idle + rattrapage hors-ligne (plafond 8 h)
+    crafting.js         Craft instantané (vérif. prérequis, conso, production)
+    combat.js           Combat tour par tour, INITIATIVE par vitesse, IA de scoring
+    gear.js             Renforcement (+0..+5) et démantèlement
+    objectives.js       Mini-checklist de découverte (5 objectifs one-way)
+    zoneprog.js         Déblocage ordonné des ennemis/boss, % de zone
+  ui/
+    dom.js              Helpers (esc, sigil PNG->SVG->emoji, bar, toast, modal)
+    views.js            Rendu HTML des écrans (716 lignes)
+  main.js               Contrôleur : navigation, boucle (500 ms), délégation de clics
+assets/                 SVG livrés + surcharge PNG (chemins dans data/*.js)
+tests/                  Tests logiques (Node natif, sans dépendance) — AJOUTÉ Lot 1
+```
+
+## Boucle de jeu
+
+`main.js` lance `setInterval(tick, 500)`. Chaque tick :
+1. `processActivity` complète les cycles de récolte écoulés (même en combat).
+2. Vérifie objectifs + déblocage de spécialisation.
+3. Régénère les PV hors combat.
+4. **Mise à jour DOM CIBLÉE** (`updateTick`) : largeurs de barres + textes, JAMAIS
+   de recréation d'`<img>` (sinon scintillement). Sauvegarde tous les 6 ticks (3 s).
+
+Le combat est piloté au clic : `resolveRound` joue l'action du joueur puis les
+tours dus de l'ennemi. L'arène est rendue **une fois** ; barres/log/contrôles
+sont rafraîchis de façon ciblée. **Contrainte forte à préserver.**
+
+## Systèmes — état actuel et limites
+
+### Statistiques (`character.js`)
+- 5 stats : `hp, atk, def, spd, crit`. Dérivées = base classe + croissance×(niv-1)
+  + équipement (instancié) + bonus de set 3 pièces + passive de classe + spé.
+- Défense : rendements décroissants `def/(def+90)`, plafond 75 % (`combat.js`).
+- **Limite** : pas de stats secondaires nommées (précision, esquive, résistances),
+  pas de répartition lisible « base / équipement / classe » dans l'UI.
+
+### Vitesse & initiative (`combat.js`)
+- Système `nextAt` : `nextAt += 100/spd` après chaque action. Le plus petit agit.
+  Plafond `MAX_CONSEC = 2` actions consécutives. **Déjà borné** — bonne base.
+- **Limite** : pas d'aperçu de l'ordre des tours, pas de réduction de recharge
+  liée à la vitesse.
+
+### Métiers (`jobs.js` + `data/jobs.js`)
+- Une activité active à la fois ; cycles chronométrés, hors-ligne plafonné 8 h à
+  **100 %** d'efficacité.
+- **Limite majeure (Lot 2/3)** : chaque métier expose plusieurs actions comme des
+  boutons permanents (ex. « bois tendre » + « chêne ») au lieu d'une activité
+  principale évolutive. Seulement 2 métiers, pas de transformation (fonte/forge
+  comme métiers), pas de courbe 1..100, pas de paliers de ressources, pas d'outils.
+
+### Combat & IA (`combat.js`)
+- DoT (poison/saignement), buffs/debuffs, garde, bouclier, soin, vol de vie,
+  passives dynamiques (execute, lowHpAtk, vsDebuff, skillPower).
+- IA par **scoring situationnel** (soin si bas, burst pour achever, ne double pas
+  un DoT actif…). Bonne base à étendre.
+- **Limite** : pas d'éléments, pas d'états élémentaires, pas de ressources de
+  classe (mana/rage…), cooldowns à rééquilibrer, boss = panoplie sans phases.
+
+### Équipement & raretés (`items.js`, `rarities.js`)
+- Instances uniques : `{uid, baseId, rarity, stats, lvl}`. Rareté = multiplicateur
+  global des stats + variance ±8 %. Renforcement +0..+5 (×4 %/niv).
+- **Limite (Lot 5/19)** : la rareté multiplie TOUTES les stats au lieu de piloter
+  des **affixes**. Familles d'armure = bonus de set 3 pièces, mais pas de passif
+  intrinsèque ni de bonus de seuil hybrides (2/4 pièces).
+
+### Sauvegarde (`state.js`)
+- `SAVE_VERSION = 3`. Migrations v1->v2 (équipement empilé -> instances), v2->v3
+  (spécialisations). **Lot 1 a ajouté** : copie de sécurité (`BACKUP_KEY`) écrite
+  avant migration ; la migration n'écrase l'original que si elle aboutit ; une
+  sauvegarde corrompue ne casse pas et n'est pas écrasée.
+
+## Contraintes à NE PAS casser (rappel)
+- Style visuel, thème, **arène de combat** (petits personnages espacés, dash,
+  impacts, retours en place, anti-scintillement). Pas de re-render global.
+- Pas de carte du monde. Pas de refonte CSS. Pas d'emoji comme icône finale
+  (réutiliser/créer des SVG). Compat mobile + navigateur Xbox (paysage).
+- Sauvegardes préservées : toute évolution de schéma = nouvelle version + migration.
+
+## Tests (ajout Lot 1)
+- Lanceur **Node natif** (`node --test`), zéro dépendance. `npm test`.
+- Couverture initiale : courbes d'XP, distribution des raretés (50 000 tirages,
+  graine reproductible), métiers (cycles + hors-ligne plafonné), combat
+  (déterminisme sous graine, terminaison, 5 classes), sauvegarde (migration v1,
+  copie de sécurité, robustesse à la corruption).
+- Helper `withSeed(seed, fn)` : remplace temporairement `Math.random` par un PRNG
+  mulberry32 pour des tests déterministes sans réécrire le moteur.
+
+## Plan des lots
+1. ✅ Audit, sécurité de sauvegarde, infrastructure de tests, doc.
+2. Métiers : une activité principale évolutive par métier.
+3. Courbe 1..100, paliers de ressources, hors-ligne équilibré (<100 %).
+4. Atelier : organisation fonctionnelle + cohérence des recettes.
+5. Matériaux d'armure : passifs intrinsèques + bonus hybrides 2/4 + comparaison.
+6. Stats lisibles (base/équip/classe), Vitesse documentée, rendements décroissants.
+7. Éléments, résistances, états.
+8. Ressources de classe, cooldowns, rééquilibrage des compétences.
+9. Audit/équilibrage des 15 spécialisations (simulateur).
+10. 2 nouvelles zones, 5 ennemis chacune, boss à phases.
+11. Familiers (première version complète).
+12. Guides contextuels, quêtes de découverte, succès.
+13. Serveur + groupe privé réel (2 joueurs).
+14. Chat de groupe + combat coopératif synchronisé.
+15. Premier boss mondial coopératif.

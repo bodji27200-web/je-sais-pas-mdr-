@@ -5,7 +5,10 @@
 import { getClass } from "../data/classes.js";
 import { makeInstance } from "./items.js";
 
-const SAVE_KEY = "idle_rpg_save_v1";
+export const SAVE_KEY = "idle_rpg_save_v1";
+// Copie de sécurité écrite AVANT toute migration : si une migration tournait mal
+// dans une future version, on garde une trace de la sauvegarde d'origine.
+export const BACKUP_KEY = "idle_rpg_save_backup";
 export const SAVE_VERSION = 3;
 
 let state = null;
@@ -114,9 +117,24 @@ export function load() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
-    const parsed = migrate(JSON.parse(raw));
-    if (!parsed) return null;
+    const parsedRaw = JSON.parse(raw);
+
+    // Sécurité : si la sauvegarde est plus ancienne que la version courante, on
+    // en écrit une copie de secours AVANT de migrer. La migration n'écrase
+    // jamais l'original tant qu'elle n'a pas abouti (voir plus bas).
+    if (parsedRaw && parsedRaw.version !== SAVE_VERSION) {
+      try {
+        localStorage.setItem(BACKUP_KEY, raw);
+      } catch (e) {
+        /* le manque d'espace ne doit pas bloquer le chargement */
+      }
+    }
+
+    const parsed = migrate(parsedRaw);
+    if (!parsed) return null; // migration impossible : l'original reste intact.
     state = parsed;
+    // On ne réécrit la sauvegarde migrée que si la migration a réellement abouti.
+    if (parsedRaw.version !== SAVE_VERSION) save();
     return state;
   } catch (e) {
     console.error("Échec du chargement de la sauvegarde", e);
