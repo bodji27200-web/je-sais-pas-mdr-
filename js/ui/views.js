@@ -457,25 +457,47 @@ function zoneForEnemy(enemyId) {
   return allZones()[0];
 }
 
-// Un combattant posé dans la scène. `side` : "hero" (gauche) / "enemy" (droite).
-// Couches : .fighter (déplacement attaquant) > .fighter-sprite (recul/flash)
-// > .sprite-anim (idle). Le sprite « pose » les pieds sur le sol du décor.
-function renderFighter(side, spritePath, emoji) {
+// Image d'un combattant avec secours PNG -> SVG -> emoji.
+// L'emoji n'est qu'un secours : dès que l'image charge, on le masque (classe
+// `img-ok`) pour qu'UN SEUL visuel soit affiché (corrige les sprites empilés).
+function fighterImg(path) {
+  if (!path) return "";
+  const svg = path.replace(/\.(png|jpe?g|webp)$/i, ".svg");
+  const onload = "this.closest('.fighter-sprite').classList.add('img-ok')";
+  const onerr =
+    svg !== path
+      ? `if(!this.dataset.alt){this.dataset.alt=1;this.src='${esc(svg)}';}else{this.remove();}`
+      : "this.remove()";
+  return `<img class="sprite-img" src="${esc(path)}" alt="" draggable="false" onload="${onload}" onerror="${onerr}" />`;
+}
+
+// Barre de vie rattachée à un combattant (au-dessus de sa tête).
+// idbase : "player" / "enemy". Reste fixe pendant le dash (hors .fighter-move).
+function renderHpBar(idbase, c) {
   return `
-    <div class="fighter ${side}" id="bt-${side}">
-      <div class="fighter-sprite">
-        <span class="sprite-emoji">${emoji || "❔"}</span>
-        <div class="sprite-anim">${chainImg(spritePath, "sprite-img", "this.style.display='none'")}</div>
+    <div class="fighter-hp ${idbase}">
+      <div class="fighter-hp-track">
+        <div class="fighter-hp-fill ${idbase}" id="bt-${idbase}-fill" style="width:${pct(c.hp, c.maxHp)}%"></div>
       </div>
+      <span class="fighter-hp-text" id="bt-${idbase}-num">${fmt(c.hp)}/${fmt(c.maxHp)}</span>
     </div>`;
 }
 
-// Grosse barre de vie en pilule (style SimpleMMO). idbase : "player" / "enemy".
-function renderHpPill(idbase, c) {
+// Un combattant posé dans la scène. `side` : "hero" (gauche) / "enemy" (droite).
+// Couches : .fighter (ancrage + barre de PV fixe) > .fighter-move (dash de
+// l'attaquant) > .fighter-sprite (recul/flash) > .sprite-anim (idle).
+// Le sprite « pose » les pieds sur le sol du décor ; une ombre suit ses pieds.
+function renderFighter(side, spritePath, emoji, hpC, idbase, isBoss) {
   return `
-    <div class="hp-pill ${idbase}">
-      <div class="hp-pill-fill ${idbase}" id="bt-${idbase}-fill" style="width:${pct(c.hp, c.maxHp)}%"></div>
-      <span class="hp-pill-text" id="bt-${idbase}-num">${fmt(c.hp)}/${fmt(c.maxHp)}</span>
+    <div class="fighter ${side}${isBoss ? " boss" : ""}" id="bt-${side}">
+      ${renderHpBar(idbase, hpC)}
+      <div class="fighter-move">
+        <div class="fighter-shadow"></div>
+        <div class="fighter-sprite">
+          <span class="sprite-emoji">${emoji || "❔"}</span>
+          <div class="sprite-anim">${fighterImg(spritePath)}</div>
+        </div>
+      </div>
     </div>`;
 }
 
@@ -497,12 +519,8 @@ export function renderBattle(state, combat) {
       <div class="arena" id="bt-arena">
         ${chainImg(bg, "arena-bg-img", "this.remove()")}
         <div class="arena-stage">
-          ${renderFighter("hero", heroClass.sprite, classEmoji(heroClass.id))}
-          ${renderFighter("enemy", e.sprite, e.icon)}
-        </div>
-        <div class="arena-hp">
-          ${renderHpPill("player", p)}
-          ${renderHpPill("enemy", e)}
+          ${renderFighter("hero", heroClass.sprite, classEmoji(heroClass.id), p, "player", false)}
+          ${renderFighter("enemy", e.sprite, e.icon, e, "enemy", e.isBoss)}
         </div>
       </div>
       <div id="bt-controls">${renderBattleControls(state, combat)}</div>

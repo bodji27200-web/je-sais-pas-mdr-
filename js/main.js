@@ -59,6 +59,10 @@ let currentCombat = null;
 let selectedClassId = null;
 let lastTick = Date.now();
 let tickCount = 0;
+// Pendant qu'une animation de tour joue, on bloque les clics (évite de
+// superposer / casser les dash ; chaque perso revient pile à sa place).
+let combatBusy = false;
+let combatBusyTimer = null;
 
 // --- Rendu ------------------------------------------------------------------
 
@@ -131,14 +135,16 @@ function animateRound(combat) {
   for (const a of combat.lastActions || []) {
     const f = document.getElementById(a.actor === "player" ? "bt-hero" : "bt-enemy");
     if (!f) continue;
+    const move = f.querySelector(".fighter-move"); // couche de déplacement (dash)
     const dir = a.actor === "player" ? "right" : "left";
     if (a.isBuff || a.anim === "buff") {
-      pulseClass(f, "anim-buff", 760);
+      // Cri de guerre : aura + pulsation sur place (aucun déplacement).
+      pulseClass(f, "anim-buff", 800);
     } else if (a.anim === "heavy") {
-      pulseClass(f, "atk-heavy-" + dir, 560);
-      if (arena) pulseClass(arena, "arena-shake", 320);
-    } else {
-      pulseClass(f, "atk-dash-" + dir, 440);
+      if (move) pulseClass(move, "atk-heavy-" + dir, 620);
+      if (arena) pulseClass(arena, "arena-shake", 340);
+    } else if (move) {
+      pulseClass(move, "atk-dash-" + dir, 500);
     }
   }
 
@@ -158,6 +164,24 @@ function animateRound(combat) {
 
   combat.lastActions = [];
   combat.lastFx = [];
+}
+
+// Verrouille les compétences le temps de l'animation du tour (anti-spam).
+// Durée alignée sur l'anim la plus longue (frappe lourde + recul) ; quasi nulle
+// si l'utilisateur a désactivé les animations.
+function lockCombat() {
+  const reduced =
+    window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const ms = reduced ? 120 : 720;
+  combatBusy = true;
+  const bar = document.querySelector(".skill-bar");
+  if (bar) bar.classList.add("locked");
+  clearTimeout(combatBusyTimer);
+  combatBusyTimer = setTimeout(() => {
+    combatBusy = false;
+    const b = document.querySelector(".skill-bar");
+    if (b) b.classList.remove("locked");
+  }, ms);
 }
 
 // Vérifie les objectifs et notifie ceux nouvellement accomplis.
@@ -352,17 +376,21 @@ const handlers = {
   fight: (el) => {
     const state = getState();
     if (state.character.hpCurrent < 1) state.character.hpCurrent = 1;
+    clearTimeout(combatBusyTimer);
+    combatBusy = false; // repart propre (au cas où on relance pendant une anim)
     currentCombat = startCombat(state, el.dataset.id);
     renderAll();
   },
   skill: (el) => {
     if (!currentCombat || currentCombat.status !== "active") return;
+    if (combatBusy) return; // une animation joue déjà : on ignore le clic
     resolveRound(getState(), currentCombat, el.dataset.id);
     checkObjectives();
     save();
     if (currentCombat.status === "active") {
       // Combat en cours : mise à jour ciblée (portraits intacts -> pas de flash).
       updateBattle(getState(), currentCombat);
+      lockCombat();
     } else {
       // Fin du combat : transition vers l'écran de victoire/défaite (rendu complet).
       if (currentCombat.status === "won") playWin();
