@@ -24,6 +24,9 @@ import {
 } from "./systems/jobs.js";
 import { charXpToNext } from "./core/progression.js";
 import { craft } from "./systems/crafting.js";
+import { upgradeItem, dismantleItem, dismantleReward, needsDismantleConfirm } from "./systems/gear.js";
+import { findEquipmentInstance } from "./core/state.js";
+import { getRarity } from "./data/rarities.js";
 import { startCombat, resolveRound } from "./systems/combat.js";
 import { updateObjectives, ensureObjectives, objectiveLabel } from "./systems/objectives.js";
 import { setMuted, isMuted, playHit, playWin, playLose, playDing } from "./core/audio.js";
@@ -59,6 +62,10 @@ let currentCombat = null;
 let selectedClassId = null;
 let lastTick = Date.now();
 let tickCount = 0;
+// Pendant qu'une animation de tour joue, on bloque les clics (évite de
+// superposer / casser les dash ; chaque perso revient pile à sa place).
+let combatBusy = false;
+let combatBusyTimer = null;
 
 // --- Rendu ------------------------------------------------------------------
 
@@ -131,14 +138,16 @@ function animateRound(combat) {
   for (const a of combat.lastActions || []) {
     const f = document.getElementById(a.actor === "player" ? "bt-hero" : "bt-enemy");
     if (!f) continue;
+    const move = f.querySelector(".fighter-move"); // couche de déplacement (dash)
     const dir = a.actor === "player" ? "right" : "left";
     if (a.isBuff || a.anim === "buff") {
-      pulseClass(f, "anim-buff", 760);
+      // Cri de guerre : aura + pulsation sur place (aucun déplacement).
+      pulseClass(f, "anim-buff", 800);
     } else if (a.anim === "heavy") {
-      pulseClass(f, "atk-heavy-" + dir, 560);
-      if (arena) pulseClass(arena, "arena-shake", 320);
-    } else {
-      pulseClass(f, "atk-dash-" + dir, 440);
+      if (move) pulseClass(move, "atk-heavy-" + dir, 620);
+      if (arena) pulseClass(arena, "arena-shake", 340);
+    } else if (move) {
+      pulseClass(move, "atk-dash-" + dir, 500);
     }
   }
 
@@ -158,6 +167,24 @@ function animateRound(combat) {
 
   combat.lastActions = [];
   combat.lastFx = [];
+}
+
+// Verrouille les compétences le temps de l'animation du tour (anti-spam).
+// Durée alignée sur l'anim la plus longue (frappe lourde + recul) ; quasi nulle
+// si l'utilisateur a désactivé les animations.
+function lockCombat() {
+  const reduced =
+    window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const ms = reduced ? 120 : 720;
+  combatBusy = true;
+  const bar = document.querySelector(".skill-bar");
+  if (bar) bar.classList.add("locked");
+  clearTimeout(combatBusyTimer);
+  combatBusyTimer = setTimeout(() => {
+    combatBusy = false;
+    const b = document.querySelector(".skill-bar");
+    if (b) b.classList.remove("locked");
+  }, ms);
 }
 
 // Vérifie les objectifs et notifie ceux nouvellement accomplis.
@@ -282,6 +309,15 @@ function showOfflineSummary(summary) {
 
 // --- Gestion des actions (délégation de clics) ------------------------------
 
+// Démantèle effectivement une pièce (après confirmation éventuelle).
+function doDismantle(uid) {
+  const r = dismantleItem(getState(), uid);
+  if (!r.ok) return toast(r.error, "warn");
+  toast(`Démantelé : +🪙${r.reward.gold} +✨${r.reward.essence}`, "good");
+  save();
+  renderAll();
+}
+
 const handlers = {
   "pick-class": (el) => {
     selectedClassId = el.dataset.id;
@@ -337,9 +373,9 @@ const handlers = {
     renderAll();
   },
   equip: (el) => {
-    const r = equip(getState(), el.dataset.id);
+    const r = equip(getState(), el.dataset.uid);
     if (!r.ok) return toast(r.error, "warn");
-    toast("Équipé : " + getEquipment(el.dataset.id).name, "good");
+    toast("Équipé : " + (r.name || "objet"), "good");
     save();
     renderAll();
   },
@@ -349,20 +385,58 @@ const handlers = {
     save();
     renderAll();
   },
+  upgrade: (el) => {
+    const r = upgradeItem(getState(), el.dataset.uid);
+    if (!r.ok) return toast(r.error, "warn");
+    toast("Renforcé : +" + r.lvl, "good");
+    playDing();
+    save();
+    renderAll();
+  },
+  dismantle: (el) => {
+    const uid = el.dataset.uid;
+    const inst = findEquipmentInstance(uid);
+    if (!inst) return toast("Objet introuvable.", "warn");
+    // Confirmation pour les pièces rares et au-dessus.
+    if (needsDismantleConfirm(inst)) {
+      const item = getEquipment(inst.baseId);
+      const rar = getRarity(inst.rarity);
+      const dr = dismantleReward(inst);
+      showModal(`
+        <h2>Démanteler ?</h2>
+        <p><strong style="color:${rar.color}">${esc(item.name)}${inst.lvl > 0 ? " +" + inst.lvl : ""}</strong> <span style="color:${rar.color}">(${rar.name})</span></p>
+        <p class="muted">Cette pièce sera détruite définitivement.</p>
+        <p>Tu obtiendras 🪙 ${dr.gold} et ✨ ${dr.essence}.</p>
+        <div class="end-actions">
+          <button class="btn" data-act="close-modal">Annuler</button>
+          <button class="btn primary" data-act="dismantle-confirm" data-uid="${uid}">Démanteler</button>
+        </div>`);
+      return;
+    }
+    doDismantle(uid);
+  },
+  "dismantle-confirm": (el) => {
+    closeModal();
+    doDismantle(el.dataset.uid);
+  },
   fight: (el) => {
     const state = getState();
     if (state.character.hpCurrent < 1) state.character.hpCurrent = 1;
+    clearTimeout(combatBusyTimer);
+    combatBusy = false; // repart propre (au cas où on relance pendant une anim)
     currentCombat = startCombat(state, el.dataset.id);
     renderAll();
   },
   skill: (el) => {
     if (!currentCombat || currentCombat.status !== "active") return;
+    if (combatBusy) return; // une animation joue déjà : on ignore le clic
     resolveRound(getState(), currentCombat, el.dataset.id);
     checkObjectives();
     save();
     if (currentCombat.status === "active") {
       // Combat en cours : mise à jour ciblée (portraits intacts -> pas de flash).
       updateBattle(getState(), currentCombat);
+      lockCombat();
     } else {
       // Fin du combat : transition vers l'écran de victoire/défaite (rendu complet).
       if (currentCombat.status === "won") playWin();
@@ -430,9 +504,11 @@ function onClick(e) {
 // --- Amorçage ---------------------------------------------------------------
 
 function boot() {
-  document.getElementById("app").addEventListener("click", onClick);
+  // Sur `document` (pas seulement #app) pour couvrir aussi #modal, qui est un
+  // sibling de #app : sinon les boutons des modales ne réagissent pas.
+  document.addEventListener("click", onClick);
   // Entrée = valider la création.
-  document.getElementById("app").addEventListener("keydown", (e) => {
+  document.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && e.target.id === "hero-name") handlers["confirm-create"]();
   });
 

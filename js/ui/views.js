@@ -8,6 +8,9 @@ import { getSkill } from "../data/skills.js";
 import { JOBS } from "../data/jobs.js";
 import { RESOURCES, getResource } from "../data/resources.js";
 import { EQUIPMENT, getEquipment, SLOTS, ARMOR_FAMILIES } from "../data/equipment.js";
+import { statScore, effectiveStats, MAX_UPGRADE } from "../core/items.js";
+import { getRarity } from "../data/rarities.js";
+import { upgradeCost, canUpgrade, dismantleReward } from "../systems/gear.js";
 import { RECIPES, STATIONS } from "../data/recipes.js";
 import { ENEMIES, getEnemy } from "../data/enemies.js";
 import { ZONES, allZones } from "../data/zones.js";
@@ -136,18 +139,19 @@ export function renderCharacter(state) {
 
   const slots = Object.keys(SLOTS)
     .map((slot) => {
-      const itemId = ch.equipment[slot];
-      if (!itemId) {
+      const inst = ch.equipment[slot];
+      if (!inst) {
         return `<div class="slot empty"><span class="slot-name">${SLOTS[slot]}</span><span class="muted">— vide —</span></div>`;
       }
-      const item = getEquipment(itemId);
+      const item = getEquipment(inst.baseId);
+      const r = getRarity(inst.rarity);
       return `
-        <div class="slot filled">
+        <div class="slot filled" style="border-left:3px solid ${r.color}">
           ${sigil(item.image, item.icon)}
           <div class="slot-info">
             <span class="slot-name">${SLOTS[slot]}</span>
-            <strong>${esc(item.name)} ${familyTag(item)}</strong>
-            <span class="muted small">${statLine(item.stats)}</span>
+            <div class="gear-title"><strong style="color:${r.color}">${esc(item.name)}</strong>${upgradeSuffix(inst)}${rarityTag(inst)}${familyTag(item)}</div>
+            <span class="muted small">${statLine(effectiveStats(inst))}</span>
           </div>
           <button class="btn tiny" data-act="unequip" data-slot="${slot}">Retirer</button>
         </div>`;
@@ -189,6 +193,11 @@ function familyTag(item) {
   return f ? `<span class="tag" style="border-color:${f.color};color:${f.color}">${f.name}</span>` : "";
 }
 
+function rarityTag(inst) {
+  const r = getRarity(inst.rarity);
+  return `<span class="tag rarity" style="border-color:${r.color};color:${r.color}">${r.name}</span>`;
+}
+
 function statLine(stats) {
   return Object.keys(stats)
     .map((k) => {
@@ -197,6 +206,41 @@ function statLine(stats) {
       return `${v > 0 ? "+" : ""}${v} ${label}`;
     })
     .join(" · ");
+}
+
+const STAT_SHORT = { hp: "PV", atk: "ATK", def: "DEF", spd: "VIT", crit: "CRIT" };
+
+// Badge « +N » de renforcement à côté du nom (rien si +0).
+function upgradeSuffix(inst) {
+  return inst.lvl > 0 ? ` <span class="plus">+${inst.lvl}</span>` : "";
+}
+
+function rc(state, id) {
+  return state.inventory.resources[id] || 0;
+}
+
+// Prévisualisation avant/après des stats qui changent au prochain renforcement.
+function statDiffPreview(inst) {
+  const cur = effectiveStats(inst);
+  const next = effectiveStats({ ...inst, lvl: (inst.lvl || 0) + 1 });
+  return (
+    Object.keys(next)
+      .filter((k) => next[k] !== cur[k])
+      .map((k) => `${STAT_SHORT[k] || k} ${cur[k]}→<strong>${next[k]}</strong>`)
+      .join(" · ") || "—"
+  );
+}
+
+// Coût d'un renforcement, chaque composante rougie si non payable.
+function costLine(state, cost) {
+  const mat = getResource(cost.material.id);
+  const part = (have, need, label) =>
+    `<span class="${have >= need ? "" : "lack"}">${label} ${need}</span>`;
+  return [
+    part(state.gold, cost.gold, "🪙"),
+    part(rc(state, "equip_essence"), cost.essence, "✨"),
+    part(rc(state, cost.material.id), cost.material.qty, `${mat ? mat.icon : "❔"}`),
+  ].join(" · ");
 }
 
 // ---------------------------------------------------------------------------
@@ -332,25 +376,53 @@ export function renderInventory(state) {
         .join("")
     : '<p class="muted">Aucune ressource. Lance un métier !</p>';
 
-  const eqIds = Object.keys(state.inventory.equipment).filter((id) => state.inventory.equipment[id] > 0);
-  const eqHtml = eqIds.length
-    ? eqIds
-        .map((id) => {
-          const item = getEquipment(id);
+  const instances = state.inventory.equipment.slice().sort((a, b) => {
+    const ta = getEquipment(a.baseId), tb = getEquipment(b.baseId);
+    const sa = Object.keys(SLOTS).indexOf(ta?.slot), sb = Object.keys(SLOTS).indexOf(tb?.slot);
+    if (sa !== sb) return sa - sb;
+    const ra = getRarity(a.rarity).rank, rb = getRarity(b.rarity).rank;
+    if (ra !== rb) return rb - ra;
+    return statScore(b.stats) - statScore(a.stats);
+  });
+  const eqHtml = instances.length
+    ? instances
+        .map((inst) => {
+          const item = getEquipment(inst.baseId);
+          if (!item) return "";
+          const r = getRarity(inst.rarity);
           const canEquip = state.character.level >= (item.levelReq || 0);
+          // Flèche d'upgrade : la pièce (renforcement compris) bat-elle l'équipée ?
+          const equipped = state.character.equipment[item.slot];
+          const isUpgrade =
+            canEquip &&
+            statScore(effectiveStats(inst)) > statScore(equipped ? effectiveStats(equipped) : {});
+
+          // Ligne de renforcement : aperçu avant/après + coût, ou « max ».
+          const cost = upgradeCost(inst);
+          const up = canUpgrade(state, inst);
+          const upLine = cost
+            ? `<span class="muted small upgrade-preview">▶ +${inst.lvl}→+${inst.lvl + 1} : ${statDiffPreview(inst)} <span class="cost">(${costLine(state, cost)})</span></span>`
+            : `<span class="muted small">✦ Renforcement max (+${MAX_UPGRADE})</span>`;
+
+          const dr = dismantleReward(inst);
           return `
-            <div class="inv-gear">
+            <div class="inv-gear" style="border-left:3px solid ${r.color}">
               ${sigil(item.image, item.icon)}
               <div class="inv-gear-info">
-                <strong>${esc(item.name)} ${familyTag(item)}</strong>
-                <span class="muted small">${SLOTS[item.slot]} · ${statLine(item.stats)}</span>
-                <span class="muted small">×${state.inventory.equipment[id]}${item.levelReq ? " · Niv. " + item.levelReq : ""}</span>
+                <div class="gear-title"><strong style="color:${r.color}">${esc(item.name)}</strong>${upgradeSuffix(inst)}${rarityTag(inst)}${familyTag(item)}</div>
+                <span class="muted small">${SLOTS[item.slot]} · ${statLine(effectiveStats(inst))}</span>
+                <span class="muted small">${item.levelReq ? "Niv. " + item.levelReq : "Aucun prérequis"}${isUpgrade ? ' · <span class="upgrade">▲ amélioration</span>' : ""}</span>
+                ${upLine}
               </div>
-              <button class="btn tiny ${canEquip ? "primary" : ""}" data-act="equip" data-id="${id}" ${canEquip ? "" : "disabled"}>${canEquip ? "Équiper" : "Niv. " + item.levelReq}</button>
+              <div class="inv-gear-actions">
+                <button class="btn tiny ${canEquip ? "primary" : ""}" data-act="equip" data-uid="${inst.uid}" ${canEquip ? "" : "disabled"}>${canEquip ? "Équiper" : "Niv. " + item.levelReq}</button>
+                <button class="btn tiny" data-act="upgrade" data-uid="${inst.uid}" ${cost && up.ok ? "" : "disabled"} title="${cost ? esc(up.ok ? "Renforcer cette pièce" : up.reason) : "Niveau maximum"}">Améliorer</button>
+                <button class="btn tiny ghost" data-act="dismantle" data-uid="${inst.uid}" title="Démanteler : +🪙${dr.gold} +✨${dr.essence}">Démanteler</button>
+              </div>
             </div>`;
         })
         .join("")
-    : '<p class="muted">Aucun équipement. Forge-en à l\'atelier !</p>';
+    : '<p class="muted">Aucun équipement. Forge-en à l\'atelier ou pille des ennemis !</p>';
 
   return `
     <section class="panel">
@@ -429,7 +501,15 @@ export function renderBattleControls(state, combat) {
   const won = combat.status === "won";
   let rewardHtml = "";
   if (won && combat.rewards) {
-    const drops = combat.rewards.drops.map((d) => `<li>${esc(d.name)} ×${d.qty}</li>`).join("");
+    const drops = combat.rewards.drops
+      .map((d) => {
+        if (d.type === "equipment") {
+          const r = getRarity(d.rarity);
+          return `<li style="color:${r.color}">${esc(d.name)} <span class="tag rarity" style="border-color:${r.color};color:${r.color}">${r.name}</span></li>`;
+        }
+        return `<li>${esc(d.name)} ×${d.qty}</li>`;
+      })
+      .join("");
     rewardHtml = `
       <div class="reward-box">
         <p>+${combat.rewards.xp} XP · +${combat.rewards.gold} 🪙</p>
@@ -457,25 +537,47 @@ function zoneForEnemy(enemyId) {
   return allZones()[0];
 }
 
-// Un combattant posé dans la scène. `side` : "hero" (gauche) / "enemy" (droite).
-// Couches : .fighter (déplacement attaquant) > .fighter-sprite (recul/flash)
-// > .sprite-anim (idle). Le sprite « pose » les pieds sur le sol du décor.
-function renderFighter(side, spritePath, emoji) {
+// Image d'un combattant avec secours PNG -> SVG -> emoji.
+// L'emoji n'est qu'un secours : dès que l'image charge, on le masque (classe
+// `img-ok`) pour qu'UN SEUL visuel soit affiché (corrige les sprites empilés).
+function fighterImg(path) {
+  if (!path) return "";
+  const svg = path.replace(/\.(png|jpe?g|webp)$/i, ".svg");
+  const onload = "this.closest('.fighter-sprite').classList.add('img-ok')";
+  const onerr =
+    svg !== path
+      ? `if(!this.dataset.alt){this.dataset.alt=1;this.src='${esc(svg)}';}else{this.remove();}`
+      : "this.remove()";
+  return `<img class="sprite-img" src="${esc(path)}" alt="" draggable="false" onload="${onload}" onerror="${onerr}" />`;
+}
+
+// Barre de vie rattachée à un combattant (au-dessus de sa tête).
+// idbase : "player" / "enemy". Reste fixe pendant le dash (hors .fighter-move).
+function renderHpBar(idbase, c) {
   return `
-    <div class="fighter ${side}" id="bt-${side}">
-      <div class="fighter-sprite">
-        <span class="sprite-emoji">${emoji || "❔"}</span>
-        <div class="sprite-anim">${chainImg(spritePath, "sprite-img", "this.style.display='none'")}</div>
+    <div class="fighter-hp ${idbase}">
+      <div class="fighter-hp-track">
+        <div class="fighter-hp-fill ${idbase}" id="bt-${idbase}-fill" style="width:${pct(c.hp, c.maxHp)}%"></div>
       </div>
+      <span class="fighter-hp-text" id="bt-${idbase}-num">${fmt(c.hp)}/${fmt(c.maxHp)}</span>
     </div>`;
 }
 
-// Grosse barre de vie en pilule (style SimpleMMO). idbase : "player" / "enemy".
-function renderHpPill(idbase, c) {
+// Un combattant posé dans la scène. `side` : "hero" (gauche) / "enemy" (droite).
+// Couches : .fighter (ancrage + barre de PV fixe) > .fighter-move (dash de
+// l'attaquant) > .fighter-sprite (recul/flash) > .sprite-anim (idle).
+// Le sprite « pose » les pieds sur le sol du décor ; une ombre suit ses pieds.
+function renderFighter(side, spritePath, emoji, hpC, idbase, isBoss) {
   return `
-    <div class="hp-pill ${idbase}">
-      <div class="hp-pill-fill ${idbase}" id="bt-${idbase}-fill" style="width:${pct(c.hp, c.maxHp)}%"></div>
-      <span class="hp-pill-text" id="bt-${idbase}-num">${fmt(c.hp)}/${fmt(c.maxHp)}</span>
+    <div class="fighter ${side}${isBoss ? " boss" : ""}" id="bt-${side}">
+      ${renderHpBar(idbase, hpC)}
+      <div class="fighter-move">
+        <div class="fighter-shadow"></div>
+        <div class="fighter-sprite">
+          <span class="sprite-emoji">${emoji || "❔"}</span>
+          <div class="sprite-anim">${fighterImg(spritePath)}</div>
+        </div>
+      </div>
     </div>`;
 }
 
@@ -497,12 +599,8 @@ export function renderBattle(state, combat) {
       <div class="arena" id="bt-arena">
         ${chainImg(bg, "arena-bg-img", "this.remove()")}
         <div class="arena-stage">
-          ${renderFighter("hero", heroClass.sprite, classEmoji(heroClass.id))}
-          ${renderFighter("enemy", e.sprite, e.icon)}
-        </div>
-        <div class="arena-hp">
-          ${renderHpPill("player", p)}
-          ${renderHpPill("enemy", e)}
+          ${renderFighter("hero", heroClass.sprite, classEmoji(heroClass.id), p, "player", false)}
+          ${renderFighter("enemy", e.sprite, e.icon, e, "enemy", e.isBoss)}
         </div>
       </div>
       <div id="bt-controls">${renderBattleControls(state, combat)}</div>
