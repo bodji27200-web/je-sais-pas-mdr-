@@ -1,31 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 64" width="96" height="128">
-  <!-- Guerrier (flat, propre), face à droite -->
-  <ellipse cx="24" cy="61" rx="15" ry="3.4" fill="#000" opacity="0.18"/>
-  <!-- Bouclier -->
-  <ellipse cx="12.5" cy="37" rx="8" ry="11" fill="#3f5e8c" stroke="#2a3f5e" stroke-width="1.4"/>
-  <ellipse cx="12.5" cy="37" rx="5" ry="7.5" fill="none" stroke="#e0b257" stroke-width="1.6"/>
-  <!-- Jambes + bottes -->
-  <rect x="19" y="45" width="5.5" height="12" rx="2.6" fill="#44597c"/>
-  <rect x="25.5" y="45" width="5.5" height="12" rx="2.6" fill="#3a4d6c"/>
-  <rect x="18.5" y="54" width="7" height="5" rx="2.4" fill="#283a59"/>
-  <rect x="25" y="54" width="7" height="5" rx="2.4" fill="#22324d"/>
-  <!-- Torse -->
-  <rect x="16.5" y="28" width="16" height="20" rx="6" fill="#6d86ab"/>
-  <rect x="19.5" y="31" width="10" height="13" rx="4" fill="#b7c4d6"/>
-  <rect x="16.5" y="43" width="16" height="3.4" rx="1.5" fill="#e0b257"/>
-  <!-- Épaules -->
-  <circle cx="18" cy="30" r="4.4" fill="#44597c"/>
-  <circle cx="31" cy="30" r="4.4" fill="#44597c"/>
-  <!-- Cou / visage -->
-  <rect x="21.5" y="22.5" width="5" height="5" fill="#e7b58a"/>
-  <!-- Casque -->
-  <path d="M16.5 21 a8 8 0 0 1 16 0 v3 h-16 z" fill="#8fa0bb"/>
-  <path d="M16.5 21 a8 8 0 0 1 16 0 v1.4 h-16 z" fill="#b7c4d6"/>
-  <rect x="18" y="20" width="13" height="2.6" rx="1" fill="#26344e"/>
-  <rect x="22.5" y="9" width="3" height="5.5" rx="1.5" fill="#c0414a"/>
-  <!-- Bras avant + épée -->
-  <rect x="29.5" y="33" width="4.5" height="9" rx="2.2" fill="#6d86ab"/>
-  <polygon points="33,7 37,12 35,38 33,38" fill="#d9e0ea"/>
-  <polygon points="33,7 35,11 34,38 33,38" fill="#aeb9c9"/>
-  <rect x="29.5" y="36" width="9.5" height="3.2" rx="1.4" fill="#e0b257"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs><radialGradient id="sh" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#000" stop-opacity="0.45"/><stop offset="100%" stop-color="#000" stop-opacity="0"/></radialGradient></defs>
+  <ellipse cx="128" cy="238" rx="62" ry="12" fill="url(#sh)"/>
+
+  <g transform="rotate(18 170 150)"><rect x="165" y="70" width="10" height="96" rx="3" fill="#d9e2ec" stroke="#8a97a6" stroke-width="2"/><rect x="156" y="162" width="28" height="9" rx="3" fill="#6b5a3a"/><rect x="167" y="168" width="6" height="26" rx="2" fill="#6b5a3a"/></g>
+  <path d="M100 196 L108 132 C112 116 144 116 148 132 L156 196 Z" fill="#8c3b32" stroke="#d8a24a" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M108 132 C112 120 144 120 148 132 L150 150 C140 142 116 142 106 150 Z" fill="#d8a24a" opacity="0.55"/>
+  <rect x="104" y="196" width="18" height="30" rx="5" fill="#8c3b32" stroke="#d8a24a" stroke-width="2"/>
+  <rect x="134" y="196" width="18" height="30" rx="5" fill="#8c3b32" stroke="#d8a24a" stroke-width="2"/>
+  <circle cx="128" cy="80" r="22" fill="#e9c9a8" stroke="#d8a24a" stroke-width="2"/>
+       <path d="M106 78 C106 56 150 56 150 78 L150 70 C150 50 106 50 106 70 Z" fill="#8c3b32" stroke="#d8a24a" stroke-width="2"/>
+       <circle cx="121" cy="80" r="4.5" fill="#1a1a22"/><circle cx="135" cy="80" r="4.5" fill="#1a1a22"/>
 </svg>

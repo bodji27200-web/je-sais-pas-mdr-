@@ -370,8 +370,9 @@ a { color: var(--gold); }
 .link-pip.on { background: var(--gold); border-color: var(--gold); }
 
 /* Familier dans l'arène : petit, près du héros, espacé (anti-scintillement). */
-.familiar-pet { position: absolute; left: 8%; bottom: 6%; transform: scale(0.52); transform-origin: bottom center; opacity: 0.96; pointer-events: none; }
-.familiar-pet .fighter-sprite { width: 96px; height: 96px; }
+/* Familier : à GAUCHE et en AVANT du héros (premier plan), nettement séparé. */
+.familiar-pet { position: absolute; left: 4%; bottom: 5%; width: auto; transform: scale(0.5); transform-origin: bottom center; opacity: 0.97; pointer-events: none; z-index: 3; }
+.familiar-pet .fighter-sprite { width: 86px; height: 86px; }
 .fighter-shadow.small { transform: scale(0.6); opacity: 0.5; }
 
 /* Intention télégraphiée du boss — Lot 10 */

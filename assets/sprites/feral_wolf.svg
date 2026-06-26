@@ -1,24 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="128" height="96">
-  <!-- Loup (flat, propre), face à droite -->
-  <ellipse cx="32" cy="44" rx="24" ry="3.4" fill="#000" opacity="0.18"/>
-  <!-- Queue -->
-  <path d="M8 22 Q1 18 4 28 Q9 26 13 30 Z" fill="#5b626c"/>
-  <!-- Pattes -->
-  <rect x="14" y="32" width="5" height="10" rx="2.4" fill="#4d545e"/>
-  <rect x="22" y="32" width="5" height="10" rx="2.4" fill="#5b626c"/>
-  <rect x="38" y="32" width="5" height="10" rx="2.4" fill="#4d545e"/>
-  <rect x="46" y="32" width="5" height="10" rx="2.4" fill="#5b626c"/>
-  <!-- Corps -->
-  <ellipse cx="30" cy="24" rx="20" ry="11" fill="#6a727e"/>
-  <ellipse cx="30" cy="28" rx="18" ry="7" fill="#828a96"/>
-  <!-- Tête -->
-  <circle cx="49" cy="22" r="9" fill="#6a727e"/>
-  <!-- Oreille -->
-  <path d="M46 13 L50 7 L53 15 Z" fill="#5b626c"/>
-  <!-- Museau -->
-  <path d="M55 20 Q63 21 62 26 Q57 27 54 25 Z" fill="#5b626c"/>
-  <circle cx="61" cy="24" r="1.8" fill="#1b1f24"/>
-  <!-- Œil -->
-  <circle cx="50" cy="21" r="2.2" fill="#ffd24a"/>
-  <circle cx="50.6" cy="21" r="1" fill="#1b1f24"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs><radialGradient id="sh" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#000" stop-opacity="0.45"/><stop offset="100%" stop-color="#000" stop-opacity="0"/></radialGradient></defs>
+  <ellipse cx="128" cy="238" rx="62" ry="12" fill="url(#sh)"/>
+
+  <ellipse cx="128" cy="150" rx="60" ry="40" fill="#2b3742" stroke="#5a6b78" stroke-width="4"/>
+  <circle cx="90" cy="112" r="30" fill="#2b3742" stroke="#5a6b78" stroke-width="4"/>
+  <polygon points="66,90 74,60 90,86" fill="#2b3742" stroke="#5a6b78" stroke-width="3"/>
+  <polygon points="110,86 100,60 116,84" fill="#2b3742" stroke="#5a6b78" stroke-width="3"/>
+  <polygon points="78,120 92,128 78,134" fill="#0a0a0f"/>
+  <g stroke="#5a6b78" stroke-width="6" stroke-linecap="round"><path d="M104 186 v12"/><path d="M134 188 v12"/><path d="M162 182 v12"/></g>
+  <path d="M184 142 q28 -8 26 -34" fill="none" stroke="#5a6b78" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="82" cy="106" r="4.5" fill="#ffd24a"/><circle cx="102" cy="106" r="4.5" fill="#ffd24a"/>
 </svg>

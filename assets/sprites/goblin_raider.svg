@@ -1,31 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 64" width="96" height="128">
-  <!-- Gobelin pillard (flat, propre), face à droite -->
-  <ellipse cx="24" cy="61" rx="13" ry="3.2" fill="#000" opacity="0.18"/>
-  <!-- Jambes -->
-  <rect x="18" y="46" width="5" height="11" rx="2.4" fill="#4d722f"/>
-  <rect x="24" y="46" width="5" height="11" rx="2.4" fill="#446628"/>
-  <rect x="17.5" y="54" width="6.5" height="5" rx="2.2" fill="#2c1c12"/>
-  <rect x="24" y="54" width="6.5" height="5" rx="2.2" fill="#241710"/>
-  <!-- Pagne -->
-  <path d="M16 40 h16 l-2 9 h-12 z" fill="#6b4a2a"/>
-  <!-- Torse -->
-  <rect x="16.5" y="30" width="15" height="13" rx="6" fill="#6f9544"/>
-  <ellipse cx="24" cy="35" rx="5" ry="5" fill="#7fae54"/>
-  <!-- Bras -->
-  <rect x="13" y="31" width="4.5" height="10" rx="2.2" fill="#5c8038"/>
-  <rect x="30.5" y="31" width="4.5" height="9" rx="2.2" fill="#6f9544"/>
-  <!-- Dague -->
-  <polygon points="35,17 38,20 36.5,33 34.5,33" fill="#cfd6e0"/>
-  <rect x="32.5" y="32" width="6" height="2.6" rx="1.2" fill="#8a6d2f"/>
-  <!-- Tête -->
-  <circle cx="24" cy="22" r="8.5" fill="#7fae54"/>
-  <!-- Oreilles -->
-  <path d="M16 21 L7 17 L16 27 Z" fill="#6f9544"/>
-  <path d="M32 21 L41 17 L32 27 Z" fill="#6f9544"/>
-  <!-- Yeux + nez + croc -->
-  <circle cx="26" cy="21" r="2" fill="#ffd84a"/>
-  <circle cx="26.5" cy="21" r="0.9" fill="#241500"/>
-  <circle cx="21" cy="21.5" r="1.4" fill="#fff2c0"/>
-  <path d="M28 24 Q31 25 28 28 Z" fill="#5c8038"/>
-  <path d="M22 27 l1.4 3 l1.4 -3 z" fill="#f2f4e2"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs><radialGradient id="sh" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#000" stop-opacity="0.45"/><stop offset="100%" stop-color="#000" stop-opacity="0"/></radialGradient></defs>
+  <ellipse cx="128" cy="238" rx="62" ry="12" fill="url(#sh)"/>
+
+  <path d="M100 196 L108 120 C112 104 144 104 148 120 L156 196 Z" fill="#4a6a32" stroke="#7ea84e" stroke-width="4" stroke-linejoin="round"/>
+  <circle cx="128" cy="86" r="24" fill="#4a6a32" stroke="#7ea84e" stroke-width="4"/>
+  <polygon points="150,40 162,40 158,196 146,196" fill="#6b5a3a" stroke="#3a3020" stroke-width="2"/><polygon points="138,40 174,40 170,56 142,56" fill="#9aa6b2" stroke="#3a3020" stroke-width="2"/>
+  <circle cx="120" cy="84" r="4.5" fill="#ffe070"/><circle cx="136" cy="84" r="4.5" fill="#ffe070"/>
 </svg>
