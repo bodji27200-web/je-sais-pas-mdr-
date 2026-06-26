@@ -43,6 +43,8 @@ import {
   renderCharacter,
   renderJobs,
   renderCraft,
+  renderCraftResults,
+  defaultCraftFilters,
   renderInventory,
   renderZones,
   renderBattle,
@@ -63,6 +65,8 @@ const TABS = [
 let currentTab = "jobs";
 let currentCombat = null;
 let selectedClassId = null;
+// Filtres de l'Atelier (persistants pendant la session).
+let craftFilters = defaultCraftFilters();
 let lastTick = Date.now();
 let tickCount = 0;
 // Pendant qu'une animation de tour joue, on bloque les clics (évite de
@@ -81,7 +85,7 @@ function renderScreen() {
     case "jobs":
       return renderJobs(state);
     case "craft":
-      return renderCraft(state);
+      return renderCraft(state, craftFilters);
     case "inventory":
       return renderInventory(state);
     case "combat":
@@ -542,6 +546,13 @@ const handlers = {
     selectedClassId = null;
     renderAll();
   },
+  "craft-filter": (el) => {
+    const key = el.dataset.key;
+    const val = el.dataset.val;
+    if (key === "craftable") craftFilters.craftable = !craftFilters.craftable;
+    else craftFilters[key] = val;
+    renderScreenOnly(); // re-render l'écran Atelier (les chips reflètent l'état)
+  },
   "close-modal": () => closeModal(),
 };
 
@@ -562,6 +573,16 @@ function boot() {
   // Entrée = valider la création.
   document.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && e.target.id === "hero-name") handlers["confirm-create"]();
+  });
+  // Recherche de l'Atelier en direct : mise à jour CIBLÉE de la liste des
+  // recettes (on ne recrée pas l'input -> le focus et le curseur sont préservés).
+  document.addEventListener("input", (e) => {
+    if (e.target.id === "craft-search") {
+      craftFilters.search = e.target.value;
+      const results = document.getElementById("craft-results");
+      const state = getState();
+      if (results && state) results.innerHTML = renderCraftResults(state, craftFilters);
+    }
   });
 
   if (hasSave() && load()) {

@@ -136,7 +136,9 @@ sont rafraîchis de façon ciblée. **Contrainte forte à préserver.**
 3. ✅ Métiers de transformation à niveau propre (Fonte ≠ Forge, XP en fabriquant,
    recettes gating par niveau de métier) + paliers de ressources (charbon,
    argent, bois ancestral) câblés à des usages réels (anti-orphelin testé).
-4. Atelier : organisation fonctionnelle + cohérence des recettes.
+4. ✅ Atelier : catégories (Armes/Armures/Accessoires/Matériaux), filtres
+   (catégorie, classe, réalisable), recherche en direct (objet + matériau),
+   cartes enrichies (type, métier requis, classes compatibles), résumé métiers.
 5. Matériaux d'armure : passifs intrinsèques + bonus hybrides 2/4 + comparaison.
 6. Stats lisibles (base/équip/classe), Vitesse documentée, rendements décroissants.
 7. Éléments, résistances, états.

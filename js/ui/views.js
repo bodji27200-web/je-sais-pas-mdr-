@@ -420,39 +420,143 @@ function renderJobBlock(state, job) {
 }
 
 // ---------------------------------------------------------------------------
-// Écran Craft
+// Écran Craft (Atelier) — catégories, filtres et recherche
 // ---------------------------------------------------------------------------
-export function renderCraft(state) {
-  const sections = Object.values(STATIONS)
-    .map((station) => {
-      const recipes = RECIPES.filter((r) => r.station === station.id);
-      if (!recipes.length) return "";
-      const prof = (state.professions && state.professions[station.id]) || { level: 1, xp: 0 };
-      const xpNext = jobXpToNext(prof.level);
-      const items = recipes.map((r) => renderRecipe(state, r)).join("");
-      return `
-        <div class="craft-station">
-          <div class="station-head">
-            <h3 class="section-title">${station.icon} ${esc(station.name)} <span class="muted">Niv. ${prof.level}</span></h3>
-            <div class="station-prog">
-              ${bar(prof.xp, xpNext, "xp")}
-              <span class="muted small">${fmt(prof.xp)}/${fmt(xpNext)} XP</span>
-            </div>
-          </div>
-          <p class="muted small">${esc(station.desc || "")}</p>
-          <div class="recipe-grid">${items}</div>
-        </div>`;
+
+// Filtres par défaut (l'état des filtres vit dans main.js).
+export function defaultCraftFilters() {
+  return { cat: "all", cls: "all", craftable: false, search: "" };
+}
+
+// Catégorie d'une recette (data-driven, dérivée de sa sortie).
+const CRAFT_CATEGORIES = [
+  { id: "all", label: "Tout" },
+  { id: "weapon", label: "Armes" },
+  { id: "armor", label: "Armures" },
+  { id: "accessory", label: "Accessoires" },
+  { id: "material", label: "Matériaux" },
+];
+function recipeCategory(recipe) {
+  const out = recipe.output;
+  if (out.type === "resource") return "material";
+  const tpl = getEquipment(out.id);
+  if (!tpl) return "other";
+  if (tpl.slot === "weapon") return "weapon";
+  if (tpl.slot === "head" || tpl.slot === "chest" || tpl.slot === "legs") return "armor";
+  if (tpl.slot === "accessory") return "accessory";
+  return "other";
+}
+
+// Classes capables de manier une arme d'un type donné (pour l'affichage compat).
+function classesForWtype(wtype) {
+  return Object.values(CLASSES).filter((c) => (c.weapons || []).includes(wtype));
+}
+
+// La recette correspond-elle au filtre de classe ? Les armes sont restreintes au
+// type maniable ; armures/accessoires/matériaux restent universels.
+function matchesClass(recipe, clsId) {
+  if (clsId === "all") return true;
+  const out = recipe.output;
+  if (out.type !== "equipment") return true;
+  const tpl = getEquipment(out.id);
+  if (!tpl) return true;
+  if (tpl.slot !== "weapon" || !tpl.wtype) return true; // armure/accessoire = universel
+  const cls = getClass(clsId);
+  return cls && (cls.weapons || []).includes(tpl.wtype);
+}
+
+// Recherche textuelle : nom de l'objet + nom des matériaux (filtre « par matériau »).
+function matchesSearch(recipe, q) {
+  if (!q) return true;
+  q = q.toLowerCase();
+  const out = recipe.output;
+  const outDef = out.type === "equipment" ? getEquipment(out.id) : getResource(out.id);
+  if (outDef && outDef.name.toLowerCase().includes(q)) return true;
+  for (const inp of recipe.inputs) {
+    const r = getResource(inp.resource);
+    if (r && r.name.toLowerCase().includes(q)) return true;
+  }
+  return false;
+}
+
+// Résumé compact des métiers de transformation (niveaux).
+function renderProfessionsSummary(state) {
+  const chips = Object.values(STATIONS)
+    .map((st) => {
+      const prof = (state.professions && state.professions[st.id]) || { level: 1 };
+      return `<span class="prof-chip" title="${esc(st.desc || "")}">${st.icon} ${esc(st.name)} <strong>${prof.level}</strong></span>`;
     })
     .join("");
+  return `<div class="prof-summary">${chips}</div>`;
+}
 
-  return `<section class="panel"><h2>Atelier</h2><p class="muted">Transforme tes ressources en équipement. Chaque métier de transformation gagne un niveau en fabriquant, ce qui débloque des recettes plus avancées.</p>${sections}</section>`;
+// Barre de filtres (catégorie, classe, réalisable, recherche).
+function renderCraftFilterBar(state, f) {
+  const catChips = CRAFT_CATEGORIES.map(
+    (c) => `<button class="filter-chip ${f.cat === c.id ? "selected" : ""}" data-act="craft-filter" data-key="cat" data-val="${c.id}">${esc(c.label)}</button>`
+  ).join("");
+  const clsChips = [{ id: "all", name: "Toutes classes" }, ...Object.values(CLASSES)]
+    .map((c) => `<button class="filter-chip ${f.cls === c.id ? "selected" : ""}" data-act="craft-filter" data-key="cls" data-val="${c.id}">${esc(c.name)}</button>`)
+    .join("");
+  return `
+    <div class="craft-filters">
+      <input id="craft-search" class="craft-search" type="text" placeholder="Rechercher (objet ou matériau)…" value="${esc(f.search)}" autocomplete="off" />
+      <div class="filter-row">${catChips}</div>
+      <div class="filter-row">${clsChips}</div>
+      <div class="filter-row">
+        <button class="filter-chip ${f.craftable ? "selected" : ""}" data-act="craft-filter" data-key="craftable" data-val="toggle">✓ Réalisable maintenant</button>
+      </div>
+    </div>`;
+}
+
+export function renderCraft(state, filters = defaultCraftFilters()) {
+  return `
+    <section class="panel">
+      <h2>Atelier</h2>
+      <p class="muted">Transforme tes ressources en équipement. Chaque métier de transformation gagne un niveau en fabriquant, ce qui débloque des recettes plus avancées.</p>
+      ${renderProfessionsSummary(state)}
+      ${renderCraftFilterBar(state, filters)}
+      <div id="craft-results">${renderCraftResults(state, filters)}</div>
+    </section>`;
+}
+
+// Liste filtrée des recettes, groupée par catégorie (mise à jour ciblée possible).
+export function renderCraftResults(state, filters = defaultCraftFilters()) {
+  const f = filters;
+  let recipes = RECIPES.filter((r) => {
+    if (f.cat !== "all" && recipeCategory(r) !== f.cat) return false;
+    if (!matchesClass(r, f.cls)) return false;
+    if (!matchesSearch(r, f.search)) return false;
+    if (f.craftable && !canCraft(state, r).ok) return false;
+    return true;
+  });
+
+  if (!recipes.length) {
+    return `<p class="muted center" style="padding:18px 0">Aucune recette ne correspond à ces filtres.</p>`;
+  }
+
+  // Groupement par catégorie pour une lecture claire.
+  const order = ["weapon", "armor", "accessory", "material", "other"];
+  const labels = { weapon: "Armes", armor: "Armures", accessory: "Accessoires", material: "Matériaux", other: "Objets spéciaux" };
+  const groups = {};
+  for (const r of recipes) {
+    const c = recipeCategory(r);
+    (groups[c] = groups[c] || []).push(r);
+  }
+  return order
+    .filter((c) => groups[c])
+    .map((c) => {
+      const items = groups[c].map((r) => renderRecipe(state, r)).join("");
+      return `<div class="craft-cat"><h3 class="section-title">${esc(labels[c])}</h3><div class="recipe-grid">${items}</div></div>`;
+    })
+    .join("");
 }
 
 function renderRecipe(state, recipe) {
   const out = recipe.output;
   const outDef = out.type === "equipment" ? getEquipment(out.id) : getResource(out.id);
   const check = canCraft(state, recipe);
-  const times = craftableTimes(state, recipe);
+  const station = STATIONS[recipe.station];
 
   const inputs = recipe.inputs
     .map((inp) => {
@@ -463,18 +567,36 @@ function renderRecipe(state, recipe) {
     })
     .join("");
 
-  const stats = out.type === "equipment" ? `<span class="muted small">${statLine(outDef.stats)} ${familyTag(outDef)}</span>` : "";
+  // Méta : type + métier requis + classes compatibles (armes) + XP de métier.
+  const typeLabel =
+    out.type === "resource"
+      ? "Matériau"
+      : { weapon: "Arme", head: "Tête", chest: "Torse", legs: "Jambes", accessory: "Accessoire" }[outDef.slot] || "Objet";
+  const profReq = recipe.profReq || 1;
+  const metaParts = [
+    `${typeLabel}`,
+    `${station ? station.icon + " " + esc(station.name) : ""} niv. ${profReq}`,
+  ];
+  if (out.type === "equipment" && outDef.slot === "weapon" && outDef.wtype) {
+    const classes = classesForWtype(outDef.wtype).map((c) => esc(c.name));
+    if (classes.length) metaParts.push("⚔ " + classes.join(", "));
+  }
+  if (recipe.levelReq) metaParts.push("Héros niv. " + recipe.levelReq);
+  const meta = `<span class="recipe-meta muted small">${metaParts.filter(Boolean).join(" · ")}</span>`;
+
+  const stats = out.type === "equipment" ? `<span class="muted small">${statLine(outDef.stats)} ${familyTag(outDef)}</span>` : `<span class="muted small">+${recipe.profXp || 0} XP ${esc(station ? station.name : "métier")}</span>`;
 
   return `
     <div class="recipe ${check.ok ? "" : "cant"}">
       ${sigil(outDef.image, outDef.icon)}
       <div class="recipe-body">
         <strong>${esc(outDef.name)}${out.qty > 1 ? " ×" + out.qty : ""}</strong>
+        ${meta}
         ${stats}
         <div class="ingredients">${inputs}</div>
       </div>
-      <button class="btn tiny ${check.ok ? "primary" : ""}" data-act="craft" data-id="${recipe.id}" ${check.ok ? "" : "disabled"}>
-        ${check.ok ? "Fabriquer" : check.reason}
+      <button class="btn tiny ${check.ok ? "primary" : ""}" data-act="craft" data-id="${recipe.id}" ${check.ok ? "" : "disabled"} title="${check.ok ? "Fabriquer" : esc(check.reason)}">
+        ${check.ok ? "Fabriquer" : esc(check.reason)}
       </button>
     </div>`;
 }
