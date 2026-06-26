@@ -126,6 +126,37 @@ export function getDerivedStats(state) {
   };
 }
 
+// Décomposition lisible de chaque stat : base (classe + niveau), équipement
+// (pièces équipées), bonus (classe + spé + matériaux, surtout multiplicatifs),
+// et total. Les trois composantes somment exactement au total affiché.
+export function getStatDetails(state) {
+  const ch = state.character;
+  const cls = getClass(ch.classId);
+  const total = getDerivedStats(state);
+
+  const base = {};
+  for (const k of STAT_KEYS) base[k] = (cls.baseStats[k] || 0) + (cls.growth[k] || 0) * (ch.level - 1);
+
+  const equip = { hp: 0, atk: 0, def: 0, spd: 0, crit: 0 };
+  for (const slot of Object.keys(ch.equipment)) {
+    const inst = ch.equipment[slot];
+    if (!inst || !inst.stats) continue;
+    const es = effectiveStats(inst);
+    for (const k of Object.keys(es)) equip[k] = (equip[k] || 0) + es[k];
+  }
+
+  const nameMap = { hp: "maxHp", atk: "atk", def: "def", spd: "spd", crit: "crit" };
+  const details = {};
+  for (const k of STAT_KEYS) {
+    const tk = nameMap[k];
+    const b = Math.round(base[k]);
+    const e = Math.round(equip[k] || 0);
+    const t = total[tk];
+    details[tk] = { base: b, equip: e, bonus: t - b - e, total: t };
+  }
+  return details;
+}
+
 // --- Spécialisations ---
 
 // Spécialisation active (ou null si non choisie / id inconnu).

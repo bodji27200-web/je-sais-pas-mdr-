@@ -282,8 +282,9 @@ a { color: var(--gold); }
 }
 .stat {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 4px 10px;
   padding: 10px 14px;
   background: var(--panel);
   border: 1px solid var(--border-soft);
@@ -292,6 +293,16 @@ a { color: var(--gold); }
 .stat-ico { font-size: 1.1rem; }
 .stat-lbl { flex: 1; color: var(--muted); font-size: 0.9rem; }
 .stat-val { font-weight: 700; color: var(--gold); }
+.stat-break { flex-basis: 100%; font-size: 0.74rem; opacity: 0.85; }
+
+/* Aperçu de l'ordre des tours (combat) */
+.turn-forecast { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin: 6px 0 2px; padding: 0 2px; }
+.fc-chip {
+  font-size: 0.72rem; padding: 2px 8px; border-radius: 999px;
+  border: 1px solid var(--border-soft); color: var(--muted);
+}
+.fc-chip.you { border-color: var(--gold-dim); color: var(--gold); }
+.fc-chip.foe { border-color: #6e3a3a; color: #e08a86; }
 
 .slot-list { display: flex; flex-direction: column; gap: 8px; }
 .slot {

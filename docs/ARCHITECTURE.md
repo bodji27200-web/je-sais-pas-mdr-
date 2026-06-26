@@ -64,16 +64,19 @@ sont rafraîchis de façon ciblée. **Contrainte forte à préserver.**
 
 ### Statistiques (`character.js`)
 - 5 stats : `hp, atk, def, spd, crit`. Dérivées = base classe + croissance×(niv-1)
-  + équipement (instancié) + bonus de set 3 pièces + passive de classe + spé.
+  + équipement + bonus de matériaux (seuils 2/4) + passive de classe + spé.
 - Défense : rendements décroissants `def/(def+90)`, plafond 75 % (`combat.js`).
-- **Limite** : pas de stats secondaires nommées (précision, esquive, résistances),
-  pas de répartition lisible « base / équipement / classe » dans l'UI.
+- **Lot 6** : `getStatDetails(state)` expose la **décomposition** base / équipement /
+  bonus (somme exacte au total), affichée sous chaque stat ; la Défense montre sa
+  réduction de dégâts effective.
+- **Limite (Lot 7)** : pas encore de stats secondaires nommées (précision,
+  résistances élémentaires) — viennent avec les éléments/états.
 
 ### Vitesse & initiative (`combat.js`)
 - Système `nextAt` : `nextAt += 100/spd` après chaque action. Le plus petit agit.
-  Plafond `MAX_CONSEC = 2` actions consécutives. **Déjà borné** — bonne base.
-- **Limite** : pas d'aperçu de l'ordre des tours, pas de réduction de recharge
-  liée à la vitesse.
+  Plafond `MAX_CONSEC = 2` actions consécutives.
+- **Lot 6** : `forecastTurns()` affiche l'**ordre probable des prochains tours** ;
+  la Vitesse réduit légèrement les recharges (`cdFactor`, **plafonné à −20 %**).
 
 ### Métiers (`jobs.js` + `data/jobs.js`) — refondus Lot 2
 - **Une activité principale par métier**, structurée en **paliers** (`tiers`) :
@@ -147,7 +150,8 @@ sont rafraîchis de façon ciblée. **Contrainte forte à préserver.**
 5. ✅ Matériaux d'armure : 2 nouveaux slots (mains/bottes), bonus de seuil 2/4
    cumulables (hybrides viables), passif comportemental par matériau en combat,
    section dédiée dans l'écran Personnage. Migration v5→v6.
-6. Stats lisibles (base/équip/classe), Vitesse documentée, rendements décroissants.
+6. ✅ Stats lisibles (décomposition base/équip/bonus), aperçu de l'ordre des
+   tours, Vitesse → recharge réduite plafonnée, réduction de défense affichée.
 7. Éléments, résistances, états.
 8. Ressources de classe, cooldowns, rééquilibrage des compétences.
 9. Audit/équilibrage des 15 spécialisations (simulateur).

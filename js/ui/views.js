@@ -15,8 +15,9 @@ import { RECIPES, STATIONS } from "../data/recipes.js";
 import { ENEMIES, getEnemy } from "../data/enemies.js";
 import { ZONES, allZones } from "../data/zones.js";
 import { enemyUnlock, zoneProgress } from "../systems/zoneprog.js";
-import { getDerivedStats, canWieldWeapon, getActiveSpec, specUnlocked, nextRespecCost, familyCounts, activeMaterialBonuses } from "../core/character.js";
+import { getDerivedStats, getStatDetails, canWieldWeapon, getActiveSpec, specUnlocked, nextRespecCost, familyCounts, activeMaterialBonuses } from "../core/character.js";
 import { MATERIALS } from "../data/materials.js";
+import { forecastTurns, DEF_K, DEF_CAP } from "../systems/combat.js";
 import { specsForClass, SPEC_UNLOCK_LEVEL } from "../data/specializations.js";
 import { charXpToNext, jobXpToNext } from "../core/progression.js";
 import { activityProgress, activityRemainingMs, activeTier } from "../systems/jobs.js";
@@ -28,8 +29,8 @@ const STAT_ICONS = { maxHp: "❤️", atk: "⚔️", def: "🛡️", spd: "💨"
 const STAT_TIP = {
   maxHp: "Quantité totale de dégâts que tu peux encaisser.",
   atk: "Base de tes dégâts infligés.",
-  def: "Réduit chaque attaque reçue (rendements décroissants, plafonné à 75 % : jamais 0 dégât).",
-  spd: "La Vitesse détermine la fréquence des actions. Un personnage plus rapide peut agir davantage qu'un personnage lent (jusqu'à 2 fois d'affilée).",
+  def: "Réduit chaque attaque reçue avec des rendements décroissants (formule def/(def+90)), plafonnée à 75 % : jamais 0 dégât.",
+  spd: "La Vitesse détermine la fréquence des actions (initiative). Un personnage plus rapide agit plus souvent (au plus 2 fois d'affilée) et réduit légèrement ses recharges (jusqu'à -20 %).",
   crit: "Chance d'infliger un coup critique (×1,6 dégâts).",
 };
 
@@ -143,8 +144,28 @@ export function renderCharacter(state) {
   const cls = getClass(ch.classId);
   const ds = getDerivedStats(state);
 
+  const det = getStatDetails(state);
   const stats = ["maxHp", "atk", "def", "spd", "crit"]
-    .map((k) => `<div class="stat" title="${esc(STAT_TIP[k])}"><span class="stat-ico">${STAT_ICONS[k]}</span><span class="stat-lbl">${STAT_LABELS[k]}</span><span class="stat-val">${k === "crit" ? ds[k] + " %" : fmt(ds[k])}</span></div>`)
+    .map((k) => {
+      const d = det[k];
+      const parts = [`base ${fmt(d.base)}`];
+      if (d.equip) parts.push(`équip. ${d.equip > 0 ? "+" : ""}${fmt(d.equip)}`);
+      if (d.bonus) parts.push(`bonus ${d.bonus > 0 ? "+" : ""}${fmt(d.bonus)}`);
+      // Détail spécifique : réduction de dégâts effective de la Défense.
+      let extra = "";
+      if (k === "def") {
+        const red = Math.round(Math.min(DEF_CAP, d.total / (d.total + DEF_K)) * 100);
+        extra = ` <span class="muted">→ −${red}% dégâts subis</span>`;
+      }
+      const valTxt = k === "crit" ? d.total + " %" : fmt(d.total);
+      return `
+        <div class="stat" title="${esc(STAT_TIP[k])}">
+          <span class="stat-ico">${STAT_ICONS[k]}</span>
+          <span class="stat-lbl">${STAT_LABELS[k]}</span>
+          <span class="stat-val">${valTxt}</span>
+          <span class="stat-break muted small">${parts.join(" · ")}${extra}</span>
+        </div>`;
+    })
     .join("");
 
   const slots = Object.keys(SLOTS)
@@ -765,6 +786,16 @@ export function renderZones(state) {
 // ---------------------------------------------------------------------------
 // Écran Combat — la bataille
 // ---------------------------------------------------------------------------
+// Aperçu de l'ordre probable des prochains tours (chips Toi / Adversaire).
+export function renderForecast(combat) {
+  const order = forecastTurns(combat, 6);
+  if (!order.length) return "";
+  const chips = order
+    .map((who) => `<span class="fc-chip ${who === "player" ? "you" : "foe"}">${who === "player" ? "Toi" : "Adv."}</span>`)
+    .join("");
+  return `<span class="muted small">Ordre probable :</span> ${chips}`;
+}
+
 // Log de combat (texte seulement, mis à jour de façon ciblée).
 export function renderBattleLog(combat) {
   return combat.log
@@ -885,6 +916,7 @@ export function renderBattle(state, combat) {
         <span class="arena-zone">${zone.icon} ${esc(zone.name)}</span>
         <span class="arena-turn">Tour <strong id="bt-turn">${combat.turn}</strong></span>
       </div>
+      <div class="turn-forecast" id="bt-forecast">${renderForecast(combat)}</div>
       <div class="arena" id="bt-arena">
         ${chainImg(bg, "arena-bg-img", "this.remove()")}
         <div class="arena-stage">

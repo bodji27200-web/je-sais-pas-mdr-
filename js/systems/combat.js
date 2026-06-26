@@ -26,6 +26,14 @@ export const CRIT_MULT = 1.6; // multiplicateur de dégâts critiques
 export const SPEED_UNIT = 100; // unité d'initiative ; nextAt += UNIT/vitesse
 export const MAX_CONSEC = 2; // actions consécutives maximum
 
+// Réduction de recharge liée à la Vitesse : faible et PLAFONNÉE (20 % max).
+// Réf. 10 (vitesse de base) -> aucune réduction ; au-delà, réduction progressive.
+export const CD_SPEED_REF = 10;
+export const CD_MIN_FACTOR = 0.8; // au plus -20 % de recharge
+export function cdFactor(spd) {
+  return Math.max(CD_MIN_FACTOR, 1 - Math.max(0, spd - CD_SPEED_REF) / 100);
+}
+
 function makeCombatant(name, stats, skillIds, passiveId) {
   const passive = passiveId ? getSkill(passiveId) : null;
   return {
@@ -290,7 +298,10 @@ function useSkill(combat, actor, other, skillId) {
   // Effets sur la cible touchée (poison, malus...).
   if (landed && skill.onHit) for (const eff of skill.onHit) applyEffect(other, eff, actor.atk, combat, kind);
 
-  if (skill.cooldown > 0) actor.cooldowns[skillId] = skill.cooldown;
+  // Recharge réduite par la Vitesse (plafonnée). Une compétence garde toujours
+  // au moins 1 tour de recharge.
+  if (skill.cooldown > 0)
+    actor.cooldowns[skillId] = Math.max(1, Math.round(skill.cooldown * cdFactor(actor.spd)));
 
   // Concentration : suit les compétences DIFFÉRENTES utilisées par le porteur ;
   // après en avoir utilisé assez, la prochaine compétence sera renforcée.
@@ -440,6 +451,27 @@ function checkDeaths(state, combat) {
 
 export function playerCanUse(combat, skillId) {
   return (combat.player.cooldowns[skillId] || 0) <= 0;
+}
+
+// Aperçu de l'ordre PROBABLE des prochains tours (initiative par vitesse).
+// Simulation sans effet de bord ; n'intègre pas le plafond MAX_CONSEC (indicatif).
+export function forecastTurns(combat, n = 6) {
+  if (!combat || combat.status !== "active") return [];
+  const ps = effectiveSpd(combat.player);
+  const es = effectiveSpd(combat.enemy);
+  let pn = combat.player.nextAt;
+  let en = combat.enemy.nextAt;
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    if (pn <= en + 1e-6) {
+      out.push("player");
+      pn += SPEED_UNIT / ps;
+    } else {
+      out.push("enemy");
+      en += SPEED_UNIT / es;
+    }
+  }
+  return out;
 }
 
 // Résout l'action du joueur, puis les tours dus de l'ennemi (≤ MAX_CONSEC).
