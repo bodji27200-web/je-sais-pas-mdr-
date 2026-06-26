@@ -44,7 +44,7 @@ export function renderCreation() {
   return `
     <section class="panel creation">
       <h1 class="title">Forge ta légende</h1>
-      <p class="muted center">Choisis ta classe. Pour ce prototype, seul le <strong>Guerrier</strong> est jouable.</p>
+      <p class="muted center">Choisis ta classe. Les <strong>cinq classes</strong> sont jouables — chacune a son identité, ses forces et ses faiblesses.</p>
       <div class="class-grid">${cards}</div>
       <div class="creation-form" id="creation-form" hidden>
         <label>Nom du héros
