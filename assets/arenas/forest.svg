@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#79c6f2"/>
+      <stop offset="60%" stop-color="#a8e0fb"/>
+      <stop offset="100%" stop-color="#d7f2ff"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fff6d2"/>
+      <stop offset="100%" stop-color="#fff6d2" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Ciel -->
+  <rect width="960" height="540" fill="url(#sky)"/>
+  <circle cx="775" cy="92" r="150" fill="url(#sun)"/>
+  <circle cx="775" cy="92" r="44" fill="#fff3bf"/>
+
+  <!-- Nuages -->
+  <g fill="#ffffff" opacity="0.92">
+    <g>
+      <ellipse cx="180" cy="120" rx="58" ry="26"/>
+      <ellipse cx="225" cy="108" rx="46" ry="30"/>
+      <ellipse cx="130" cy="112" rx="40" ry="22"/>
+    </g>
+    <g opacity="0.85">
+      <ellipse cx="560" cy="80" rx="50" ry="22"/>
+      <ellipse cx="600" cy="70" rx="38" ry="26"/>
+      <ellipse cx="520" cy="74" rx="34" ry="18"/>
+    </g>
+  </g>
+
+  <!-- Montagnes lointaines -->
+  <path d="M0 350 L150 250 L300 350 Z" fill="#a9c8e2"/>
+  <path d="M220 350 L420 235 L600 350 Z" fill="#bcd6ea"/>
+  <path d="M520 350 L720 250 L960 350 L960 360 L520 360 Z" fill="#a9c8e2"/>
+
+  <!-- Collines en couches -->
+  <path d="M0 360 Q240 300 480 350 T960 340 L960 540 L0 540 Z" fill="#8ed06a"/>
+  <path d="M0 400 Q260 350 520 392 T960 388 L960 540 L0 540 Z" fill="#73bf52"/>
+
+  <!-- Petits arbres sur la colline -->
+  <g>
+    <rect x="116" y="350" width="8" height="22" fill="#6b4a2c"/>
+    <circle cx="120" cy="344" r="22" fill="#4f9c39"/>
+    <rect x="820" y="346" width="9" height="24" fill="#6b4a2c"/>
+    <circle cx="824" cy="338" r="26" fill="#4f9c39"/>
+    <rect x="700" y="360" width="7" height="18" fill="#6b4a2c"/>
+    <circle cx="703" cy="356" r="18" fill="#57a83f"/>
+  </g>
+
+  <!-- Sol (herbe au premier plan) -->
+  <rect x="0" y="392" width="960" height="148" fill="#5fae42"/>
+  <rect x="0" y="392" width="960" height="16" fill="#73c052"/>
+  <rect x="0" y="470" width="960" height="70" fill="#4f9a36"/>
+
+  <!-- Buissons -->
+  <g fill="#3f8a2e">
+    <ellipse cx="120" cy="470" rx="70" ry="34"/>
+    <ellipse cx="175" cy="468" rx="52" ry="40"/>
+    <ellipse cx="820" cy="476" rx="78" ry="36"/>
+    <ellipse cx="760" cy="474" rx="50" ry="34"/>
+  </g>
+  <g fill="#4d9c38">
+    <ellipse cx="140" cy="462" rx="40" ry="24"/>
+    <ellipse cx="800" cy="468" rx="44" ry="24"/>
+  </g>
+
+  <!-- Petites touffes / fleurs -->
+  <g>
+    <circle cx="430" cy="500" r="4" fill="#f2d24a"/>
+    <circle cx="560" cy="514" r="4" fill="#f0f0f0"/>
+    <circle cx="350" cy="520" r="4" fill="#f2d24a"/>
+  </g>
+</svg>
