@@ -6,6 +6,9 @@ import { esc, sigil, bar, fmt, fmtDuration, chainImg } from "./dom.js";
 import { getClass, CLASSES } from "../data/classes.js";
 import { getSkill } from "../data/skills.js";
 import { getClassResource } from "../data/classResources.js";
+import { FAMILIARS, allFamiliars, FAMILIAR_ROLES, EGGS, LINK_MAX, FEED_ESSENCE_COST } from "../data/familiars.js";
+import { ensureFamiliars, familiarLevelCap } from "../systems/familiars.js";
+import { familiarXpAt } from "../data/curves.js";
 import { JOBS, unlockedTiers, bestTier, nextTier } from "../data/jobs.js";
 import { RESOURCES, getResource } from "../data/resources.js";
 import { EQUIPMENT, getEquipment, SLOTS, ARMOR_FAMILIES } from "../data/equipment.js";
@@ -739,6 +742,122 @@ export function renderInventory(state) {
 }
 
 // ---------------------------------------------------------------------------
+// Écran Familiers (Lot 11)
+// ---------------------------------------------------------------------------
+const RARITY_ORDER = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4 };
+
+function linkPips(link) {
+  let s = "";
+  for (let i = 0; i < LINK_MAX; i++) s += `<span class="link-pip ${i < link ? "on" : ""}"></span>`;
+  return `<span class="link-bar" title="Lien ${link}/${LINK_MAX}">${s}</span>`;
+}
+
+function familiarPassiveLines(fam) {
+  const p = fam.passive || {};
+  const out = [];
+  if (p.skillPowerPct) out.push(`Compétences +${Math.round(p.skillPowerPct * 100)} %`);
+  if (p.lifestealPct) out.push(`Vol de vie +${Math.round(p.lifestealPct * 100)} %`);
+  if (p.hpRegenPct) out.push(`Régén. ${Math.round(p.hpRegenPct * 100)} %/tour`);
+  if (p.critFlat) out.push(`Crit +${p.critFlat} %`);
+  if (p.spdPct) out.push(`Vitesse +${Math.round(p.spdPct * 100)} %`);
+  if (p.maxHpPct) out.push(`PV max +${Math.round(p.maxHpPct * 100)} %`);
+  if (p.elementDmgPct) for (const el of Object.keys(p.elementDmgPct)) {
+    const e = getElement(el);
+    out.push(`${e ? e.name : el} +${Math.round(p.elementDmgPct[el] * 100)} %`);
+  }
+  return out;
+}
+
+function filterChip(act, key, val, cur, label) {
+  return `<button class="zone-chip ${cur === val ? "active" : ""}" data-act="${act}" data-key="${key}" data-val="${val}">${esc(label)}</button>`;
+}
+
+export function renderFamiliars(state, filters = { element: "all", role: "all", rarity: "all" }) {
+  const f = ensureFamiliars(state);
+  const cap = familiarLevelCap(state);
+
+  // --- Œufs + essence ---
+  const eggBtns = Object.values(EGGS)
+    .map((egg) => {
+      const n = f.eggs[egg.id] || 0;
+      const r = getRarity(egg.id === "common" ? "common" : egg.id);
+      const eggSvg = `<svg viewBox="0 0 24 30" width="20" height="26" aria-hidden="true"><path d="M12 1 C6 1 2 12 2 19 a10 10 0 0 0 20 0 C22 12 18 1 12 1 Z" fill="${r.color}22" stroke="${r.color}" stroke-width="1.6"/><path d="M7 16 l3 3 l-2 3 M15 14 l-2 4 l3 2" stroke="${r.color}" stroke-width="1.2" fill="none" opacity="0.7"/></svg>`;
+      return `<div class="egg-card">
+          <div class="egg-ico" style="border-color:${r.color}">${eggSvg}</div>
+          <div class="egg-info"><strong style="color:${r.color}">${esc(egg.name)}</strong><span class="muted small">En réserve : ${n}</span></div>
+          <button class="btn tiny ${n > 0 ? "primary" : ""}" data-act="hatch-egg" data-egg="${egg.id}" ${n > 0 ? "" : "disabled"}>Faire éclore</button>
+        </div>`;
+    })
+    .join("");
+
+  // --- Filtres ---
+  const elements = ["all", ...new Set(allFamiliars().map((x) => x.element))];
+  const roles = ["all", ...Object.keys(FAMILIAR_ROLES)];
+  const rarities = ["all", "common", "uncommon", "rare", "epic", "legendary"];
+  const elChips = elements.map((el) => filterChip("familiar-filter", "element", el, filters.element, el === "all" ? "Tous éléments" : getElement(el)?.name || el)).join("");
+  const roleChips = roles.map((r) => filterChip("familiar-filter", "role", r, filters.role, r === "all" ? "Tous rôles" : FAMILIAR_ROLES[r].name)).join("");
+  const rarChips = rarities.map((r) => filterChip("familiar-filter", "rarity", r, filters.rarity, r === "all" ? "Toutes raretés" : getRarity(r).name)).join("");
+
+  // --- Collection (possédés + silhouettes à découvrir) ---
+  const list = allFamiliars()
+    .filter((fam) => (filters.element === "all" || fam.element === filters.element)
+      && (filters.role === "all" || fam.role === filters.role)
+      && (filters.rarity === "all" || fam.rarity === filters.rarity))
+    .sort((a, b) => RARITY_ORDER[a.rarity] - RARITY_ORDER[b.rarity] || a.element.localeCompare(b.element));
+
+  const cards = list
+    .map((fam) => {
+      const owned = f.owned[fam.id];
+      const r = getRarity(fam.rarity);
+      const el = getElement(fam.element);
+      const role = FAMILIAR_ROLES[fam.role];
+      if (!owned) {
+        return `<div class="fam-card locked" style="border-color:${r.color}33">
+            <div class="fam-portrait silhouette">${sigil("", "")}</div>
+            <div class="fam-body"><strong class="muted">? ? ?</strong>
+              <span class="muted small">${el ? el.icon : ""} ${esc(r.name)} · ${role ? role.name : ""}</span>
+              <span class="muted small">Non découvert</span></div>
+          </div>`;
+      }
+      const equipped = f.equipped === fam.id;
+      const need = familiarXpAt(owned.level);
+      const xpPct = owned.level >= cap ? 100 : Math.min(100, Math.round((owned.xp / need) * 100));
+      const passives = familiarPassiveLines(fam).map((x) => `<span class="spec-bonus">${esc(x)}</span>`).join("");
+      return `<div class="fam-card ${equipped ? "equipped" : ""}" style="border-color:${r.color}">
+          <div class="fam-portrait">${sigil(fam.image, "")}</div>
+          <div class="fam-body">
+            <div class="fam-title"><strong style="color:${r.color}">${esc(fam.name)}</strong>
+              <span class="tag rarity" style="border-color:${r.color};color:${r.color}">${r.name}</span></div>
+            <span class="muted small">${el ? el.icon + " " + el.name : ""} · ${role ? role.name : ""} · Niv. ${owned.level}${owned.level >= cap ? " (max)" : ""}</span>
+            <div class="bar tiny"><div class="bar-fill xp" style="width:${xpPct}%"></div></div>
+            ${linkPips(owned.link)}
+            <div class="spec-bonuses">${passives}</div>
+            <p class="muted small">${esc(fam.desc)}</p>
+            <div class="fam-actions">
+              <button class="btn tiny ${equipped ? "" : "primary"}" data-act="equip-familiar" data-id="${fam.id}">${equipped ? "Équipé ✓" : "Équiper"}</button>
+              <button class="btn tiny" data-act="feed-familiar" data-id="${fam.id}" ${owned.link >= LINK_MAX || f.essence < FEED_ESSENCE_COST ? "disabled" : ""}>Nourrir · ${FEED_ESSENCE_COST} ✦</button>
+            </div>
+          </div>
+        </div>`;
+    })
+    .join("");
+
+  const discovered = Object.keys(f.owned).length;
+  return `
+    <section class="panel">
+      <h2>Familiers</h2>
+      <p class="muted small">Découverts : ${discovered}/${allFamiliars().length} · Essence de familier : <strong>${f.essence} ✦</strong>. Un familier équipé t'épaule en combat (soutien léger) et gagne de l'expérience.</p>
+      <h3 class="section-title">Œufs</h3>
+      <div class="egg-list">${eggBtns}</div>
+      <h3 class="section-title">Collection</h3>
+      <div class="fam-filters">${elChips}</div>
+      <div class="fam-filters">${roleChips}</div>
+      <div class="fam-filters">${rarChips}</div>
+      <div class="fam-grid">${cards || '<p class="muted">Aucun familier pour ce filtre.</p>'}</div>
+    </section>`;
+}
+
+// ---------------------------------------------------------------------------
 // Écran Combat — sélection de zone / d'ennemi
 // ---------------------------------------------------------------------------
 // Ligne de bestiaire d'un ennemi : résistances/faiblesses, cachées tant qu'on
@@ -1011,6 +1130,15 @@ function renderFighter(side, spritePath, emoji, hpC, idbase, isBoss) {
     </div>`;
 }
 
+// Familier équipé : petit sprite près du héros (Lot 11). Espacé, ne recrée rien.
+function renderFamiliarSprite(fam) {
+  return `
+    <div class="fighter familiar-pet" id="bt-familiar">
+      <div class="fighter-shadow small"></div>
+      <div class="fighter-sprite">${fighterImg(fam.sprite)}</div>
+    </div>`;
+}
+
 export function renderBattle(state, combat) {
   const p = combat.player;
   const e = combat.enemy;
@@ -1032,6 +1160,7 @@ export function renderBattle(state, combat) {
         ${chainImg(bg, "arena-bg-img", "this.remove()")}
         <div class="arena-stage">
           ${renderFighter("hero", heroClass.sprite, classEmoji(heroClass.id), p, "player", false)}
+          ${p.familiar ? renderFamiliarSprite(p.familiar) : ""}
           ${renderFighter("enemy", e.sprite, e.icon, e, "enemy", e.isBoss)}
         </div>
       </div>

@@ -18,6 +18,8 @@ import { MATERIAL_BEHAVIOR } from "../data/materials.js";
 import { getState as getStateDef } from "../data/states.js";
 import { ELEMENT_ORDER } from "../data/elements.js";
 import { getClassResource } from "../data/classResources.js";
+import { effectiveFamiliarPassive, gainEquippedFamiliarXp, addEgg } from "./familiars.js";
+import { getEgg } from "../data/familiars.js";
 import { rollAmount } from "../core/progression.js";
 import { addGold, addResource, addEquipmentInstance } from "../core/state.js";
 import { makeInstance, rollRarity, enemyLuck, rollGearDrop } from "../core/items.js";
@@ -192,6 +194,23 @@ export function buildPlayerCombatant(state) {
   const clothResist = Math.min(0.3, clothCount * 0.06);
   if (clothResist > 0) for (const el of ELEMENT_ORDER) player.resist[el] = 1 - clothResist;
 
+  // Familier équipé (Lot 11) : SOUTIEN LÉGER appliqué au héros en combat.
+  const fam = effectiveFamiliarPassive(state);
+  if (fam) {
+    const p = fam.passive || {};
+    if (p.maxHpPct) {
+      player.maxHp = Math.round(player.maxHp * (1 + p.maxHpPct));
+      player.hp = Math.min(player.maxHp, player.hp);
+    }
+    if (p.critFlat) player.crit += p.critFlat;
+    if (p.spdPct) player.spd = Math.max(1, player.spd * (1 + p.spdPct));
+    const ppAdd = {};
+    for (const k of ["skillPowerPct", "lifestealPct", "hpRegenPct"]) if (p[k]) ppAdd[k] = p[k];
+    if (Object.keys(ppAdd).length) mergePp(player.pp, ppAdd);
+    player.familiarElementDmg = p.elementDmgPct || null;
+    player.familiar = { id: fam.id, sprite: fam.sprite, image: fam.image, element: fam.element, role: fam.role, level: fam.level, link: fam.link };
+  }
+
   return player;
 }
 
@@ -349,6 +368,10 @@ function dealDamage(combat, attacker, defender, power, opts = {}) {
 
   // Élément : résistances/vulnérabilités de la cible + états (Trempé, Exposé...).
   base *= incomingMultiplier(defender, opts.element || null);
+
+  // Synergie de familier (Lot 11) : bonus léger aux dégâts de l'élément assorti.
+  if (attacker.familiarElementDmg && opts.element && attacker.familiarElementDmg[opts.element])
+    base *= 1 + attacker.familiarElementDmg[opts.element];
 
   base *= 0.9 + Math.random() * 0.2; // variance ±10 %
   const critChance = attacker.crit + (opts.critBonus || 0) + sumBuff(attacker, "crit_buff");
@@ -781,6 +804,11 @@ function finishCombat(state, combat, result) {
         if (!inst) continue;
         addEquipmentInstance(inst);
         drops.push({ type: "equipment", inst, name: getEquipment(d.item)?.name || d.item, rarity: inst.rarity });
+      } else if (d.type === "egg") {
+        const qty = rollAmount(d.min, d.max);
+        if (qty <= 0) continue;
+        addEgg(state, d.item, qty);
+        drops.push({ type: "egg", egg: d.item, qty, name: getEgg(d.item)?.name || "Œuf" });
       }
     }
   }
@@ -794,6 +822,10 @@ function finishCombat(state, combat, result) {
 
   addGold(enemy.gold);
   const levels = gainCharXp(state, enemy.xp);
+  clampHp(state); // un familier a pu gonfler les PV max en combat : on borne au réel
+
+  // Familier équipé : gagne de l'XP (plafonnée au niveau du héros) + du lien.
+  const famGain = gainEquippedFamiliarXp(state, enemy.xp);
 
   state.counters.kills += 1;
   if (!state.counters.defeated) state.counters.defeated = {};
@@ -803,9 +835,10 @@ function finishCombat(state, combat, result) {
     state.flags.bossDefeated = true;
   }
 
-  combat.rewards = { xp: enemy.xp, gold: enemy.gold, drops, levels };
+  combat.rewards = { xp: enemy.xp, gold: enemy.gold, drops, levels, familiar: famGain };
   log(combat, `${enemy.name} est vaincu ! +${enemy.xp} XP, +${enemy.gold} or.`, "reward");
   if (levels > 0) log(combat, `Niveau supérieur ! Tu passes niveau ${state.character.level}.`, "reward");
+  if (famGain && famGain.levels > 0) log(combat, `Ton familier gagne ${famGain.levels} niveau(x) !`, "reward");
 }
 
 // ===========================================================================

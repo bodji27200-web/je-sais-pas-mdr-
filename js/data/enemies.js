@@ -107,6 +107,7 @@ export const ENEMIES = {
       { item: "rough_gem", type: "resource", min: 1, max: 2, chance: 1 },
       { item: "iron_ingot", type: "resource", min: 2, max: 3, chance: 1 },
       { item: "gem_amulet", type: "equipment", min: 1, max: 1, chance: 0.2 },
+      { item: "common", type: "egg", min: 1, max: 1, chance: 0.5 }, // œuf de familier
     ],
   },
 
@@ -191,6 +192,7 @@ export const ENEMIES = {
       { item: "silver_ingot", type: "resource", min: 2, max: 3, chance: 1 },
       { item: "rough_gem", type: "resource", min: 2, max: 4, chance: 1 },
       { item: "silver_amulet", type: "equipment", min: 1, max: 1, chance: 0.25 },
+      { item: "rare", type: "egg", min: 1, max: 1, chance: 0.6 }, // œuf rare de familier
     ],
   },
 
@@ -274,6 +276,7 @@ export const ENEMIES = {
       { item: "silver_ingot", type: "resource", min: 2, max: 4, chance: 1 },
       { item: "rough_gem", type: "resource", min: 2, max: 4, chance: 1 },
       { item: "ancient_staff", type: "equipment", min: 1, max: 1, chance: 0.2 },
+      { item: "epic", type: "egg", min: 1, max: 1, chance: 0.5 }, // œuf épique de familier
     ],
   },
 };

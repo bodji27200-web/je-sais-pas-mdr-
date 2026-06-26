@@ -21,7 +21,7 @@ export const SAVE_KEY = "idle_rpg_save_v1";
 // Copie de sécurité écrite AVANT toute migration : si une migration tournait mal
 // dans une future version, on garde une trace de la sauvegarde d'origine.
 export const BACKUP_KEY = "idle_rpg_save_backup";
-export const SAVE_VERSION = 7;
+export const SAVE_VERSION = 8;
 
 let state = null;
 
@@ -79,6 +79,9 @@ export function newGame(name, classId) {
     counters: { kills: 0, bossKills: 0, crafted: 0, harvested: 0 },
     // Bestiaire : { [enemyId]: { seen, resistKnown } } — découvert au fil des combats.
     bestiary: {},
+    // Familiers (Lot 11) : collection, œufs, équipé, essence. Un œuf commun offert
+    // pour découvrir le système.
+    familiars: { owned: {}, eggs: { common: 1 }, equipped: null, essence: 0 },
     flags: { bossDefeated: false },
     objectives: {
       woodcut: false,
@@ -173,6 +176,20 @@ function migrate(parsed) {
   if (parsed.version === 6) {
     if (!parsed.bestiary) parsed.bestiary = {};
     parsed.version = 7;
+  }
+  // v7 -> v8 : familiers (collection persistée). On initialise la structure sans
+  // rien écraser et on offre un œuf commun pour découvrir le système.
+  if (parsed.version === 7) {
+    if (!parsed.familiars) parsed.familiars = { owned: {}, eggs: { common: 1 }, equipped: null, essence: 0 };
+    else {
+      const f = parsed.familiars;
+      if (!f.owned) f.owned = {};
+      if (!f.eggs) f.eggs = {};
+      if (f.essence == null) f.essence = 0;
+      if (f.equipped === undefined) f.equipped = null;
+      if (!Object.keys(f.eggs).length && !Object.keys(f.owned).length) f.eggs.common = 1;
+    }
+    parsed.version = 8;
   }
   return parsed.version === SAVE_VERSION ? parsed : null;
 }

@@ -116,6 +116,15 @@ sont rafraîchis de façon ciblée. **Contrainte forte à préserver.**
   build dominant** (>60 % contre toutes), **aucun build inutile**, voies d'une
   même classe resserrées. Ajustements : départ de ressource Guerrier/Assassin
   (ouverture), Templier offensif, Rempart plus increvable, Rôdeur/Trappeur revus.
+- **Lot 11** : **familiers** (`data/familiars.js` + `systems/familiars.js`),
+  persistés (**migration v7→v8**). Soutien LÉGER : le familier équipé applique un
+  petit passif au héros en combat (PV/crit/vitesse/régén/vol de vie/synergie
+  d'élément via `effectiveFamiliarPassive` → appliqué dans `buildPlayerCombatant`)
+  et apparaît, petit et espacé, près du héros dans l'arène. Œufs (3 paliers,
+  poids clairs/testables) lâchés par les boss + 1 offert ; doublon → **Essence**
+  (nourrir = +lien). Niveau plafonné au héros, **lien** (×1,5 %/cran). Écran
+  Familiers (collection + silhouettes non découvertes, filtres élément/rôle/rareté,
+  éclosion, équipement, nourrissage). 11 SVG originaux.
 - **Lot 10** : **phases de boss** data-driven (`enemy.phases` : seuils de PV qui
   changent une RÈGLE — atk, brise-bouclier, élément, perce-défense, compétence
   signature — pas un simple +atk) + **intentions télégraphiées** (`planIntent`,
@@ -141,8 +150,8 @@ sont rafraîchis de façon ciblée. **Contrainte forte à préserver.**
   piloter des **affixes** par familles cohérentes.
 
 ### Sauvegarde (`state.js`)
-- `SAVE_VERSION = 3`. Migrations v1->v2 (équipement empilé -> instances), v2->v3
-  (spécialisations). **Lot 1 a ajouté** : copie de sécurité (`BACKUP_KEY`) écrite
+- `SAVE_VERSION = 8`. Migrations v1→v8 (instances, spécialisations, métiers,
+  professions, slots d'armure, bestiaire, **familiers v7→v8**). **Lot 1 a ajouté** : copie de sécurité (`BACKUP_KEY`) écrite
   avant migration ; la migration n'écrase l'original que si elle aboutit ; une
   sauvegarde corrompue ne casse pas et n'est pas écrasée.
 
@@ -190,6 +199,9 @@ sont rafraîchis de façon ciblée. **Contrainte forte à préserver.**
 10. ✅ 2 zones (10 ennemis à mécaniques distinctes + 2 boss à phases), intentions
    télégraphiées, déblocage de zone, sélecteur de zones, 26 SVG originaux.
    Tests : 7 cas (zones, déblocages ordonnés, phases, intentions, terminaison).
+11. ✅ Familiers (collection, œufs, lien, soutien léger en combat + arène, écran
+   dédié, 11 SVG). Migration v7→v8. Tests : 8 cas (distribution, doublons,
+   équipement, lien, plafond d'XP, passif en combat).
 10. 2 nouvelles zones, 5 ennemis chacune, boss à phases.
 11. Familiers (première version complète).
 12. Guides contextuels, quêtes de découverte, succès.

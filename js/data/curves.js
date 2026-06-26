@@ -21,3 +21,11 @@ export function charXpAt(level) {
 export function jobXpAt(level) {
   return Math.round(JOB_XP.base * Math.pow(level, JOB_XP.exp));
 }
+
+// Familier (Lot 11) : monte un peu plus vite (il accompagne, il ne remplace pas
+// la progression du héros). Plafonné au niveau du héros par la logique de gain.
+export const FAMILIAR_XP = { base: 40, exp: 1.3 };
+
+export function familiarXpAt(level) {
+  return Math.round(FAMILIAR_XP.base * Math.pow(level, FAMILIAR_XP.exp));
+}

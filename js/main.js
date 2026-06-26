@@ -31,6 +31,7 @@ import { findEquipmentInstance } from "./core/state.js";
 import { getRarity } from "./data/rarities.js";
 import { startCombat, resolveRound } from "./systems/combat.js";
 import { enemyUnlock } from "./systems/zoneprog.js";
+import { hatchEgg, equipFamiliar, feedFamiliar } from "./systems/familiars.js";
 import { updateObjectives, ensureObjectives, objectiveLabel } from "./systems/objectives.js";
 import { setMuted, isMuted, playHit, playWin, playLose, playDing } from "./core/audio.js";
 import { getResource } from "./data/resources.js";
@@ -46,6 +47,7 @@ import {
   renderCraftResults,
   defaultCraftFilters,
   renderInventory,
+  renderFamiliars,
   renderZones,
   renderBattle,
   renderBattleLog,
@@ -62,6 +64,7 @@ const TABS = [
   { id: "jobs", label: "Métiers", icon: "🪓" },
   { id: "craft", label: "Atelier", icon: "🔥" },
   { id: "inventory", label: "Sac", icon: "🎒" },
+  { id: "familiars", label: "Familiers", icon: "🐾" },
   { id: "combat", label: "Combat", icon: "⚔️" },
 ];
 
@@ -69,6 +72,7 @@ let currentTab = "jobs";
 let currentCombat = null;
 let selectedClassId = null;
 let currentZoneId = null; // zone sélectionnée dans le menu Combat (défaut : 1re)
+let familiarFilters = { element: "all", role: "all", rarity: "all" };
 // Filtres de l'Atelier (persistants pendant la session).
 let craftFilters = defaultCraftFilters();
 let lastTick = Date.now();
@@ -92,6 +96,8 @@ function renderScreen() {
       return renderCraft(state, craftFilters);
     case "inventory":
       return renderInventory(state);
+    case "familiars":
+      return renderFamiliars(state, familiarFilters);
     case "combat":
       return renderZones(state, currentZoneId);
     default:
@@ -398,6 +404,31 @@ const handlers = {
   },
   "select-zone": (el) => {
     currentZoneId = el.dataset.zone;
+    renderAll();
+  },
+  "familiar-filter": (el) => {
+    familiarFilters = { ...familiarFilters, [el.dataset.key]: el.dataset.val };
+    renderAll();
+  },
+  "hatch-egg": (el) => {
+    const r = hatchEgg(getState(), el.dataset.egg);
+    if (!r.ok) return toast(r.error, "warn");
+    if (r.duplicate) toast(`Doublon : ${r.familiar.name} → +${r.essenceGain} ✦ Essence`, "good");
+    else toast(`Nouveau familier : ${r.familiar.name} !`, "good");
+    save();
+    renderAll();
+  },
+  "equip-familiar": (el) => {
+    const r = equipFamiliar(getState(), el.dataset.id);
+    if (!r.ok) return toast(r.error, "warn");
+    save();
+    renderAll();
+  },
+  "feed-familiar": (el) => {
+    const r = feedFamiliar(getState(), el.dataset.id);
+    if (!r.ok) return toast(r.error, "warn");
+    toast(`Lien renforcé (${r.link}/10)`, "good");
+    save();
     renderAll();
   },
   "start-activity": (el) => {

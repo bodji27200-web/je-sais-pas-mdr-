@@ -318,6 +318,30 @@ a { color: var(--gold); }
 .zone-chip .zone-done { color: var(--good); }
 .zone-chip .lock { font-size: 0.72rem; }
 
+/* Familiers — Lot 11 */
+.egg-list { display: flex; flex-wrap: wrap; gap: 10px; }
+.egg-card { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid var(--border-soft); border-radius: 10px; background: rgba(0,0,0,0.18); }
+.egg-ico { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border: 1px solid; border-radius: 50%; }
+.egg-info { display: flex; flex-direction: column; }
+.fam-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.fam-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(248px, 1fr)); gap: 10px; margin-top: 6px; }
+.fam-card { display: flex; gap: 10px; padding: 10px; border: 1px solid var(--border-soft); border-radius: 12px; background: rgba(0,0,0,0.2); }
+.fam-card.equipped { box-shadow: 0 0 0 1px var(--gold-dim) inset; }
+.fam-card.locked { opacity: 0.7; }
+.fam-portrait { flex: 0 0 56px; }
+.fam-portrait.silhouette { filter: brightness(0) saturate(0); opacity: 0.4; }
+.fam-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.fam-title { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.fam-actions { display: flex; gap: 6px; margin-top: 4px; }
+.link-bar { display: inline-flex; gap: 3px; margin: 2px 0; }
+.link-pip { width: 9px; height: 9px; border-radius: 50%; border: 1px solid var(--border); background: transparent; }
+.link-pip.on { background: var(--gold); border-color: var(--gold); }
+
+/* Familier dans l'arène : petit, près du héros, espacé (anti-scintillement). */
+.familiar-pet { position: absolute; left: 8%; bottom: 6%; transform: scale(0.52); transform-origin: bottom center; opacity: 0.96; pointer-events: none; }
+.familiar-pet .fighter-sprite { width: 96px; height: 96px; }
+.fighter-shadow.small { transform: scale(0.6); opacity: 0.5; }
+
 /* Intention télégraphiée du boss — Lot 10 */
 .intent {
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 2px;
