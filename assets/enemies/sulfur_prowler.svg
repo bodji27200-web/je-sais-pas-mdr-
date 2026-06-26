@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="78%">
+      <stop offset="0%" stop-color="#2e2e16"/><stop offset="62%" stop-color="#1c1c0c"/><stop offset="100%" stop-color="#0c0c05"/>
+    </radialGradient>
+    <radialGradient id="vig" cx="50%" cy="48%" r="62%">
+      <stop offset="66%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#000" stop-opacity="0.5"/>
+    </radialGradient>
+  </defs>
+  <rect width="256" height="256" fill="url(#bg)"/>
+
+  <ellipse cx="120" cy="150" rx="46" ry="34" fill="#8a6a1f" stroke="#caa233" stroke-width="3"/>
+  <path d="M150 130 C190 120 196 84 168 64 C176 92 156 104 150 120" fill="none" stroke="#caa233" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="166" cy="62" r="8" fill="#8a6a1f" stroke="#caa233" stroke-width="3"/>
+  <g stroke="#caa233" stroke-width="5" stroke-linecap="round">
+    <path d="M84 140 L52 122"/><path d="M84 152 L50 152"/><path d="M84 164 L54 182"/></g>
+  <circle cx="106" cy="142" r="5" fill="#fff0a0"/><circle cx="132" cy="142" r="5" fill="#fff0a0"/>
+  <rect width="256" height="256" fill="url(#vig)"/>
+</svg>

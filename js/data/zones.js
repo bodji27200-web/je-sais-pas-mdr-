@@ -27,6 +27,55 @@ export const ZONES = {
     // Boss : niveau requis + dernier palier vaincu prevKills fois.
     bossUnlock: { level: 6, prevKills: 3 },
   },
+
+  shadowstone_quarry: {
+    id: "shadowstone_quarry",
+    name: "Carrière d'Ombrepierre",
+    icon: "⛰️",
+    image: "assets/zones/shadowstone_quarry.png",
+    arena: "assets/zones/shadowstone_quarry.png",
+    recommendedLevel: 6,
+    elements: ["umbral", "nature"], // éléments dominants de la zone
+    desc:
+      "Une carrière abandonnée où la pierre garde l'écho des mineurs morts. " +
+      "Les âmes y marquent les vivants ; Vorrak veille sur l'effondrement.",
+    enemies: ["dust_weaver", "miner_wraith", "shale_golem", "echo_bat", "damned_foreman"],
+    boss: "vorrak_collapse",
+    // La zone se débloque après avoir vaincu le boss de la zone précédente.
+    unlock: { prevBoss: "goblin_chief_grok" },
+    progression: [
+      { enemy: "dust_weaver", level: 6, prevKills: 0, clearKills: 3 },
+      { enemy: "miner_wraith", level: 7, prevKills: 3, clearKills: 3 },
+      { enemy: "shale_golem", level: 8, prevKills: 3, clearKills: 3 },
+      { enemy: "echo_bat", level: 9, prevKills: 3, clearKills: 3 },
+      { enemy: "damned_foreman", level: 10, prevKills: 3, clearKills: 3 },
+    ],
+    bossUnlock: { level: 11, prevKills: 3 },
+  },
+
+  pyrelake_ashes: {
+    id: "pyrelake_ashes",
+    name: "Cendres de Pyrelac",
+    icon: "🌋",
+    image: "assets/zones/pyrelake_ashes.png",
+    arena: "assets/zones/pyrelake_ashes.png",
+    recommendedLevel: 10,
+    elements: ["fire", "lightning"],
+    desc:
+      "Un lac de lave figé sous une pluie de cendres. La chaleur brûle, la " +
+      "foudre crépite, et Ignar bat tel un cœur de braise au centre du cratère.",
+    enemies: ["magma_larva", "spark_elemental", "ash_carapace", "sulfur_prowler", "flame_priest"],
+    boss: "ignar_emberheart",
+    unlock: { prevBoss: "vorrak_collapse" },
+    progression: [
+      { enemy: "magma_larva", level: 10, prevKills: 0, clearKills: 3 },
+      { enemy: "spark_elemental", level: 11, prevKills: 3, clearKills: 3 },
+      { enemy: "ash_carapace", level: 12, prevKills: 3, clearKills: 3 },
+      { enemy: "sulfur_prowler", level: 13, prevKills: 3, clearKills: 3 },
+      { enemy: "flame_priest", level: 14, prevKills: 3, clearKills: 3 },
+    ],
+    bossUnlock: { level: 15, prevKills: 3 },
+  },
 };
 
 export function getZone(id) {

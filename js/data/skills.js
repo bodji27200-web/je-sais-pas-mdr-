@@ -306,6 +306,151 @@ export const SKILLS = {
     passive: { hpRegenPct: 0.05 },
     desc: "Régénère 5 % de ses PV max chaque tour.",
   },
+  // Sustain de BOSS (PV élevés -> régénération volontairement faible, sinon
+  // imbattable). Voir équilibrage Lot 10.
+  boss_resilience: {
+    id: "boss_resilience", name: "Résilience", type: "passive",
+    passive: { hpRegenPct: 0.018 },
+    desc: "Régénère lentement (~2 % des PV max par tour).",
+  },
+  soul_siphon: {
+    id: "soul_siphon", name: "Siphon d'âme", type: "passive",
+    passive: { lifestealPct: 0.1 },
+    desc: "Récupère 10 % des dégâts infligés (vol de vie).",
+  },
+
+  // ===================== ENNEMIS — Zone 2 : Carrière d'Ombrepierre =====================
+  // (Thème Umbral : âmes, marque funéraire, défenses minérales.)
+  dust_bolt: {
+    id: "dust_bolt", name: "Jet de poussière", type: "active", power: 1.1, cooldown: 2,
+    target: "enemy", anim: "ranged", onHit: [{ type: "slow", amount: 0.2, turns: 2 }],
+    desc: "Projette une bourrasque de poussière (110 %) qui ralentit.",
+  },
+  soul_drain: {
+    id: "soul_drain", name: "Drain d'âme", type: "active", power: 1.2, cooldown: 2,
+    target: "enemy", anim: "magic", element: "umbral", inflicts: "soulmark",
+    self: [{ type: "heal", pctMaxHp: 0.06 }],
+    desc: "Aspire l'âme (120 %, Umbral), applique la Marque funéraire et se soigne un peu.",
+  },
+  spectral_wail: {
+    id: "spectral_wail", name: "Lamentation", type: "active", power: 0, cooldown: 3,
+    target: "enemy", anim: "buff", onHit: [{ type: "atk_debuff", amount: 0.25, turns: 2 }],
+    desc: "Un cri d'outre-tombe qui affaiblit l'attaque adverse de 25 %.",
+  },
+  stone_fist: {
+    id: "stone_fist", name: "Poing de schiste", type: "active", power: 1.4, cooldown: 2,
+    target: "enemy", anim: "heavy", desc: "Un coup de roche massif (140 %).",
+  },
+  brace: {
+    id: "brace", name: "Carapace", type: "active", power: 0, cooldown: 4,
+    target: "self", anim: "buff",
+    self: [{ type: "def_buff", amount: 0.55, turns: 2 }, { type: "guard", reduce: 0.45, turns: 1 }],
+    desc: "Se met en garde minérale : défense +55 % et prochaine attaque réduite.",
+  },
+  screech: {
+    id: "screech", name: "Cri d'écho", type: "active", power: 0.6, cooldown: 2,
+    target: "enemy", anim: "ranged", element: "wind", inflicts: "unbalance",
+    desc: "Onde sonore (60 %, Vent) qui déséquilibre la cible.",
+  },
+  dive: {
+    id: "dive", name: "Piqué", type: "active", power: 1.3, cooldown: 2,
+    target: "enemy", anim: "light", desc: "Fond sur la cible à pleine vitesse (130 %).",
+  },
+  cursed_smash: {
+    id: "cursed_smash", name: "Frappe maudite", type: "active", power: 1.6, cooldown: 3,
+    target: "enemy", anim: "heavy", element: "umbral", inflicts: "soulmark",
+    desc: "Écrase la cible (160 %) et la marque de l'au-delà.",
+  },
+  dark_rally: {
+    id: "dark_rally", name: "Appel des damnés", type: "active", power: 0, cooldown: 4,
+    target: "self", anim: "buff", self: [{ type: "atk_buff", amount: 0.35, turns: 3 }],
+    desc: "Galvanise les morts : attaque +35 % pendant 3 tours.",
+  },
+
+  // ===================== ENNEMIS — Zone 3 : Cendres de Pyrelac =====================
+  // (Thème Feu / Foudre : brûlures, charges, fournaise.)
+  ember_spit: {
+    id: "ember_spit", name: "Crachat de braise", type: "active", power: 1.1, cooldown: 2,
+    target: "enemy", anim: "magic", element: "fire", inflicts: "burn",
+    desc: "Projette une braise (110 %, Feu) qui embrase la cible.",
+  },
+  arc_zap: {
+    id: "arc_zap", name: "Arc électrique", type: "active", power: 1.0, cooldown: 2,
+    target: "enemy", anim: "magic", element: "lightning", inflicts: "charge",
+    desc: "Décharge un arc (100 %, Foudre) qui accumule une Charge.",
+  },
+  cinder_guard: {
+    id: "cinder_guard", name: "Voile de cendres", type: "active", power: 0, cooldown: 4,
+    target: "self", anim: "buff",
+    self: [{ type: "def_buff", amount: 0.5, turns: 3 }, { type: "shield", pctMaxHp: 0.18, turns: 3 }],
+    desc: "S'entoure de cendres : défense +50 % et bouclier sur 3 tours.",
+  },
+  sear_claw: {
+    id: "sear_claw", name: "Griffe ardente", type: "active", power: 1.2, cooldown: 2,
+    target: "enemy", anim: "light", element: "fire", inflicts: "burn",
+    onHit: [{ type: "poison", pctAtk: 0.3, turns: 2 }],
+    desc: "Lacère et embrase (120 %, Feu) : Brûlure + venin de soufre.",
+  },
+  searing_mend: {
+    id: "searing_mend", name: "Onction ardente", type: "active", power: 0, cooldown: 3,
+    target: "self", anim: "buff", self: [{ type: "heal", pctMaxHp: 0.16 }, { type: "def_buff", amount: 0.2, turns: 2 }],
+    desc: "Se soigne de 16 % des PV et renforce sa défense.",
+  },
+  flame_lash: {
+    id: "flame_lash", name: "Fouet de flammes", type: "active", power: 1.3, cooldown: 2,
+    target: "enemy", anim: "magic", element: "fire", inflicts: "burn",
+    desc: "Un fouet incandescent (130 %, Feu) qui embrase.",
+  },
+
+  // ===================== BOSS — Vorrak, l'Effondrement (Umbral) =====================
+  vorrak_smash: {
+    id: "vorrak_smash", name: "Éboulement", type: "active", power: 1.8, cooldown: 2,
+    target: "enemy", anim: "heavy", desc: "Abat une masse de pierre (180 %).",
+  },
+  soul_harvest: {
+    id: "soul_harvest", name: "Moisson des âmes", type: "active", power: 1.3, cooldown: 3,
+    target: "enemy", anim: "magic", element: "umbral", inflicts: "soulmark",
+    self: [{ type: "heal", pctMaxHp: 0.1 }],
+    desc: "Récolte l'âme (130 %, Umbral), marque la cible et se soigne de 10 %.",
+  },
+  collapse: {
+    id: "collapse", name: "Effondrement total", type: "active", power: 2.5, cooldown: 3,
+    target: "enemy", anim: "heavy", onHit: [{ type: "slow", amount: 0.3, turns: 2 }],
+    desc: "Fait s'écrouler la galerie (250 %) : dégâts massifs et ralentissement.",
+  },
+  grave_ward: {
+    id: "grave_ward", name: "Sceau funéraire", type: "active", power: 0, cooldown: 4,
+    target: "self", anim: "buff",
+    self: [{ type: "def_buff", amount: 0.4, turns: 2 }, { type: "shield", pctMaxHp: 0.2, turns: 3 }],
+    desc: "Érige un sceau : défense +40 % et bouclier funéraire.",
+  },
+
+  // ===================== BOSS — Ignar, Cœur de Braise (Feu / Foudre) =====================
+  ignar_slam: {
+    id: "ignar_slam", name: "Marteau de magma", type: "active", power: 1.8, cooldown: 2,
+    target: "enemy", anim: "heavy", element: "fire", desc: "Un coup de magma en fusion (180 %, Feu).",
+  },
+  flame_wave: {
+    id: "flame_wave", name: "Vague ardente", type: "active", power: 1.4, cooldown: 2,
+    target: "enemy", anim: "magic", element: "fire", inflicts: "burn",
+    desc: "Déferlante de flammes (140 %, Feu) qui embrase profondément.",
+  },
+  thunder_call: {
+    id: "thunder_call", name: "Appel du tonnerre", type: "active", power: 1.2, cooldown: 2,
+    target: "enemy", anim: "magic", element: "lightning", inflicts: "charge",
+    desc: "Invoque la foudre (120 %, Foudre) et accumule une Charge.",
+  },
+  meteor: {
+    id: "meteor", name: "Pluie de météores", type: "active", power: 2.6, cooldown: 3,
+    target: "enemy", anim: "heavy", element: "fire", inflicts: "burn",
+    desc: "Fait pleuvoir le ciel en feu (260 %, Feu) : dégâts dévastateurs et Brûlure.",
+  },
+  ember_shield: {
+    id: "ember_shield", name: "Aegis de braise", type: "active", power: 0, cooldown: 4,
+    target: "self", anim: "buff",
+    self: [{ type: "def_buff", amount: 0.45, turns: 2 }, { type: "shield", pctMaxHp: 0.22, turns: 3 }],
+    desc: "Bouclier de braise : défense +45 % et absorption sur 3 tours.",
+  },
 };
 
 export function getSkill(id) {

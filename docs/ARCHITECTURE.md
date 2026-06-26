@@ -23,8 +23,8 @@ js/
     resources.js        11 ressources (matières, intermédiaires, butin)
     equipment.js        25 équipements (armes par classe + 3 familles d'armure)
     recipes.js          Recettes (4 stations : forge/tannerie/couture/joaillerie)
-    enemies.js          4 ennemis + 1 boss (Forêt des Murmures)
-    zones.js            1 zone avec progression ordonnée + déblocage du boss
+    enemies.js          14 ennemis + 3 boss (3 zones) ; bosses = phases + 2 passives
+    zones.js            3 zones (progression ordonnée, déblocage de zone par boss)
     rarities.js         5 raretés (commun -> légendaire), poids + sensibilité chance
   core/                 Moteur transverse
     state.js            État global, sauvegarde localStorage, MIGRATIONS (v1->v3)
@@ -116,8 +116,17 @@ sont rafraîchis de façon ciblée. **Contrainte forte à préserver.**
   build dominant** (>60 % contre toutes), **aucun build inutile**, voies d'une
   même classe resserrées. Ajustements : départ de ressource Guerrier/Assassin
   (ouverture), Templier offensif, Rempart plus increvable, Rôdeur/Trappeur revus.
-- **Limite** : boss = panoplie sans phases (Lot 10). Le duel sous-estime les
-  tanks (valeur de mitigation surtout PvE) — à revalider avec le contenu Lot 10.
+- **Lot 10** : **phases de boss** data-driven (`enemy.phases` : seuils de PV qui
+  changent une RÈGLE — atk, brise-bouclier, élément, perce-défense, compétence
+  signature — pas un simple +atk) + **intentions télégraphiées** (`planIntent`,
+  `nextEnemySkill`, `enemyIntentInfo` : le boss s'engage sur sa prochaine action,
+  le joueur peut réagir) + **2e passive** boss (`secondPassive`). `effectiveAtk`
+  intègre `phaseAtkPct`, `dealDamage` applique `phaseDefShred` et l'élément de
+  phase. 2 zones (Ombrepierre/Umbral, Pyrelac/Feu-Foudre), **5 ennemis chacune**
+  à mécaniques distinctes + 1 boss à phases ; déblocage de zone par boss précédent
+  (`zoneUnlocked`). Sélecteur de zones dans le menu Combat. Drops = ressources
+  EXISTANTES (anti-orphelin). **26 SVG originaux** (créatures + biomes, style
+  maison, zéro emoji final).
 
 ### Équipement & raretés (`items.js`, `rarities.js`)
 - Instances uniques : `{uid, baseId, rarity, stats, lvl}`. Rareté = multiplicateur
@@ -178,6 +187,9 @@ sont rafraîchis de façon ciblée. **Contrainte forte à préserver.**
 9. ✅ Simulateur de duel (réutilise le vrai moteur) + audit/équilibrage des 15
    voies : aucun build dominant ni inutile, voies d'une classe resserrées.
    Tests : 5 cas d'invariants d'équilibrage (round-robin, équipement comparable).
+10. ✅ 2 zones (10 ennemis à mécaniques distinctes + 2 boss à phases), intentions
+   télégraphiées, déblocage de zone, sélecteur de zones, 26 SVG originaux.
+   Tests : 7 cas (zones, déblocages ordonnés, phases, intentions, terminaison).
 10. 2 nouvelles zones, 5 ennemis chacune, boss à phases.
 11. Familiers (première version complète).
 12. Guides contextuels, quêtes de découverte, succès.

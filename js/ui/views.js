@@ -15,10 +15,10 @@ import { upgradeCost, canUpgrade, dismantleReward } from "../systems/gear.js";
 import { RECIPES, STATIONS } from "../data/recipes.js";
 import { ENEMIES, getEnemy } from "../data/enemies.js";
 import { ZONES, allZones } from "../data/zones.js";
-import { enemyUnlock, zoneProgress } from "../systems/zoneprog.js";
+import { enemyUnlock, zoneProgress, zoneUnlocked } from "../systems/zoneprog.js";
 import { getDerivedStats, getStatDetails, canWieldWeapon, getActiveSpec, specUnlocked, nextRespecCost, familyCounts, activeMaterialBonuses } from "../core/character.js";
 import { MATERIALS } from "../data/materials.js";
-import { forecastTurns, whyCannotUse, DEF_K, DEF_CAP } from "../systems/combat.js";
+import { forecastTurns, whyCannotUse, enemyIntentInfo, DEF_K, DEF_CAP } from "../systems/combat.js";
 import { getState as getStateDef } from "../data/states.js";
 import { getElement } from "../data/elements.js";
 import { specsForClass, SPEC_UNLOCK_LEVEL } from "../data/specializations.js";
@@ -758,8 +758,26 @@ function bestiaryLine(state, enemy) {
   return `<div class="bestiary-line small">${weak ? `<span class="muted">Faible : </span>${weak} ` : ""}${res ? `<span class="muted">Résiste : </span>${res}` : ""}</div>`;
 }
 
-export function renderZones(state) {
-  const zone = Object.values(ZONES)[0];
+export function renderZones(state, selectedZoneId) {
+  const zonesList = Object.values(ZONES);
+  // Zone sélectionnée (défaut : 1re). Si verrouillée, on retombe sur la 1re.
+  let zone = zonesList.find((z) => z.id === selectedZoneId) || zonesList[0];
+  if (!zoneUnlocked(state, zone.id).unlocked) zone = zonesList[0];
+
+  // Sélecteur de zones (cartes/chips). Zone verrouillée -> non cliquable + raison.
+  const zoneChips = zonesList
+    .map((z) => {
+      const u = zoneUnlocked(state, z.id);
+      const active = z.id === zone.id;
+      const done = zoneProgress(state, z.id) >= 100;
+      if (!u.unlocked) {
+        return `<button class="zone-chip locked" disabled title="Verrouillée : ${esc(u.reason)}">${z.icon} ${esc(z.name)} <span class="lock">🔒</span></button>`;
+      }
+      return `<button class="zone-chip ${active ? "active" : ""}" data-act="select-zone" data-zone="${z.id}">${z.icon} ${esc(z.name)}${done ? ' <span class="zone-done">✓</span>' : ""}</button>`;
+    })
+    .join("");
+  const zoneSelector = `<div class="zone-selector">${zoneChips}</div>`;
+
   const prog = zoneProgress(state, zone.id);
   const defeated = (id) => (state.counters && state.counters.defeated && state.counters.defeated[id]) || 0;
 
@@ -792,11 +810,20 @@ export function renderZones(state) {
     ? `Niv. ${boss.level} · PV ${boss.stats.hp}`
     : `Requis : ${esc(bu.reasons.join(" · "))}`;
 
+  const elTags = (zone.elements || [])
+    .map((id) => {
+      const el = getElement(id);
+      return el ? `<span class="el-tag" style="border-color:${el.color};color:${el.color}">${el.icon} ${esc(el.name)}</span>` : "";
+    })
+    .join(" ");
+
   return `
     <section class="panel">
+      ${zoneSelector}
       <div class="zone-head">
         ${sigil(zone.image, zone.icon, "lg")}
-        <div><h2>${esc(zone.name)}</h2><p class="muted">${esc(zone.desc)}</p><p class="muted small">Niveau conseillé : ${zone.recommendedLevel}+</p></div>
+        <div><h2>${esc(zone.name)}</h2><p class="muted">${esc(zone.desc)}</p>
+          <p class="muted small">Niveau conseillé : ${zone.recommendedLevel}+${elTags ? ` · Éléments : ${elTags}` : ""}</p></div>
       </div>
       <div class="zone-prog">
         <div class="bar"><div class="bar-fill xp" style="width:${prog}%"></div></div>
@@ -844,6 +871,20 @@ export function renderForecast(combat) {
     .map((who) => `<span class="fc-chip ${who === "player" ? "you" : "foe"}">${who === "player" ? "Toi" : "Adv."}</span>`)
     .join("");
   return `<span class="muted small">Ordre probable :</span> ${chips}`;
+}
+
+// Intention télégraphiée du boss (prochaine action annoncée). Permet au joueur
+// de se préparer (défendre, affaiblir, interrompre). Vide pour les non-boss.
+export function renderIntent(combat) {
+  const info = enemyIntentInfo(combat);
+  if (!info) return "";
+  const el = info.element ? getElement(info.element) : null;
+  const dot = el ? `<span class="el-dot" style="background:${el.color}"></span>` : "";
+  const phase = info.phase ? `<span class="intent-phase">${esc(info.phase)}</span>` : "";
+  return `<div class="intent ${info.danger ? "danger" : ""}">
+      <span class="intent-ico">${info.danger ? "⚠" : "◔"}</span>
+      <span class="intent-txt">${combat.enemy.name} prépare : ${dot}<strong>${esc(info.name)}</strong></span>${phase}
+    </div>`;
 }
 
 // Log de combat (texte seulement, mis à jour de façon ciblée).
@@ -986,6 +1027,7 @@ export function renderBattle(state, combat) {
         <span class="arena-turn">Tour <strong id="bt-turn">${combat.turn}</strong></span>
       </div>
       <div class="turn-forecast" id="bt-forecast">${renderForecast(combat)}</div>
+      <div id="bt-intent">${renderIntent(combat)}</div>
       <div class="arena" id="bt-arena">
         ${chainImg(bg, "arena-bg-img", "this.remove()")}
         <div class="arena-stage">

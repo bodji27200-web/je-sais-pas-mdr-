@@ -49,6 +49,16 @@ export function enemyUnlock(state, enemyId) {
   return { unlocked: reasons.length === 0, reasons };
 }
 
+// Une zone est-elle débloquée ? (le boss de la zone précédente doit être vaincu).
+// { unlocked, reason }.
+export function zoneUnlocked(state, zoneId) {
+  const zone = getZone(zoneId);
+  if (!zone || !zone.unlock || !zone.unlock.prevBoss) return { unlocked: true, reason: "" };
+  const have = defeatedCount(state, zone.unlock.prevBoss);
+  if (have > 0) return { unlocked: true, reason: "" };
+  return { unlocked: false, reason: `Vaincre ${getEnemy(zone.unlock.prevBoss)?.name || zone.unlock.prevBoss}` };
+}
+
 // Progression de la zone en % (0–100). 100 % = boss vaincu.
 export function zoneProgress(state, zoneId) {
   const zone = getZone(zoneId);

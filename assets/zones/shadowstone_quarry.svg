@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#2b2740"/><stop offset="55%" stop-color="#1c1a2c"/><stop offset="100%" stop-color="#0c0b14"/></linearGradient>
+    <radialGradient id="haze" cx="50%" cy="70%" r="60%"><stop offset="0%" stop-color="#6a5a8c" stop-opacity="0.4"/><stop offset="100%" stop-color="#6a5a8c" stop-opacity="0"/></radialGradient></defs>
+  <rect width="256" height="256" fill="url(#sky)"/>
+  <circle cx="196" cy="64" r="30" fill="#cabbe6" opacity="0.5"/>
+  <g fill="#221d30" stroke="#3a3350" stroke-width="2">
+    <polygon points="0,256 0,150 50,120 96,150 96,256"/>
+    <polygon points="96,256 96,128 150,96 210,134 210,256"/>
+    <polygon points="180,256 210,150 256,128 256,256"/></g>
+  <g fill="#171323"><rect x="30" y="170" width="40" height="86"/><rect x="120" y="150" width="54" height="106"/></g>
+  <rect width="256" height="256" fill="url(#haze)"/>
+</svg>

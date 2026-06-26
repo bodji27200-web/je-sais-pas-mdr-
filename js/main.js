@@ -51,6 +51,7 @@ import {
   renderBattleLog,
   renderBattleControls,
   renderForecast,
+  renderIntent,
   renderStates,
   renderObjectives,
   topbarActivityInner,
@@ -67,6 +68,7 @@ const TABS = [
 let currentTab = "jobs";
 let currentCombat = null;
 let selectedClassId = null;
+let currentZoneId = null; // zone sélectionnée dans le menu Combat (défaut : 1re)
 // Filtres de l'Atelier (persistants pendant la session).
 let craftFilters = defaultCraftFilters();
 let lastTick = Date.now();
@@ -91,7 +93,7 @@ function renderScreen() {
     case "inventory":
       return renderInventory(state);
     case "combat":
-      return renderZones(state);
+      return renderZones(state, currentZoneId);
     default:
       return renderJobs(state);
   }
@@ -276,6 +278,8 @@ function updateBattle(state, combat) {
   setText("bt-turn", combat.turn);
   const fc = document.getElementById("bt-forecast");
   if (fc) fc.innerHTML = renderForecast(combat);
+  const it = document.getElementById("bt-intent");
+  if (it) it.innerHTML = renderIntent(combat);
   const sp = document.getElementById("bt-states-player");
   if (sp) sp.innerHTML = renderStates(combat.player);
   const se = document.getElementById("bt-states-enemy");
@@ -390,6 +394,10 @@ const handlers = {
     }
     currentCombat = null;
     currentTab = el.dataset.tab;
+    renderAll();
+  },
+  "select-zone": (el) => {
+    currentZoneId = el.dataset.zone;
     renderAll();
   },
   "start-activity": (el) => {

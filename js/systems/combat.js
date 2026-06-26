@@ -215,13 +215,28 @@ export function startCombat(state, enemyId) {
   e.role = enemy.role || null;
   e.resist = enemy.resist || {}; // résistances/vulnérabilités élémentaires
 
+  // Seconde passive éventuelle (boss : 2 passives) — fusionnée dans pp.
+  if (enemy.secondPassive) {
+    const sp = getSkill(enemy.secondPassive);
+    if (sp && sp.passive) mergePp(e.pp, sp.passive);
+  }
+
+  // Phases de boss (Lot 10) : règles qui changent sous des seuils de PV.
+  e.phases = enemy.phases || [];
+  e.phaseIdx = 0;
+  e.phaseAtkPct = 0;
+  e.phaseDefShred = 0;
+  e.element = null; // élément des attaques sans élément propre (posé par les phases)
+  e.phaseName = null;
+  e.planned = null; // action télégraphiée (intention)
+
   // Bestiaire : on note la rencontre (les résistances se révèlent après le combat).
   if (state.bestiary) {
     const b = state.bestiary[enemy.id] || (state.bestiary[enemy.id] = { seen: false, resistKnown: false });
     b.seen = true;
   }
 
-  return {
+  const combat = {
     enemyId,
     player,
     enemy: e,
@@ -233,6 +248,8 @@ export function startCombat(state, enemyId) {
     lastFx: [],
     lastActions: [],
   };
+  if (e.isBoss) planIntent(combat); // première intention télégraphiée
+  return combat;
 }
 
 function log(combat, text, kind = "info") {
@@ -248,6 +265,7 @@ function sumBuff(c, type) {
 function effectiveAtk(c) {
   let mult = 1 + sumBuff(c, "atk_buff") - sumBuff(c, "atk_debuff");
   if (c.pp.lowHpAtk && c.hp / c.maxHp < c.pp.lowHpAtk.threshold) mult += c.pp.lowHpAtk.bonus;
+  if (c.phaseAtkPct) mult += c.phaseAtkPct; // enrage de phase (boss)
   return Math.max(0.1, c.atk * mult);
 }
 function effectiveDef(c) {
@@ -325,8 +343,9 @@ function dealDamage(combat, attacker, defender, power, opts = {}) {
   // Passive : bonus contre cible affaiblie (malus/DoT).
   if (attacker.pp.vsDebuff && hasNegative(defender)) base *= 1 + attacker.pp.vsDebuff.bonus;
 
-  // Défense (rendements décroissants).
-  base *= 1 - defReduction(effectiveDef(defender));
+  // Défense (rendements décroissants) — éventuellement percée par une phase de boss.
+  const shred = attacker.phaseDefShred || 0;
+  base *= 1 - defReduction(effectiveDef(defender) * (1 - shred));
 
   // Élément : résistances/vulnérabilités de la cible + états (Trempé, Exposé...).
   base *= incomingMultiplier(defender, opts.element || null);
@@ -401,7 +420,7 @@ function useSkill(combat, actor, other, skillId) {
     let total = 0;
     let anyCrit = false;
     for (let i = 0; i < hits && other.hp > 0; i++) {
-      const r = dealDamage(combat, actor, other, skill.power, { skillId, critBonus: skill.critBonus || 0, concBonus, element: skill.element || null });
+      const r = dealDamage(combat, actor, other, skill.power, { skillId, critBonus: skill.critBonus || 0, concBonus, element: skill.element || actor.element || null });
       total += r.dmg;
       anyCrit = anyCrit || r.isCrit;
       landed = true;
@@ -544,6 +563,61 @@ function chooseEnemySkill(combat) {
   return best;
 }
 
+// --- Phases de boss (Lot 10) -------------------------------------------------
+// Quand les PV du boss passent SOUS un seuil, on entre dans la phase : règles
+// persistantes (atk/defShred/élément) + effets ponctuels (heal, brise-bouclier,
+// nouvelle compétence). Boucle au cas où plusieurs seuils sont franchis d'un coup.
+function checkPhase(combat) {
+  const e = combat.enemy;
+  if (!e.phases || e.phaseIdx >= e.phases.length || e.hp <= 0) return;
+  while (e.phaseIdx < e.phases.length) {
+    const ph = e.phases[e.phaseIdx];
+    if (e.hp / e.maxHp > ph.atHpPct) break;
+    const set = ph.set || {};
+    if (set.atkPct) e.phaseAtkPct = (e.phaseAtkPct || 0) + set.atkPct;
+    if (set.defShredPct) e.phaseDefShred = Math.max(e.phaseDefShred || 0, set.defShredPct);
+    if (set.element) e.element = set.element;
+    if (set.clearShields) { combat.player.shield = 0; combat.player.shieldTurns = 0; }
+    if (ph.heal) e.hp = Math.min(e.maxHp, e.hp + Math.round(e.maxHp * ph.heal));
+    if (ph.grant && !e.skills.includes(ph.grant)) e.skills.push(ph.grant);
+    e.phaseName = ph.name;
+    log(combat, `⚠ ${e.name} — ${ph.name} : ${ph.announce}`, "enemy");
+    e.phaseIdx++;
+  }
+}
+
+// --- Intentions télégraphiées (boss) ----------------------------------------
+// Le boss ANNONCE sa prochaine action ; il s'y engage (le joueur peut réagir :
+// se défendre, baisser ses PV, l'affaiblir). planIntent fixe l'action prévue.
+function planIntent(combat) {
+  const e = combat.enemy;
+  if (!e.isBoss || combat.status !== "active") { e.planned = null; return; }
+  e.planned = chooseEnemySkill(combat);
+}
+
+// Compétence que l'ennemi joue : l'intention engagée si elle est prête, sinon un
+// choix frais. Consomme l'intention.
+function nextEnemySkill(combat) {
+  const e = combat.enemy;
+  const ready = (id) => !e.cooldowns[id] || e.cooldowns[id] <= 0;
+  if (e.planned && ready(e.planned)) {
+    const s = e.planned;
+    e.planned = null;
+    return s;
+  }
+  return chooseEnemySkill(combat);
+}
+
+// Info d'intention pour l'UI (nom, élément, danger). Danger = gros coup signature.
+export function enemyIntentInfo(combat) {
+  const e = combat.enemy;
+  if (!e || !e.isBoss || combat.status !== "active" || !e.planned) return null;
+  const s = getSkill(e.planned);
+  if (!s) return null;
+  const danger = (s.power || 0) >= 1.8;
+  return { name: s.name, element: s.element || e.element || null, danger, phase: e.phaseName || null };
+}
+
 // Entretien après chaque action du joueur : DoT, cooldowns, buffs, régén.
 function upkeep(combat) {
   for (const c of [combat.player, combat.enemy]) {
@@ -642,12 +716,14 @@ export function resolveRound(state, combat, playerSkillId) {
   // Action du joueur.
   useSkill(combat, combat.player, combat.enemy, playerSkillId);
   combat.player.nextAt += SPEED_UNIT / effectiveSpd(combat.player);
+  checkPhase(combat); // un burst peut faire franchir un seuil de phase tout de suite
   checkDeaths(state, combat);
 
-  // Tours de l'ennemi tant que c'est son tour (≤ MAX_CONSEC).
+  // Tours de l'ennemi tant que c'est son tour (≤ MAX_CONSEC). Le boss joue
+  // l'action télégraphiée si elle est prête (le joueur a pu s'y préparer).
   let eActed = 0;
   while (combat.status === "active" && combat.enemy.nextAt <= combat.player.nextAt + 1e-6 && eActed < MAX_CONSEC) {
-    useSkill(combat, combat.enemy, combat.player, chooseEnemySkill(combat));
+    useSkill(combat, combat.enemy, combat.player, nextEnemySkill(combat));
     combat.enemy.nextAt += SPEED_UNIT / effectiveSpd(combat.enemy);
     eActed++;
     checkDeaths(state, combat);
@@ -657,7 +733,7 @@ export function resolveRound(state, combat, playerSkillId) {
   if (eActed === 0) {
     combat.pConsec += 1;
     if (combat.status === "active" && combat.pConsec >= MAX_CONSEC) {
-      useSkill(combat, combat.enemy, combat.player, chooseEnemySkill(combat));
+      useSkill(combat, combat.enemy, combat.player, nextEnemySkill(combat));
       combat.enemy.nextAt += SPEED_UNIT / effectiveSpd(combat.enemy);
       combat.pConsec = 0;
       checkDeaths(state, combat);
@@ -670,7 +746,9 @@ export function resolveRound(state, combat, playerSkillId) {
 
   if (combat.status === "active") {
     upkeep(combat);
+    checkPhase(combat); // un DoT peut aussi faire franchir un seuil
     checkDeaths(state, combat); // un DoT peut achever un combattant
+    planIntent(combat); // télégraphie la prochaine action du boss
   }
   return combat;
 }

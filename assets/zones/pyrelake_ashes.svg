@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs><linearGradient id="sky2" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#3a1f16"/><stop offset="55%" stop-color="#23110b"/><stop offset="100%" stop-color="#100604"/></linearGradient>
+    <radialGradient id="lava" cx="50%" cy="92%" r="70%"><stop offset="0%" stop-color="#ff7a1e"/><stop offset="55%" stop-color="#b53a12" stop-opacity="0.7"/><stop offset="100%" stop-color="#b53a12" stop-opacity="0"/></radialGradient></defs>
+  <rect width="256" height="256" fill="url(#sky2)"/>
+  <circle cx="60" cy="60" r="22" fill="#ff9a4a" opacity="0.35"/>
+  <g fill="#1c0d08" stroke="#3a1d12" stroke-width="2">
+    <polygon points="0,256 0,160 46,128 92,162 92,256"/>
+    <polygon points="150,256 150,140 196,110 256,150 256,256"/>
+    <polygon points="92,256 110,170 138,150 150,170 150,256"/></g>
+  <ellipse cx="128" cy="244" rx="150" ry="40" fill="url(#lava)"/>
+  <g stroke="#ff8a3a" stroke-width="2" opacity="0.7"><path d="M20 250 L60 232 L100 250"/><path d="M150 248 L190 230 L236 250"/></g>
+</svg>
