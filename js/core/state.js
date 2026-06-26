@@ -4,6 +4,7 @@
 
 import { getClass } from "../data/classes.js";
 import { STATIONS } from "../data/recipes.js";
+import { getEquipment } from "../data/equipment.js";
 import { makeInstance } from "./items.js";
 
 // Métiers de transformation (Fonte, Forge, etc.) : niveau propre qui monte en
@@ -20,7 +21,7 @@ export const SAVE_KEY = "idle_rpg_save_v1";
 // Copie de sécurité écrite AVANT toute migration : si une migration tournait mal
 // dans une future version, on garde une trace de la sauvegarde d'origine.
 export const BACKUP_KEY = "idle_rpg_save_backup";
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 
 let state = null;
 
@@ -57,7 +58,7 @@ export function newGame(name, classId) {
       level: 1,
       xp: 0,
       hpCurrent: cls.baseStats.hp, // ajusté ensuite par les stats dérivées
-      equipment: { weapon: null, head: null, chest: null, legs: null, accessory: null },
+      equipment: { weapon: null, head: null, chest: null, hands: null, legs: null, feet: null, accessory: null },
       specId: null, // voie de spécialisation (choisie au niveau 10)
       specChanges: 0, // nombre de changements de voie payés (coût croissant)
     },
@@ -140,6 +141,31 @@ function migrate(parsed) {
   if (parsed.version === 4) {
     parsed.professions = initProfessions(parsed.professions || {});
     parsed.version = 5;
+  }
+  // v5 -> v6 : emplacements d'armure Mains et Bottes. On ajoute les nouveaux
+  // slots et on replace les pièces mal rangées (ex. bottes de cuir : legs -> feet).
+  if (parsed.version === 5) {
+    const eq = parsed.character && parsed.character.equipment;
+    if (eq) {
+      for (const slot of ["weapon", "head", "chest", "hands", "legs", "feet", "accessory"]) {
+        if (eq[slot] === undefined) eq[slot] = null;
+      }
+      for (const key of Object.keys(eq)) {
+        const inst = eq[key];
+        if (!inst || !inst.baseId) continue;
+        const tpl = getEquipment(inst.baseId);
+        if (tpl && tpl.slot !== key) {
+          eq[key] = null;
+          if (!eq[tpl.slot]) eq[tpl.slot] = inst;
+          else {
+            if (!parsed.inventory) parsed.inventory = { resources: {}, equipment: [] };
+            if (!Array.isArray(parsed.inventory.equipment)) parsed.inventory.equipment = [];
+            parsed.inventory.equipment.push(inst);
+          }
+        }
+      }
+    }
+    parsed.version = 6;
   }
   return parsed.version === SAVE_VERSION ? parsed : null;
 }

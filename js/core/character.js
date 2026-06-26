@@ -4,6 +4,7 @@ import { getClass } from "../data/classes.js";
 import { getEquipment } from "../data/equipment.js";
 import { getSkill } from "../data/skills.js";
 import { getSpec, SPEC_UNLOCK_LEVEL, respecCost } from "../data/specializations.js";
+import { MATERIALS } from "../data/materials.js";
 import {
   addEquipmentInstance,
   removeEquipmentInstance,
@@ -17,18 +18,12 @@ export const OUT_OF_COMBAT_REGEN_PER_SEC = 0.03;
 
 const STAT_KEYS = ["hp", "atk", "def", "spd", "crit"];
 
-// Slots d'armure pris en compte pour les bonus de famille (set 3 pièces).
-const ARMOR_SLOTS = ["head", "chest", "legs"];
+// Slots d'armure pris en compte pour les bonus de matériau (seuils 2 / 4 pièces).
+// Cinq emplacements -> les seuils 2 et 4 sont atteignables, et les builds
+// HYBRIDES (ex. 2 Tissu + 2 Métal) cumulent deux bonus « 2 pièces ».
+const ARMOR_SLOTS = ["head", "chest", "hands", "legs", "feet"];
 
-// Bonus de set 3 pièces par famille (identité forte des armures).
-// Modifiable ici (data-driven d'esprit : un seul endroit).
-export const SET_BONUS = {
-  cloth: { atkMult: 0.12, crit: 3, label: "+12 % ATK · +3 % crit" },
-  leather: { spdMult: 0.1, crit: 5, label: "+10 % VIT · +5 % crit" },
-  metal: { hpMult: 0.12, defMult: 0.12, label: "+12 % PV · +12 % DEF" },
-};
-
-// Compte les familles d'armure équipées (slots tête/torse/jambes).
+// Compte les familles d'armure équipées (5 slots d'armure).
 export function familyCounts(state) {
   const c = { cloth: 0, leather: 0, metal: 0 };
   for (const slot of ARMOR_SLOTS) {
@@ -40,11 +35,27 @@ export function familyCounts(state) {
   return c;
 }
 
-// Famille de set actif (>= 3 pièces), ou null.
-export function activeSet(state) {
+// Bonus de matériau actifs : pour chaque famille, le bonus « 2 pièces » dès 2,
+// et le bonus « 4 pièces » (avec passif comportemental) dès 4. Cumulables entre
+// matériaux (builds hybrides). Renvoie [{ material, tier, statMods, behavior?, label }].
+export function activeMaterialBonuses(state) {
   const c = familyCounts(state);
-  for (const fam of Object.keys(c)) if (c[fam] >= 3) return fam;
-  return null;
+  const out = [];
+  for (const fam of Object.keys(c)) {
+    const mat = MATERIALS[fam];
+    if (!mat) continue;
+    if (c[fam] >= 2) out.push({ material: fam, tier: 2, statMods: mat.bonus2.statMods, label: mat.bonus2.label });
+    if (c[fam] >= 4)
+      out.push({ material: fam, tier: 4, statMods: mat.bonus4.statMods, behavior: mat.bonus4.behavior, label: mat.bonus4.label });
+  }
+  return out;
+}
+
+// Comportements de matériau actifs (4 pièces) — lus par le moteur de combat.
+export function activeMaterialBehaviors(state) {
+  return activeMaterialBonuses(state)
+    .filter((b) => b.behavior)
+    .map((b) => b.behavior);
 }
 
 // Calcule les stats finales : base + croissance + équipement + set + passive.
@@ -64,15 +75,14 @@ export function getDerivedStats(state) {
     for (const k of Object.keys(es)) stats[k] = (stats[k] || 0) + es[k];
   }
 
-  // Bonus de set 3 pièces (multiplicatif sur les totaux).
-  const set = activeSet(state);
-  if (set) {
-    const b = SET_BONUS[set];
-    if (b.atkMult) stats.atk *= 1 + b.atkMult;
-    if (b.hpMult) stats.hp *= 1 + b.hpMult;
-    if (b.defMult) stats.def *= 1 + b.defMult;
-    if (b.spdMult) stats.spd *= 1 + b.spdMult;
-    if (b.crit) stats.crit = (stats.crit || 0) + b.crit;
+  // Bonus de matériau (seuils 2 / 4 pièces, cumulables -> builds hybrides).
+  for (const b of activeMaterialBonuses(state)) {
+    const m = b.statMods || {};
+    if (m.atkPct) stats.atk *= 1 + m.atkPct;
+    if (m.hpPct) stats.hp *= 1 + m.hpPct;
+    if (m.defPct) stats.def *= 1 + m.defPct;
+    if (m.spdPct) stats.spd *= 1 + m.spdPct;
+    if (m.critFlat) stats.crit = (stats.crit || 0) + m.critFlat;
   }
 
   // Passive de classe (parties permanentes des stats).

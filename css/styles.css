@@ -398,6 +398,13 @@ a { color: var(--gold); }
 .filter-chip:hover { border-color: var(--gold-dim); color: var(--text); }
 .filter-chip.selected { border-color: var(--gold); color: var(--gold); background: rgba(224, 178, 87, 0.08); }
 .recipe-meta { display: block; margin: 2px 0; }
+
+/* Matériaux d'armure (écran Personnage) */
+.mat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.mat-card { padding: 10px 12px; background: var(--panel); border: 1px solid var(--border-soft); border-radius: 10px; }
+.mat-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.mat-tier { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
+.mat-tier.on { color: var(--gold); }
 .recipe-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));

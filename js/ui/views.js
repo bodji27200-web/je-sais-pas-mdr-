@@ -15,7 +15,8 @@ import { RECIPES, STATIONS } from "../data/recipes.js";
 import { ENEMIES, getEnemy } from "../data/enemies.js";
 import { ZONES, allZones } from "../data/zones.js";
 import { enemyUnlock, zoneProgress } from "../systems/zoneprog.js";
-import { getDerivedStats, canWieldWeapon, getActiveSpec, specUnlocked, nextRespecCost } from "../core/character.js";
+import { getDerivedStats, canWieldWeapon, getActiveSpec, specUnlocked, nextRespecCost, familyCounts, activeMaterialBonuses } from "../core/character.js";
+import { MATERIALS } from "../data/materials.js";
 import { specsForClass, SPEC_UNLOCK_LEVEL } from "../data/specializations.js";
 import { charXpToNext, jobXpToNext } from "../core/progression.js";
 import { activityProgress, activityRemainingMs, activeTier } from "../systems/jobs.js";
@@ -188,6 +189,7 @@ export function renderCharacter(state) {
       <div class="stat-grid">${stats}</div>
       <h3 class="section-title">Équipement</h3>
       <div class="slot-list">${slots}</div>
+      ${renderMaterialSection(state)}
       <h3 class="section-title">Compétences</h3>
       <ul class="skill-list">
         ${activeSkills}
@@ -253,6 +255,30 @@ function renderSpecSection(state) {
     <h3 class="section-title">Voie</h3>
     <p class="muted small">${intro}</p>
     <div class="spec-grid">${cards}</div>`;
+}
+
+// Section « Matériaux d'armure » : compte des pièces par matériau et seuils 2/4.
+function renderMaterialSection(state) {
+  const counts = familyCounts(state);
+  const rows = Object.values(MATERIALS)
+    .map((mat) => {
+      const n = counts[mat.id] || 0;
+      const active2 = n >= 2;
+      const active4 = n >= 4;
+      const tier = (on, label) => `<div class="mat-tier ${on ? "on" : ""}">${on ? "✓" : "○"} ${esc(label)}</div>`;
+      return `
+        <div class="mat-card" style="border-left:3px solid ${mat.color}">
+          <div class="mat-head"><strong style="color:${mat.color}">${esc(mat.name)}</strong> <span class="muted small">${n}/5 pièces</span></div>
+          <p class="muted small">${esc(mat.identity)}</p>
+          ${tier(active2, mat.bonus2.label)}
+          ${tier(active4, mat.bonus4.label)}
+        </div>`;
+    })
+    .join("");
+  return `
+    <h3 class="section-title">Matériaux d'armure</h3>
+    <p class="muted small">Mixe les matériaux : 2 pièces activent un bonus, 4 pièces un bonus majeur avec un passif. Les builds hybrides cumulent plusieurs bonus « 2 pièces ».</p>
+    <div class="mat-grid">${rows}</div>`;
 }
 
 function familyTag(item) {

@@ -128,6 +128,38 @@ test("migration v3 -> v4 : l'activité passe de actionId à tierId + auto", () =
   assert.equal(loaded.activity.actionId, undefined, "l'ancien champ actionId doit être retiré");
 });
 
+test("migration v5 -> v6 : les bottes de cuir passent du slot legs au slot feet", () => {
+  resetSave();
+  const bootInst = { uid: "eq_test1", baseId: "leather_boots", rarity: "common", stats: { def: 2, spd: 4, crit: 1 }, lvl: 0 };
+  const v5 = {
+    version: 5,
+    character: {
+      name: "Botté",
+      classId: "assassin",
+      level: 5,
+      xp: 0,
+      hpCurrent: 80,
+      equipment: { weapon: null, head: null, chest: null, legs: bootInst, accessory: null },
+      specId: null,
+      specChanges: 0,
+    },
+    jobs: { woodcutting: { level: 1, xp: 0 }, mining: { level: 1, xp: 0 } },
+    professions: {},
+    activity: null,
+    inventory: { resources: {}, equipment: [] },
+    gold: 0,
+    counters: { kills: 0, bossKills: 0, crafted: 0, harvested: 0 },
+    flags: {},
+  };
+  localStorage.setItem(SAVE_KEY, JSON.stringify(v5));
+  const loaded = load();
+  assert.ok(loaded);
+  assert.equal(loaded.version, SAVE_VERSION);
+  assert.equal(loaded.character.equipment.legs, null, "le slot legs doit être libéré");
+  assert.ok(loaded.character.equipment.feet, "les bottes doivent occuper le slot feet");
+  assert.equal(loaded.character.equipment.feet.baseId, "leather_boots");
+});
+
 test("une sauvegarde corrompue ne casse pas et n'écrase pas l'original", () => {
   resetSave();
   localStorage.setItem(SAVE_KEY, "{ ceci n'est pas du JSON valide");

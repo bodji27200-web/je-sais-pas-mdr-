@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { RESOURCES } from "../js/data/resources.js";
-import { EQUIPMENT } from "../js/data/equipment.js";
+import { EQUIPMENT, SLOTS } from "../js/data/equipment.js";
 import { RECIPES, STATIONS } from "../js/data/recipes.js";
 import { JOBS } from "../js/data/jobs.js";
 import { ENEMIES } from "../js/data/enemies.js";
@@ -69,9 +69,8 @@ test("aucune ressource orpheline (récoltable, produite ou consommée)", () => {
   }
 });
 
-test("chaque équipement fabricable correspond à un slot connu", () => {
-  const SLOTS = ["weapon", "head", "chest", "legs", "accessory"];
+test("chaque équipement correspond à un slot connu", () => {
   for (const e of Object.values(EQUIPMENT)) {
-    assert.ok(SLOTS.includes(e.slot), `équipement ${e.id}: slot inconnu ${e.slot}`);
+    assert.ok(SLOTS[e.slot], `équipement ${e.id}: slot inconnu ${e.slot}`);
   }
 });

@@ -13,7 +13,8 @@ import { getSkill } from "../data/skills.js";
 import { getClass } from "../data/classes.js";
 import { getEquipment } from "../data/equipment.js";
 import { getResource } from "../data/resources.js";
-import { getDerivedStats, gainCharXp, clampHp, getActiveSpec } from "../core/character.js";
+import { getDerivedStats, gainCharXp, clampHp, getActiveSpec, activeMaterialBehaviors } from "../core/character.js";
+import { MATERIAL_BEHAVIOR } from "../data/materials.js";
 import { rollAmount } from "../core/progression.js";
 import { addGold, addResource, addEquipmentInstance } from "../core/state.js";
 import { makeInstance, rollRarity, enemyLuck, rollGearDrop } from "../core/items.js";
@@ -80,6 +81,17 @@ export function startCombat(state, enemyId) {
   );
   // Passive de spécialisation : fusionnée aux effets de combat de la classe.
   if (spec && spec.passive) mergePp(player.pp, spec.passive);
+
+  // Passifs comportementaux des matériaux d'armure (4 pièces).
+  const behaviors = new Set(activeMaterialBehaviors(state));
+  player.mat = {
+    stability: behaviors.has("stabilite"),
+    evasionPct: behaviors.has("souplesse") ? MATERIAL_BEHAVIOR.souplesse.evasionPct : 0,
+    concentration: behaviors.has("concentration"),
+  };
+  player._distinct = new Set();
+  player._concReady = false;
+  player._stabilityUsed = false;
 
   const e = makeCombatant(
     enemy.name,
@@ -172,13 +184,25 @@ function applyEffect(target, eff, sourceAtk, combat, who) {
   }
 }
 
-// Calcule et applique les dégâts. opts: { skillId, critBonus }.
+// Calcule et applique les dégâts. opts: { skillId, critBonus, concBonus }.
 function dealDamage(combat, attacker, defender, power, opts = {}) {
+  // Souplesse (Cuir, 4 pièces) : chance d'esquiver complètement l'attaque, puis
+  // gain temporaire de critique. Seul le porteur du matériau peut esquiver.
+  if (defender.mat && defender.mat.evasionPct > 0 && Math.random() * 100 < defender.mat.evasionPct) {
+    const cfg = MATERIAL_BEHAVIOR.souplesse;
+    defender.buffs.push({ type: "crit_buff", amount: cfg.critBuff, turns: cfg.critTurns });
+    log(combat, `${defender.name} esquive l'attaque (Souplesse) et gagne en précision.`, defender === combat.player ? "player" : "enemy");
+    combat.lastFx.push({ target: defender === combat.enemy ? "enemy" : "player", dmg: 0, crit: false, evaded: true });
+    return { dmg: 0, isCrit: false, evaded: true };
+  }
+
   let base = effectiveAtk(attacker) * power;
 
   // Passive : boost des compétences (hors attaque de base).
   if (opts.skillId && opts.skillId !== "basic_attack" && attacker.pp.skillPowerPct)
     base *= 1 + attacker.pp.skillPowerPct;
+  // Concentration (Tissu, 4 pièces) : compétence renforcée après 2 compétences différentes.
+  if (opts.concBonus) base *= 1 + opts.concBonus;
   // Passive : exécution (cible à faibles PV).
   if (attacker.pp.execute && defender.hp / defender.maxHp < attacker.pp.execute.threshold)
     base *= 1 + attacker.pp.execute.bonus;
@@ -189,7 +213,7 @@ function dealDamage(combat, attacker, defender, power, opts = {}) {
   base *= 1 - defReduction(effectiveDef(defender));
 
   base *= 0.9 + Math.random() * 0.2; // variance ±10 %
-  const critChance = attacker.crit + (opts.critBonus || 0);
+  const critChance = attacker.crit + (opts.critBonus || 0) + sumBuff(attacker, "crit_buff");
   const isCrit = Math.random() * 100 < critChance;
   if (isCrit) base *= CRIT_MULT;
 
@@ -199,6 +223,12 @@ function dealDamage(combat, attacker, defender, power, opts = {}) {
   if (defender.guard) {
     dmg = Math.max(1, Math.round(dmg * (1 - defender.guard.reduce)));
     defender.guard = null;
+  }
+  // Stabilité (Métal, 4 pièces) : la 1re attaque subie du combat est réduite.
+  if (defender.mat && defender.mat.stability && !defender._stabilityUsed) {
+    dmg = Math.max(1, Math.round(dmg * (1 - MATERIAL_BEHAVIOR.stabilite.reduce)));
+    defender._stabilityUsed = true;
+    log(combat, `${defender.name} encaisse le premier coup (Stabilité).`, defender === combat.player ? "player" : "enemy");
   }
   // Bouclier : absorbe avant les PV.
   if (defender.shield > 0) {
@@ -227,6 +257,15 @@ function useSkill(combat, actor, other, skillId) {
   // Effets sur soi (buff, bouclier, garde, soin).
   if (skill.self) for (const eff of skill.self) applyEffect(actor, eff, actor.atk, combat, kind);
 
+  // Concentration (Tissu) : la compétence est-elle renforcée ce tour ?
+  let concBonus = 0;
+  if (actor.mat && actor.mat.concentration && skill.power > 0 && actor._concReady) {
+    concBonus = MATERIAL_BEHAVIOR.concentration.bonus;
+    actor._concReady = false;
+    actor._distinct.clear();
+    log(combat, `${actor.name} libère sa Concentration : compétence renforcée !`, isPlayer ? "player" : "enemy");
+  }
+
   // Dégâts (éventuellement multi-frappes).
   let landed = false;
   if (skill.power > 0) {
@@ -234,7 +273,7 @@ function useSkill(combat, actor, other, skillId) {
     let total = 0;
     let anyCrit = false;
     for (let i = 0; i < hits && other.hp > 0; i++) {
-      const r = dealDamage(combat, actor, other, skill.power, { skillId, critBonus: skill.critBonus || 0 });
+      const r = dealDamage(combat, actor, other, skill.power, { skillId, critBonus: skill.critBonus || 0, concBonus });
       total += r.dmg;
       anyCrit = anyCrit || r.isCrit;
       landed = true;
@@ -252,6 +291,13 @@ function useSkill(combat, actor, other, skillId) {
   if (landed && skill.onHit) for (const eff of skill.onHit) applyEffect(other, eff, actor.atk, combat, kind);
 
   if (skill.cooldown > 0) actor.cooldowns[skillId] = skill.cooldown;
+
+  // Concentration : suit les compétences DIFFÉRENTES utilisées par le porteur ;
+  // après en avoir utilisé assez, la prochaine compétence sera renforcée.
+  if (actor.mat && actor.mat.concentration) {
+    actor._distinct.add(skillId);
+    if (actor._distinct.size >= MATERIAL_BEHAVIOR.concentration.skillsNeeded) actor._concReady = true;
+  }
 
   combat.lastActions.push({
     actor: kind,

@@ -103,9 +103,14 @@ sont rafraîchis de façon ciblée. **Contrainte forte à préserver.**
 ### Équipement & raretés (`items.js`, `rarities.js`)
 - Instances uniques : `{uid, baseId, rarity, stats, lvl}`. Rareté = multiplicateur
   global des stats + variance ±8 %. Renforcement +0..+5 (×4 %/niv).
-- **Limite (Lot 5/19)** : la rareté multiplie TOUTES les stats au lieu de piloter
-  des **affixes**. Familles d'armure = bonus de set 3 pièces, mais pas de passif
-  intrinsèque ni de bonus de seuil hybrides (2/4 pièces).
+- **Lot 5** : 7 emplacements (arme, tête, torse, **mains**, jambes, **bottes**,
+  accessoire). Matériaux d'armure (`data/materials.js`) avec **bonus de seuil
+  2/4 pièces cumulables** (builds hybrides viables) + un **passif comportemental**
+  par matériau, implémenté dans le combat : Tissu *Concentration* (compétence
+  renforcée après 2 compétences différentes), Cuir *Souplesse* (esquive + crit),
+  Métal *Stabilité* (1re attaque subie réduite). Migration v5→v6.
+- **Limite (Lot 19)** : la rareté multiplie encore TOUTES les stats au lieu de
+  piloter des **affixes** par familles cohérentes.
 
 ### Sauvegarde (`state.js`)
 - `SAVE_VERSION = 3`. Migrations v1->v2 (équipement empilé -> instances), v2->v3
@@ -139,7 +144,9 @@ sont rafraîchis de façon ciblée. **Contrainte forte à préserver.**
 4. ✅ Atelier : catégories (Armes/Armures/Accessoires/Matériaux), filtres
    (catégorie, classe, réalisable), recherche en direct (objet + matériau),
    cartes enrichies (type, métier requis, classes compatibles), résumé métiers.
-5. Matériaux d'armure : passifs intrinsèques + bonus hybrides 2/4 + comparaison.
+5. ✅ Matériaux d'armure : 2 nouveaux slots (mains/bottes), bonus de seuil 2/4
+   cumulables (hybrides viables), passif comportemental par matériau en combat,
+   section dédiée dans l'écran Personnage. Migration v5→v6.
 6. Stats lisibles (base/équip/classe), Vitesse documentée, rendements décroissants.
 7. Éléments, résistances, états.
 8. Ressources de classe, cooldowns, rééquilibrage des compétences.

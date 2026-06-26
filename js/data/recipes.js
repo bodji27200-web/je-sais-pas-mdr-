@@ -338,6 +338,24 @@ export const RECIPES = [
     profReq: 3,
     profXp: 18,
   },
+  {
+    id: "craft_iron_gauntlets",
+    station: "forge",
+    output: { type: "equipment", id: "iron_gauntlets", qty: 1 },
+    inputs: [{ resource: "iron_ingot", qty: 3 }],
+    levelReq: 3,
+    profReq: 3,
+    profXp: 16,
+  },
+  {
+    id: "craft_iron_sabatons",
+    station: "forge",
+    output: { type: "equipment", id: "iron_sabatons", qty: 1 },
+    inputs: [{ resource: "iron_ingot", qty: 3 }],
+    levelReq: 3,
+    profReq: 3,
+    profXp: 16,
+  },
 
   // --- Tannerie : armures de cuir ---
   {
@@ -370,6 +388,27 @@ export const RECIPES = [
     profReq: 1,
     profXp: 10,
   },
+  {
+    id: "craft_leather_leggings",
+    station: "tannerie",
+    output: { type: "equipment", id: "leather_leggings", qty: 1 },
+    inputs: [
+      { resource: "raw_hide", qty: 3 },
+      { resource: "coarse_cloth", qty: 1 },
+    ],
+    levelReq: 2,
+    profReq: 2,
+    profXp: 14,
+  },
+  {
+    id: "craft_leather_gloves",
+    station: "tannerie",
+    output: { type: "equipment", id: "leather_gloves", qty: 1 },
+    inputs: [{ resource: "raw_hide", qty: 2 }],
+    levelReq: 1,
+    profReq: 1,
+    profXp: 10,
+  },
 
   // --- Couture : armures de tissu ---
   {
@@ -398,6 +437,24 @@ export const RECIPES = [
     levelReq: 2,
     profReq: 1,
     profXp: 12,
+  },
+  {
+    id: "craft_cloth_gloves",
+    station: "couture",
+    output: { type: "equipment", id: "cloth_gloves", qty: 1 },
+    inputs: [{ resource: "coarse_cloth", qty: 2 }],
+    levelReq: 1,
+    profReq: 1,
+    profXp: 8,
+  },
+  {
+    id: "craft_cloth_sandals",
+    station: "couture",
+    output: { type: "equipment", id: "cloth_sandals", qty: 1 },
+    inputs: [{ resource: "coarse_cloth", qty: 2 }],
+    levelReq: 1,
+    profReq: 1,
+    profXp: 8,
   },
 ];
 

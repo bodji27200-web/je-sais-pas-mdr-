@@ -3,8 +3,8 @@
 // wtype  : type d'arme (armes uniquement) — voir data/classes.js (compatibilité).
 // stats  : bonus additifs appliqués aux stats du personnage.
 //
-// Identité FORTE des familles (par pièce ; un set 3 pièces ajoute un bonus,
-// voir core/character.js SET_BONUS) :
+// Identité FORTE des familles (par pièce ; bonus de SEUIL 2/4 pièces + passif
+// comportemental, voir data/materials.js et core/character.js) :
 //  - Tissu : dégâts + critique élevés, AUCUNE défense, peu de PV.
 //  - Cuir  : vitesse + critique + survie correcte (équilibré).
 //  - Métal : beaucoup de PV et de défense, malus de vitesse, zéro offensif.
@@ -19,7 +19,9 @@ export const SLOTS = {
   weapon: "Arme",
   head: "Tête",
   chest: "Torse",
+  hands: "Mains",
   legs: "Jambes",
+  feet: "Bottes",
   accessory: "Accessoire",
 };
 
@@ -140,6 +142,16 @@ export const EQUIPMENT = {
     levelReq: 2, icon: "👖", image: "assets/equipment/cloth_leggings.png",
     stats: { atk: 5, crit: 3 }, desc: "Permet d'achever une tenue de tissu complète, offensive à l'extrême.",
   },
+  cloth_gloves: {
+    id: "cloth_gloves", name: "Gants de tissu", slot: "hands", family: "cloth",
+    levelReq: 1, icon: "🧤", image: "assets/equipment/cloth_gloves.png",
+    stats: { atk: 4, crit: 2 }, desc: "Des gants fins qui canalisent l'arcane sans entraver les gestes.",
+  },
+  cloth_sandals: {
+    id: "cloth_sandals", name: "Sandales de tissu", slot: "feet", family: "cloth",
+    levelReq: 1, icon: "🥿", image: "assets/equipment/cloth_sandals.png",
+    stats: { atk: 3, crit: 3 }, desc: "Légères au point de se faire oublier. Aucune protection.",
+  },
 
   // --- Cuir (équilibré : vitesse / crit / survie correcte) ---
   leather_cap: {
@@ -152,8 +164,18 @@ export const EQUIPMENT = {
     levelReq: 2, icon: "🦺", image: "assets/equipment/leather_armor.png",
     stats: { def: 6, hp: 24, spd: 2, crit: 3 }, desc: "L'armure polyvalente par excellence.",
   },
+  leather_leggings: {
+    id: "leather_leggings", name: "Jambières de cuir", slot: "legs", family: "leather",
+    levelReq: 2, icon: "👖", image: "assets/equipment/leather_leggings.png",
+    stats: { def: 4, hp: 16, spd: 2, crit: 1 }, desc: "Souples et résistantes : le bon compromis pour les jambes.",
+  },
+  leather_gloves: {
+    id: "leather_gloves", name: "Gants de cuir", slot: "hands", family: "leather",
+    levelReq: 1, icon: "🧤", image: "assets/equipment/leather_gloves.png",
+    stats: { def: 2, spd: 2, crit: 2 }, desc: "Une bonne prise et des doigts agiles.",
+  },
   leather_boots: {
-    id: "leather_boots", name: "Bottes de cuir", slot: "legs", family: "leather",
+    id: "leather_boots", name: "Bottes de cuir", slot: "feet", family: "leather",
     levelReq: 1, icon: "🥾", image: "assets/equipment/leather_boots.png",
     stats: { def: 2, spd: 4, crit: 1 }, desc: "Souples et rapides.",
   },
@@ -178,6 +200,16 @@ export const EQUIPMENT = {
     id: "iron_greaves", name: "Jambières de fer", slot: "legs", family: "metal",
     levelReq: 3, icon: "🦿", image: "assets/equipment/iron_greaves.png",
     stats: { def: 9, hp: 38, spd: -1 }, desc: "Lourdes mais inébranlables.",
+  },
+  iron_gauntlets: {
+    id: "iron_gauntlets", name: "Gantelets de fer", slot: "hands", family: "metal",
+    levelReq: 3, icon: "🧤", image: "assets/equipment/iron_gauntlets.png",
+    stats: { def: 6, hp: 18, spd: -1 }, desc: "Des poings d'acier qui ne lâchent jamais prise.",
+  },
+  iron_sabatons: {
+    id: "iron_sabatons", name: "Solerets de fer", slot: "feet", family: "metal",
+    levelReq: 3, icon: "🥾", image: "assets/equipment/iron_sabatons.png",
+    stats: { def: 6, hp: 24, spd: -2 }, desc: "Lourds mais inébranlables : on ne te déplace pas.",
   },
 
   // --- Accessoire ---
