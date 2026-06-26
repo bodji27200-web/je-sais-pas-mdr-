@@ -2,7 +2,7 @@
 // l'état et produisent du HTML ; les interactions passent par des attributs
 // data-act gérés dans main.js.
 
-import { esc, sigil, bar, fmt, fmtDuration } from "./dom.js";
+import { esc, sigil, bar, fmt, fmtDuration, chainImg } from "./dom.js";
 import { getClass, CLASSES } from "../data/classes.js";
 import { getSkill } from "../data/skills.js";
 import { JOBS } from "../data/jobs.js";
@@ -10,7 +10,7 @@ import { RESOURCES, getResource } from "../data/resources.js";
 import { EQUIPMENT, getEquipment, SLOTS, ARMOR_FAMILIES } from "../data/equipment.js";
 import { RECIPES, STATIONS } from "../data/recipes.js";
 import { ENEMIES, getEnemy } from "../data/enemies.js";
-import { ZONES } from "../data/zones.js";
+import { ZONES, allZones } from "../data/zones.js";
 import { getDerivedStats } from "../core/character.js";
 import { charXpToNext, jobXpToNext } from "../core/progression.js";
 import { activityProgress, activityRemainingMs } from "../systems/jobs.js";
@@ -448,33 +448,66 @@ export function renderBattleControls(state, combat) {
     </div>`;
 }
 
+// Zone d'où provient l'ennemi (pour le décor d'arène). Data-driven, retombe
+// sur la première zone si non trouvée.
+function zoneForEnemy(enemyId) {
+  for (const z of allZones()) {
+    if (z.boss === enemyId || (z.enemies || []).includes(enemyId)) return z;
+  }
+  return allZones()[0];
+}
+
+// Un combattant dans l'arène. `side` : "hero" (gauche) ou "enemy" (droite).
+// Couches imbriquées pour des animations qui ne se gênent pas :
+//   .fighter (déplacement attaquant) > .fighter-sprite (recul/flash défenseur)
+//   > .sprite-anim (idle continu).
+function renderFighter(side, name, c, spritePath, emoji) {
+  const idbase = side === "hero" ? "player" : "enemy";
+  const hpCls = side === "hero" ? "hp" : "hp enemy";
+  return `
+    <div class="fighter ${side}" id="bt-${side}">
+      <div class="fighter-status">
+        <span class="fighter-name">${esc(name)}</span>
+        <div class="hpbar"><div class="hpbar-fill ${hpCls}" id="bt-${idbase}-fill" style="width:${pct(c.hp, c.maxHp)}%"></div></div>
+        <span class="hp-num" id="bt-${idbase}-num">${fmt(c.hp)}/${fmt(c.maxHp)}</span>
+        <div class="states" id="bt-${idbase}-states"></div>
+      </div>
+      <div class="fighter-sprite">
+        <span class="sprite-emoji">${emoji || "❔"}</span>
+        <div class="sprite-anim">${chainImg(spritePath, "sprite-img", "this.style.display='none'")}</div>
+      </div>
+    </div>`;
+}
+
 export function renderBattle(state, combat) {
   const p = combat.player;
   const e = combat.enemy;
+  const zone = zoneForEnemy(combat.enemyId);
+  const heroClass = getClass(state.character.classId);
 
-  // Les barres ont un id : mises à jour à chaque tour SANS recréer les portraits.
+  // Décor + sprites créés UNE FOIS ici ; barres/log/contrôles/anims mis à jour
+  // ensuite de façon ciblée (jamais de recréation -> pas de scintillement).
+  // Structure en "équipes" gauche/droite : prête pour 2e joueur/familier/multi.
   return `
     <section class="panel battle">
-      <div class="battle-arena">
-        <div class="combatant enemy-side">
-          ${sigil(e.image, e.icon, "lg")}
-          <strong>${esc(e.name)}</strong>
-          <div class="bar-row">
-            <div class="bar hp enemy"><div class="bar-fill" id="bt-enemy-fill" style="width:${pct(e.hp, e.maxHp)}%"></div></div>
-            <span class="bar-num" id="bt-enemy-num">${fmt(e.hp)}/${fmt(e.maxHp)}</span>
-          </div>
+      <div class="arena-header">
+        <span class="arena-zone">${zone.icon} ${esc(zone.name)}</span>
+        <span class="arena-turn">Tour <strong id="bt-turn">${combat.turn}</strong></span>
+      </div>
+      <div class="arena" id="bt-arena">
+        ${chainImg(zone.image, "arena-bg-img", "this.remove()")}
+        <div class="arena-ground"></div>
+        <div class="team team-left">
+          ${renderFighter("hero", p.name, p, heroClass.sprite, classEmoji(heroClass.id))}
         </div>
-        <div class="vs">⚔</div>
-        <div class="combatant player-side">
-          ${sigil(getClass(state.character.classId).image, classEmoji(state.character.classId), "lg")}
-          <strong>${esc(p.name)}</strong>
-          <div class="bar-row">
-            <div class="bar hp"><div class="bar-fill" id="bt-player-fill" style="width:${pct(p.hp, p.maxHp)}%"></div></div>
-            <span class="bar-num" id="bt-player-num">${fmt(p.hp)}/${fmt(p.maxHp)}</span>
-          </div>
+        <div class="team team-right">
+          ${renderFighter("enemy", e.name, e, e.sprite, e.icon)}
         </div>
       </div>
-      <div class="battle-log" id="battle-log">${renderBattleLog(combat)}</div>
       <div id="bt-controls">${renderBattleControls(state, combat)}</div>
+      <details class="battle-log-wrap" id="bt-log-wrap" open>
+        <summary>📜 Journal de combat</summary>
+        <div class="battle-log" id="battle-log">${renderBattleLog(combat)}</div>
+      </details>
     </section>`;
 }

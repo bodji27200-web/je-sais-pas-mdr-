@@ -107,31 +107,56 @@ function renderAll() {
   if (currentCombat) {
     const lg = $("#battle-log");
     if (lg) lg.scrollTop = lg.scrollHeight;
-    applyCombatFx(currentCombat);
+    animateRound(currentCombat);
   }
 }
 
-// Effets visuels/sonores du dernier tour : nombres flottants, flash, secousse.
-function applyCombatFx(combat) {
-  if (!combat || !combat.lastFx || !combat.lastFx.length) return;
-  for (const fx of combat.lastFx) {
-    const el = document.querySelector(
-      ".combatant." + (fx.target === "enemy" ? "enemy-side" : "player-side")
-    );
-    if (!el) continue;
+// Ajoute une classe d'animation puis la retire (réamorçable au clic rapide).
+function pulseClass(el, cls, ms) {
+  el.classList.remove(cls);
+  void el.offsetWidth; // force un reflow -> relance l'animation
+  el.classList.add(cls);
+  const key = "__t_" + cls;
+  clearTimeout(el[key]);
+  el[key] = setTimeout(() => el.classList.remove(cls), ms + 60);
+}
+
+// Anime le dernier tour : déplacement des attaquants (dash/heavy/buff),
+// recul + flash des défenseurs, nombres flottants, son. N'ajoute/retire QUE des
+// classes sur des éléments existants -> aucune image recréée, aucun scintillement.
+function animateRound(combat) {
+  if (!combat) return;
+  const arena = document.getElementById("bt-arena");
+
+  for (const a of combat.lastActions || []) {
+    const f = document.getElementById(a.actor === "player" ? "bt-hero" : "bt-enemy");
+    if (!f) continue;
+    const dir = a.actor === "player" ? "right" : "left";
+    if (a.isBuff || a.anim === "buff") {
+      pulseClass(f, "anim-buff", 760);
+    } else if (a.anim === "heavy") {
+      pulseClass(f, "atk-heavy-" + dir, 560);
+      if (arena) pulseClass(arena, "arena-shake", 320);
+    } else {
+      pulseClass(f, "atk-dash-" + dir, 440);
+    }
+  }
+
+  for (const fx of combat.lastFx || []) {
+    const f = document.getElementById(fx.target === "enemy" ? "bt-enemy" : "bt-hero");
+    if (!f) continue;
     const num = document.createElement("span");
     num.className = "dmg-float" + (fx.crit ? " crit" : "");
     num.textContent = "-" + fx.dmg + (fx.crit ? " !" : "");
-    el.appendChild(num);
+    f.appendChild(num);
     num.addEventListener("animationend", () => num.remove());
-    const sig = el.querySelector(".sigil");
-    if (sig) {
-      sig.classList.remove("fx-hit", "fx-crit");
-      void sig.offsetWidth; // relance l'animation CSS
-      sig.classList.add(fx.crit ? "fx-crit" : "fx-hit");
-    }
+    const spr = f.querySelector(".fighter-sprite");
+    const dir = fx.target === "enemy" ? "right" : "left";
+    if (spr) pulseClass(spr, (fx.crit ? "crit-" : "hit-") + dir, fx.crit ? 500 : 320);
     playHit(fx.crit);
   }
+
+  combat.lastActions = [];
   combat.lastFx = [];
 }
 
@@ -199,6 +224,7 @@ function updateBattle(state, combat) {
   setText("bt-enemy-num", fmt(combat.enemy.hp) + "/" + fmt(combat.enemy.maxHp));
   setWidth("bt-player-fill", combat.player.hp, combat.player.maxHp);
   setText("bt-player-num", fmt(combat.player.hp) + "/" + fmt(combat.player.maxHp));
+  setText("bt-turn", combat.turn);
   const lg = document.getElementById("battle-log");
   if (lg) {
     lg.innerHTML = renderBattleLog(combat);
@@ -206,7 +232,7 @@ function updateBattle(state, combat) {
   }
   const ctrl = document.getElementById("bt-controls");
   if (ctrl) ctrl.innerHTML = renderBattleControls(state, combat);
-  applyCombatFx(combat);
+  animateRound(combat);
 }
 
 // --- Boucle de jeu ----------------------------------------------------------

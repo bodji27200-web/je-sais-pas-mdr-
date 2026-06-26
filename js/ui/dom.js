@@ -67,6 +67,18 @@ export function fmt(n) {
   return Math.round(n).toLocaleString("fr-FR");
 }
 
+// <img> avec chaîne de secours PNG -> SVG (déposer un PNG remplace le SVG).
+// `onfail` : code JS inline exécuté si PNG ET SVG échouent (défaut : retire l'img).
+export function chainImg(path, className = "", onfail = "this.remove()") {
+  if (!path) return "";
+  const svg = path.replace(/\.(png|jpe?g|webp)$/i, ".svg");
+  const onerr =
+    svg !== path
+      ? `if(!this.dataset.alt){this.dataset.alt=1;this.src='${esc(svg)}';}else{${onfail}}`
+      : onfail;
+  return `<img class="${className}" src="${esc(path)}" alt="" draggable="false" loading="lazy" onerror="${onerr}" />`;
+}
+
 // Durée lisible pour un compte à rebours : "12 s" ou "1 m 04 s".
 export function fmtDuration(ms) {
   const totalSec = Math.ceil(ms / 1000);

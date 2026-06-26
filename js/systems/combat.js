@@ -51,6 +51,7 @@ export function startCombat(state, enemyId) {
   e.enemyId = enemy.id;
   e.icon = enemy.icon;
   e.image = enemy.image;
+  e.sprite = enemy.sprite;
   e.isBoss = enemy.isBoss;
 
   return {
@@ -62,6 +63,7 @@ export function startCombat(state, enemyId) {
     status: "active", // active | won | lost
     rewards: null,
     lastFx: [], // effets du dernier tour (dégâts) pour l'UI
+    lastActions: [], // actions du dernier tour (attaquant + anim) pour l'UI
   };
 }
 
@@ -112,6 +114,15 @@ function useSkill(combat, actor, other, skillId) {
   }
 
   if (skill.cooldown > 0) actor.cooldowns[skillId] = skill.cooldown;
+
+  // Trace l'action pour l'animation côté UI (data-driven via skill.anim).
+  combat.lastActions.push({
+    actor: isPlayer ? "player" : "enemy",
+    skillId,
+    anim: skill.anim || "dash",
+    isBuff: !!(skill.effect && skill.effect.type === "atk_buff"),
+    hasDamage: skill.power > 0,
+  });
 }
 
 // IA ennemie : buff si pertinent, sinon meilleure compétence offensive dispo.
@@ -172,6 +183,7 @@ export function resolveRound(state, combat, playerSkillId) {
   if (!playerCanUse(combat, playerSkillId)) return combat;
 
   combat.lastFx = []; // effets de ce tour
+  combat.lastActions = []; // actions de ce tour
 
   // Ordre selon la vitesse (égalité : joueur en premier).
   const playerFirst = combat.player.spd >= combat.enemy.spd;

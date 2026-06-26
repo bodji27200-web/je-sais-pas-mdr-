@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 38 44" shape-rendering="crispEdges" width="76" height="88">
+  <!-- Grôk, chef gobelin (boss), face à droite. Plus massif, couronné. -->
+  <!-- Jambes / pieds -->
+  <rect x="12" y="33" width="6" height="7" fill="#48652a"/>
+  <rect x="20" y="33" width="6" height="7" fill="#3f5a24"/>
+  <rect x="11" y="39" width="8" height="4" fill="#241710"/>
+  <rect x="20" y="39" width="8" height="4" fill="#1d130c"/>
+  <!-- Pagne -->
+  <rect x="11" y="27" width="16" height="8" fill="#5a3c22"/>
+  <!-- Torse massif -->
+  <rect x="10" y="17" width="18" height="11" fill="#6f9544"/>
+  <rect x="12" y="18" width="8" height="8" fill="#86a84f"/>
+  <rect x="10" y="25" width="18" height="3" fill="#5c8038"/>
+  <!-- Bras arrière + massue -->
+  <rect x="7" y="18" width="4" height="10" fill="#5c8038"/>
+  <rect x="3" y="10" width="5" height="10" fill="#6a523f"/>
+  <rect x="2" y="8" width="7" height="4" fill="#4a382a"/>
+  <!-- Bras avant -->
+  <rect x="27" y="19" width="4" height="9" fill="#6f9544"/>
+  <rect x="28" y="26" width="4" height="4" fill="#86a84f"/>
+  <!-- Tête -->
+  <rect x="14" y="7" width="11" height="10" fill="#86a84f"/>
+  <!-- Cornes -->
+  <polygon points="14,7 9,2 12,8" fill="#1c130d"/>
+  <polygon points="25,7 30,2 27,8" fill="#1c130d"/>
+  <!-- Oreilles -->
+  <polygon points="14,10 7,8 13,15" fill="#6f9544"/>
+  <polygon points="25,10 32,8 26,15" fill="#6f9544"/>
+  <!-- Couronne -->
+  <polygon points="14,7 16,3 19,6 22,3 24,7" fill="#e0b257"/>
+  <rect x="18" y="4" width="2" height="2" fill="#c0354a"/>
+  <!-- Yeux ardents + nez + crocs -->
+  <rect x="20" y="11" width="3" height="2" fill="#ff5a2e"/>
+  <rect x="15" y="11" width="3" height="2" fill="#ff5a2e"/>
+  <polygon points="24,13 27,14 24,16" fill="#5c8038"/>
+  <rect x="16" y="16" width="2" height="2" fill="#f1f4e2"/>
+  <rect x="21" y="16" width="2" height="2" fill="#f1f4e2"/>
+</svg>
