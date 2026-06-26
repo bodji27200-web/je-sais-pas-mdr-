@@ -15,7 +15,7 @@ import { RECIPES, STATIONS } from "../data/recipes.js";
 import { ENEMIES, getEnemy } from "../data/enemies.js";
 import { ZONES, allZones } from "../data/zones.js";
 import { enemyUnlock, zoneProgress } from "../systems/zoneprog.js";
-import { getDerivedStats } from "../core/character.js";
+import { getDerivedStats, canWieldWeapon } from "../core/character.js";
 import { charXpToNext, jobXpToNext } from "../core/progression.js";
 import { activityProgress, activityRemainingMs } from "../systems/jobs.js";
 import { craftableTimes, canCraft } from "../systems/crafting.js";
@@ -412,7 +412,11 @@ export function renderInventory(state) {
           const item = getEquipment(inst.baseId);
           if (!item) return "";
           const r = getRarity(inst.rarity);
-          const canEquip = state.character.level >= (item.levelReq || 0);
+          const levelOk = state.character.level >= (item.levelReq || 0);
+          const compatible = canWieldWeapon(state, item);
+          const canEquip = levelOk && compatible;
+          const equipLabel = !compatible ? "Incompatible" : !levelOk ? "Niv. " + item.levelReq : "Équiper";
+          const equipTitle = !compatible ? "Ta classe ne peut pas manier ce type d'arme." : "";
           // Comparaison HONNÊTE (stat par stat) avec la pièce équipée du même slot.
           const equipped = state.character.equipment[item.slot];
           const cmp = compareLine(effectiveStats(inst), equipped ? effectiveStats(equipped) : null);
@@ -435,7 +439,7 @@ export function renderInventory(state) {
                 ${upLine}
               </div>
               <div class="inv-gear-actions">
-                <button class="btn tiny ${canEquip ? "primary" : ""}" data-act="equip" data-uid="${inst.uid}" ${canEquip ? "" : "disabled"}>${canEquip ? "Équiper" : "Niv. " + item.levelReq}</button>
+                <button class="btn tiny ${canEquip ? "primary" : ""}" data-act="equip" data-uid="${inst.uid}" ${canEquip ? "" : "disabled"} title="${esc(equipTitle)}">${equipLabel}</button>
                 <button class="btn tiny" data-act="upgrade" data-uid="${inst.uid}" ${cost && up.ok ? "" : "disabled"} title="${cost ? esc(up.ok ? "Renforcer cette pièce" : up.reason) : "Niveau maximum"}">Améliorer</button>
                 <button class="btn tiny ghost" data-act="dismantle" data-uid="${inst.uid}" title="Démanteler : +🪙${dr.gold} +✨${dr.essence}">Démanteler</button>
               </div>
