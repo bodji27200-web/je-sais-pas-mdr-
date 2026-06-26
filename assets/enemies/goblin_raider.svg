@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <radialGradient id="bgg" cx="50%" cy="40%" r="75%">
+      <stop offset="0%" stop-color="#2c3a26"/>
+      <stop offset="60%" stop-color="#1a2418"/>
+      <stop offset="100%" stop-color="#0b0f0a"/>
+    </radialGradient>
+    <linearGradient id="skin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7fae54"/>
+      <stop offset="100%" stop-color="#4d722f"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" fill="url(#bgg)"/>
+  <!-- oreilles -->
+  <polygon points="78,96 26,72 70,128" fill="url(#skin)" stroke="#2f4a1d" stroke-width="3"/>
+  <polygon points="178,96 230,72 186,128" fill="url(#skin)" stroke="#2f4a1d" stroke-width="3"/>
+  <!-- tête -->
+  <path d="M84 78 C112 60 144 60 172 78 C188 110 184 150 156 178 C140 192 116 192 100 178 C72 150 68 110 84 78 Z"
+        fill="url(#skin)" stroke="#2f4a1d" stroke-width="3"/>
+  <!-- arcades + yeux -->
+  <path d="M92 118 L122 126 L116 134 L94 130 Z" fill="#1d2a13"/>
+  <path d="M164 118 L134 126 L140 134 L162 130 Z" fill="#1d2a13"/>
+  <ellipse cx="108" cy="126" rx="7" ry="5" fill="#ffd84a"/>
+  <ellipse cx="148" cy="126" rx="7" ry="5" fill="#ffd84a"/>
+  <circle cx="109" cy="126" r="2.4" fill="#2a1500"/>
+  <circle cx="149" cy="126" r="2.4" fill="#2a1500"/>
+  <!-- nez + bouche/crocs -->
+  <polygon points="122,138 134,138 128,154" fill="#3a5622"/>
+  <path d="M104 162 C118 174 138 174 152 162 L146 166 L140 174 L134 166 L128 176 L122 166 L116 174 L110 166 Z" fill="#0f1609"/>
+  <polygon points="116,164 120,176 124,164" fill="#eef3df"/>
+  <polygon points="132,164 136,176 140,164" fill="#eef3df"/>
+  <radialGradient id="vigg" cx="50%" cy="48%" r="60%">
+    <stop offset="68%" stop-color="#000" stop-opacity="0"/>
+    <stop offset="100%" stop-color="#000" stop-opacity="0.5"/>
+  </radialGradient>
+  <rect width="256" height="256" fill="url(#vigg)"/>
+</svg>

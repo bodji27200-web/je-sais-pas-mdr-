@@ -22,6 +22,8 @@ import {
 } from "./systems/jobs.js";
 import { craft } from "./systems/crafting.js";
 import { startCombat, resolveRound } from "./systems/combat.js";
+import { updateObjectives, ensureObjectives, objectiveLabel } from "./systems/objectives.js";
+import { setMuted, isMuted, playHit, playWin, playLose, playDing } from "./core/audio.js";
 import { getResource } from "./data/resources.js";
 import { getEquipment } from "./data/equipment.js";
 import { getRecipe } from "./data/recipes.js";
@@ -35,6 +37,7 @@ import {
   renderInventory,
   renderZones,
   renderBattle,
+  renderObjectives,
 } from "./ui/views.js";
 
 const TABS = [
@@ -92,11 +95,48 @@ function renderAll() {
   $("#topbar").innerHTML =
     renderTopbar(state) + `<button class="gear-btn" data-act="open-options" title="Options">⚙</button>`;
   $("#tabs").innerHTML = renderTabs();
+  $("#objectives").innerHTML = currentCombat ? "" : renderObjectives(state);
   $("#screen").innerHTML = renderScreen();
 
   if (currentCombat) {
     const lg = $("#battle-log");
     if (lg) lg.scrollTop = lg.scrollHeight;
+    applyCombatFx(currentCombat);
+  }
+}
+
+// Effets visuels/sonores du dernier tour : nombres flottants, flash, secousse.
+function applyCombatFx(combat) {
+  if (!combat || !combat.lastFx || !combat.lastFx.length) return;
+  for (const fx of combat.lastFx) {
+    const el = document.querySelector(
+      ".combatant." + (fx.target === "enemy" ? "enemy-side" : "player-side")
+    );
+    if (!el) continue;
+    const num = document.createElement("span");
+    num.className = "dmg-float" + (fx.crit ? " crit" : "");
+    num.textContent = "-" + fx.dmg + (fx.crit ? " !" : "");
+    el.appendChild(num);
+    num.addEventListener("animationend", () => num.remove());
+    const sig = el.querySelector(".sigil");
+    if (sig) {
+      sig.classList.remove("fx-hit", "fx-crit");
+      void sig.offsetWidth; // relance l'animation CSS
+      sig.classList.add(fx.crit ? "fx-crit" : "fx-hit");
+    }
+    playHit(fx.crit);
+  }
+  combat.lastFx = [];
+}
+
+// Vérifie les objectifs et notifie ceux nouvellement accomplis.
+function checkObjectives() {
+  const state = getState();
+  if (!state) return;
+  const newly = updateObjectives(state);
+  for (const id of newly) {
+    toast("Objectif accompli : " + objectiveLabel(id), "good");
+    playDing();
   }
 }
 
@@ -111,6 +151,7 @@ function tick() {
 
   // Les métiers tournent même pendant un combat.
   processActivity(state, now);
+  checkObjectives();
 
   if (currentCombat && currentCombat.status === "active") {
     // En combat : on ne rafraîchit que la barre supérieure pour ne pas écraser l'arène.
@@ -218,6 +259,9 @@ const handlers = {
   skill: (el) => {
     if (!currentCombat || currentCombat.status !== "active") return;
     resolveRound(getState(), currentCombat, el.dataset.id);
+    if (currentCombat.status === "won") playWin();
+    else if (currentCombat.status === "lost") playLose();
+    checkObjectives();
     save();
     renderAll();
   },
@@ -232,10 +276,23 @@ const handlers = {
       <h2>Options</h2>
       <p class="muted small">Sauvegarde automatique active (navigateur).</p>
       <div class="end-actions">
+        <button class="btn" data-act="toggle-sound">${isMuted() ? "🔇 Son : coupé" : "🔊 Son : activé"}</button>
         <button class="btn danger" data-act="reset-save">Nouvelle partie</button>
         <button class="btn" data-act="close-modal">Fermer</button>
       </div>
     `);
+  },
+  "toggle-sound": () => {
+    const state = getState();
+    const muted = !isMuted();
+    setMuted(muted);
+    if (state) {
+      if (!state.settings) state.settings = {};
+      state.settings.muted = muted;
+      save();
+    }
+    if (!muted) playDing();
+    handlers["open-options"](); // ré-affiche avec le nouvel état
   },
   "reset-save": () => {
     showModal(`
@@ -275,7 +332,12 @@ function boot() {
   });
 
   if (hasSave() && load()) {
-    const summary = processOffline(getState());
+    const state = getState();
+    ensureObjectives(state); // compat anciennes sauvegardes
+    if (!state.settings) state.settings = { muted: false };
+    setMuted(!!state.settings.muted);
+    const summary = processOffline(state);
+    updateObjectives(state);
     save();
     renderAll();
     if (summary && summary.cycles > 0) showOfflineSummary(summary);

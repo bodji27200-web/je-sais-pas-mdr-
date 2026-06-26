@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <radialGradient id="bgd" cx="50%" cy="38%" r="78%">
+      <stop offset="0%" stop-color="#2a2b34"/>
+      <stop offset="60%" stop-color="#181922"/>
+      <stop offset="100%" stop-color="#090a0f"/>
+    </radialGradient>
+    <linearGradient id="cloak" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3c3f4d"/>
+      <stop offset="100%" stop-color="#20222c"/>
+    </linearGradient>
+    <linearGradient id="blade" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e6ebf3"/>
+      <stop offset="100%" stop-color="#7c8595"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" fill="url(#bgd)"/>
+  <!-- capuche -->
+  <path d="M128 40 C176 40 198 84 196 132 C194 172 170 200 128 214 C86 200 62 172 60 132 C58 84 80 40 128 40 Z"
+        fill="url(#cloak)" stroke="#14151c" stroke-width="3"/>
+  <!-- ombre du visage -->
+  <path d="M128 78 C158 78 174 104 172 134 C170 162 152 182 128 192 C104 182 86 162 84 134 C82 104 98 78 128 78 Z"
+        fill="#0a0b10"/>
+  <!-- yeux luisants -->
+  <ellipse cx="112" cy="128" rx="9" ry="5" fill="#9fe3ff"/>
+  <ellipse cx="144" cy="128" rx="9" ry="5" fill="#9fe3ff"/>
+  <circle cx="113" cy="128" r="2.4" fill="#06222e"/>
+  <circle cx="145" cy="128" r="2.4" fill="#06222e"/>
+  <!-- dague -->
+  <g transform="rotate(24 196 150)">
+    <rect x="190" y="96" width="10" height="70" rx="3" fill="url(#blade)"/>
+    <polygon points="195,86 200,100 190,100" fill="url(#blade)"/>
+    <rect x="178" y="164" width="34" height="9" rx="3" fill="#caa253"/>
+    <rect x="191" y="172" width="8" height="20" rx="2" fill="#6e5326"/>
+  </g>
+  <radialGradient id="vigd" cx="50%" cy="46%" r="60%">
+    <stop offset="68%" stop-color="#000" stop-opacity="0"/>
+    <stop offset="100%" stop-color="#000" stop-opacity="0.5"/>
+  </radialGradient>
+  <rect width="256" height="256" fill="url(#vigd)"/>
+</svg>

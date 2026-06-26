@@ -13,13 +13,21 @@ export function esc(str) {
     .replace(/"/g, "&quot;");
 }
 
-// Médaillon illustré : l'emoji sert de secours tant que l'image n'existe pas.
-// Si l'image se charge, elle recouvre l'emoji ; si elle est absente (404),
-// l'<img> se masque et l'emoji reste visible.
+// Médaillon illustré avec chaîne de secours : PNG -> SVG -> emoji.
+// - Si le PNG existe (illustration générée plus tard), il s'affiche.
+// - Sinon on tente le SVG de même nom (illustration vectorielle livrée).
+// - Sinon l'emoji de secours reste visible.
+// Déposer un PNG au même chemin que le SVG le remplacera donc automatiquement.
 export function sigil(imagePath, emoji, extraClass = "") {
-  const img = imagePath
-    ? `<img class="sigil-img" src="${esc(imagePath)}" alt="" loading="lazy" onerror="this.remove()" />`
-    : "";
+  let img = "";
+  if (imagePath) {
+    const svg = imagePath.replace(/\.(png|jpe?g|webp)$/i, ".svg");
+    const onerr =
+      svg !== imagePath
+        ? `if(!this.dataset.alt){this.dataset.alt=1;this.src='${esc(svg)}';}else{this.remove();}`
+        : "this.remove()";
+    img = `<img class="sigil-img" src="${esc(imagePath)}" alt="" loading="lazy" onerror="${onerr}" />`;
+  }
   return `<span class="sigil ${extraClass}"><span class="sigil-emoji">${emoji || "❔"}</span>${img}</span>`;
 }
 
@@ -57,4 +65,13 @@ export function closeModal() {
 
 export function fmt(n) {
   return Math.round(n).toLocaleString("fr-FR");
+}
+
+// Durée lisible pour un compte à rebours : "12 s" ou "1 m 04 s".
+export function fmtDuration(ms) {
+  const totalSec = Math.ceil(ms / 1000);
+  if (totalSec < 60) return `${totalSec} s`;
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m} m ${String(s).padStart(2, "0")} s`;
 }

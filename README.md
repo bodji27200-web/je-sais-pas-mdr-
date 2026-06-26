@@ -18,6 +18,9 @@ d'ajouter les autres classes, métiers et zones.
   (**Tissu** offensif · **Cuir** équilibré · **Métal** tank) → vrais choix de build
 - **Craft** (forge, tannerie, couture, joaillerie) + **inventaire** + **équipement**
 - **Sauvegarde automatique** dans le navigateur (localStorage) + résumé hors-ligne
+- **Illustrations vectorielles** (classe, zone, ennemis, boss) avec surcharge PNG
+- **Objectifs de départ** guidés + **compte à rebours exact** pendant la récolte
+- **Game-feel de combat** : dégâts flottants, flash/secousse à l'impact, sons synthétisés (désactivables via ⚙)
 
 ## Jouer en local
 Le jeu utilise les modules ES : il faut le servir via HTTP (pas en `file://`).

@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="38%" r="75%">
+      <stop offset="0%" stop-color="#2e2740"/>
+      <stop offset="60%" stop-color="#1b1530"/>
+      <stop offset="100%" stop-color="#0c0814"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f4d784"/>
+      <stop offset="55%" stop-color="#e0b257"/>
+      <stop offset="100%" stop-color="#9a7a36"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e8edf5"/>
+      <stop offset="50%" stop-color="#aab4c4"/>
+      <stop offset="100%" stop-color="#5e6678"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" fill="url(#bg)"/>
+  <!-- bouclier -->
+  <path d="M128 44 L196 70 V134 C196 178 165 204 128 218 C91 204 60 178 60 134 V70 Z"
+        fill="#1f3550" stroke="url(#gold)" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M128 58 L182 79 V133 C182 169 157 191 128 203 C99 191 74 169 74 133 V79 Z"
+        fill="#27425f" opacity="0.9"/>
+  <!-- épée -->
+  <g>
+    <rect x="122" y="60" width="12" height="116" rx="3" fill="url(#steel)"/>
+    <polygon points="128,52 134,64 122,64" fill="url(#steel)"/>
+    <rect x="100" y="120" width="56" height="12" rx="4" fill="url(#gold)"/>
+    <rect x="123" y="176" width="10" height="22" rx="3" fill="url(#gold)"/>
+    <circle cx="128" cy="202" r="8" fill="url(#gold)"/>
+  </g>
+  <!-- vignette -->
+  <rect width="256" height="256" fill="url(#bg)" opacity="0" />
+  <radialGradient id="vig" cx="50%" cy="50%" r="60%">
+    <stop offset="70%" stop-color="#000" stop-opacity="0"/>
+    <stop offset="100%" stop-color="#000" stop-opacity="0.55"/>
+  </radialGradient>
+  <rect width="256" height="256" fill="url(#vig)"/>
+</svg>
