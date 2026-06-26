@@ -753,3 +753,35 @@ a { color: var(--gold); }
 .zone-prog .bar { flex: 1; }
 .enemy-card.locked { opacity: 0.6; }
 .enemy-card.locked .btn { filter: grayscale(0.4); }
+
+/* --- Spécialisations (voies) --------------------------------------------- */
+.spec-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+.spec-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: border-color 0.15s ease;
+}
+.spec-card.active { border-color: var(--gold); box-shadow: 0 0 0 1px rgba(224, 178, 87, 0.25); }
+.spec-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.spec-head strong { font-size: 0.98rem; color: var(--gold); }
+.spec-bonuses { display: flex; flex-wrap: wrap; gap: 5px; }
+.spec-bonus {
+  font-size: 0.7rem;
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--good);
+  background: rgba(95, 207, 149, 0.07);
+}
+.spec-card p { margin: 0; }
+.tag.spec-current { color: var(--gold); border-color: var(--gold-dim); }

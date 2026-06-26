@@ -13,6 +13,8 @@ import {
   regenOutOfCombat,
   equip,
   unequip,
+  chooseSpec,
+  specUnlocked,
 } from "./core/character.js";
 import {
   startActivity,
@@ -199,6 +201,19 @@ function checkObjectives() {
   }
 }
 
+// Notifie une seule fois quand la spécialisation se débloque (niveau 10).
+function checkSpecUnlock() {
+  const state = getState();
+  if (!state) return;
+  if (!state.flags) state.flags = {};
+  if (specUnlocked(state) && !state.character.specId && !state.flags.specPrompted) {
+    state.flags.specPrompted = true;
+    toast("Spécialisation débloquée ! Choisis ta voie dans l'onglet Héros.", "good");
+    playDing();
+    save();
+  }
+}
+
 // Helpers de mise à jour ciblée du DOM (sans recréer d'éléments).
 function setWidth(id, v, max) {
   const el = document.getElementById(id);
@@ -275,6 +290,7 @@ function tick() {
   // Les métiers tournent même pendant un combat.
   const cycle = processActivity(state, now);
   checkObjectives();
+  checkSpecUnlock();
   if (!(currentCombat && currentCombat.status === "active")) {
     regenOutOfCombat(state, delta);
   }
@@ -383,6 +399,14 @@ const handlers = {
   unequip: (el) => {
     const r = unequip(getState(), el.dataset.slot);
     if (!r.ok) return toast(r.error, "warn");
+    save();
+    renderAll();
+  },
+  "choose-spec": (el) => {
+    const r = chooseSpec(getState(), el.dataset.spec);
+    if (!r.ok) return toast(r.error, "warn");
+    toast(r.paid > 0 ? `Voie changée : ${r.name} (−${r.paid} or)` : `Voie choisie : ${r.name}`, "good");
+    playDing();
     save();
     renderAll();
   },

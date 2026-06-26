@@ -121,6 +121,98 @@ export const SKILLS = {
     desc: "Inflige +60 % de dégâts aux cibles sous 40 % de leurs PV.",
   },
 
+  // ===================== SPÉCIALISATIONS =====================
+  // -- Guerrier --
+  bulwark: {
+    id: "bulwark", name: "Rempart", type: "active", power: 0, cooldown: 4,
+    target: "self", anim: "buff",
+    self: [{ type: "def_buff", amount: 0.45, turns: 2 }, { type: "shield", pctMaxHp: 0.25, turns: 2 }],
+    desc: "Défense +45 % et bouclier (25 % des PV max) pendant 2 tours. (Récup. 4)",
+  },
+  reckless_swing: {
+    id: "reckless_swing", name: "Coup téméraire", type: "active", power: 2.2, cooldown: 3,
+    target: "enemy", anim: "heavy", critBonus: 25,
+    desc: "Une frappe sauvage (220 %) avec +25 % de critique. (Récup. 3)",
+  },
+  rallying_strike: {
+    id: "rallying_strike", name: "Frappe de ralliement", type: "active", power: 1.3, cooldown: 3,
+    target: "enemy", anim: "heavy", self: [{ type: "atk_buff", amount: 0.25, turns: 3 }],
+    desc: "Frappe (130 %) et galvanise : attaque +25 % pendant 3 tours.",
+  },
+
+  // -- Gardien --
+  fortress: {
+    id: "fortress", name: "Forteresse", type: "active", power: 0, cooldown: 5,
+    target: "self", anim: "buff",
+    self: [{ type: "def_buff", amount: 0.6, turns: 3 }, { type: "guard", reduce: 0.5, turns: 1 }, { type: "shield", pctMaxHp: 0.3, turns: 3 }],
+    desc: "Défense +60 %, prochaine attaque -50 %, bouclier (30 % PV) sur 3 tours. (Récup. 5)",
+  },
+  consecrate: {
+    id: "consecrate", name: "Consécration", type: "active", power: 1.4, cooldown: 3,
+    target: "enemy", anim: "heavy", self: [{ type: "heal", pctMaxHp: 0.18 }],
+    desc: "Frappe sacrée (140 %) et te soigne de 18 % des PV max.",
+  },
+  pin_down: {
+    id: "pin_down", name: "Clouer au sol", type: "active", power: 1.2, cooldown: 3,
+    target: "enemy", anim: "heavy",
+    onHit: [{ type: "slow", amount: 0.3, turns: 2 }, { type: "atk_debuff", amount: 0.2, turns: 2 }],
+    desc: "Empale (120 %), ralentit (-30 % VIT) et affaiblit (-20 % ATK).",
+  },
+
+  // -- Archer --
+  aimed_shot: {
+    id: "aimed_shot", name: "Tir ajusté", type: "active", power: 2.0, cooldown: 3,
+    target: "enemy", anim: "ranged", critBonus: 50,
+    desc: "Un tir mortel (200 %) avec +50 % de chances de critique. (Récup. 3)",
+  },
+  arrow_volley: {
+    id: "arrow_volley", name: "Volée de flèches", type: "active", power: 0.6, hits: 3, cooldown: 2,
+    target: "enemy", anim: "ranged",
+    desc: "Trois flèches infligeant chacune 60 % des dégâts.",
+  },
+  venom_shot: {
+    id: "venom_shot", name: "Tir empoisonné", type: "active", power: 1.1, cooldown: 2,
+    target: "enemy", anim: "ranged",
+    onHit: [{ type: "poison", pctAtk: 0.5, turns: 3 }, { type: "slow", amount: 0.25, turns: 2 }],
+    desc: "Flèche toxique (110 %), poison (50 % ATK/tour) et ralentissement.",
+  },
+
+  // -- Mage --
+  fireball: {
+    id: "fireball", name: "Boule de feu", type: "active", power: 1.9, cooldown: 2,
+    target: "enemy", anim: "magic", onHit: [{ type: "bleed", pctAtk: 0.4, turns: 3 }],
+    desc: "Explosion ardente (190 %) qui embrase la cible (40 % ATK/tour).",
+  },
+  frost_nova: {
+    id: "frost_nova", name: "Nova de givre", type: "active", power: 1.3, cooldown: 3,
+    target: "enemy", anim: "magic",
+    onHit: [{ type: "slow", amount: 0.35, turns: 2 }, { type: "atk_debuff", amount: 0.2, turns: 2 }],
+    desc: "Vague glaciale (130 %) qui ralentit (-35 % VIT) et affaiblit (-20 % ATK).",
+  },
+  mana_shield: {
+    id: "mana_shield", name: "Bouclier de mana", type: "active", power: 0, cooldown: 4,
+    target: "self", anim: "buff",
+    self: [{ type: "shield", pctMaxHp: 0.4, turns: 3 }, { type: "heal", pctMaxHp: 0.12 }],
+    desc: "Bouclier (40 % PV) sur 3 tours et soin immédiat de 12 % des PV. (Récup. 4)",
+  },
+
+  // -- Assassin --
+  assassinate: {
+    id: "assassinate", name: "Assassinat", type: "active", power: 2.1, cooldown: 3,
+    target: "enemy", anim: "light", critBonus: 45,
+    desc: "Frappe à la jugulaire (210 %) avec +45 % de critique. (Récup. 3)",
+  },
+  toxic_strike: {
+    id: "toxic_strike", name: "Frappe toxique", type: "active", power: 1.1, cooldown: 2,
+    target: "enemy", anim: "light", onHit: [{ type: "poison", pctAtk: 0.6, turns: 3 }],
+    desc: "Lame enduite (110 %) puis poison violent (60 % ATK/tour, 3 tours).",
+  },
+  flurry: {
+    id: "flurry", name: "Déluge de lames", type: "active", power: 0.6, hits: 3, cooldown: 2,
+    target: "enemy", anim: "light", critBonus: 10,
+    desc: "Trois frappes rapides (60 % chacune) avec +10 % de critique.",
+  },
+
   // ===================== ENNEMIS =====================
   // -- Skirmisher (loup) : rapide, saigne ses proies.
   feral_bite: {
