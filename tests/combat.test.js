@@ -77,6 +77,17 @@ test("un ennemi très rapide n'agit jamais plus de 2 fois d'affilée", () => {
   });
 });
 
+test("un ennemi ENRAGÉ a +50 % de stats (et le combat reste cohérent)", () => {
+  const s = combatReadyState();
+  const normal = startCombat(s, "feral_wolf");
+  const enraged = startCombat(s, "feral_wolf", { forceEnrage: true });
+  assert.equal(normal.enemy.enraged, false);
+  assert.equal(enraged.enemy.enraged, true);
+  assert.equal(enraged.enemy.maxHp, Math.round(normal.enemy.maxHp * 1.5), "PV ×1.5");
+  assert.equal(enraged.enemy.atk, Math.round(normal.enemy.atk * 1.5), "ATK ×1.5");
+  assert.ok(enraged.enemy.hp === enraged.enemy.maxHp, "démarre à PV pleins");
+});
+
 test("les cinq classes peuvent démarrer un combat", () => {
   for (const cls of ["warrior", "guardian", "archer", "mage", "assassin"]) {
     const s = combatReadyState(cls);

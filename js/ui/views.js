@@ -147,6 +147,10 @@ export function renderTopbar(state) {
         <span class="bar-num" id="tb-xp-num">${fmt(ch.xp)}/${fmt(xpNext)}</span></div>
     </div>
     <div class="top-side">
+      <div class="topbar-actions">
+        <button class="gear-btn help-btn" data-act="open-guide" title="Aide / Guide" aria-label="Aide">?</button>
+        <button class="gear-btn" data-act="open-options" title="Options" aria-label="Options">⚙</button>
+      </div>
       <div class="gold" id="tb-gold">🪙 ${fmt(state.gold)}</div>
       <div class="top-activity" id="tb-activity">${topbarActivityInner(state)}</div>
     </div>`;
@@ -1197,7 +1201,7 @@ function renderHpBar(idbase, c) {
 // Le sprite « pose » les pieds sur le sol du décor ; une ombre suit ses pieds.
 function renderFighter(side, spritePath, emoji, hpC, idbase, isBoss) {
   return `
-    <div class="fighter ${side}${isBoss ? " boss" : ""}" id="bt-${side}">
+    <div class="fighter ${side}${isBoss ? " boss" : ""}${hpC.enraged ? " enraged" : ""}" id="bt-${side}">
       ${renderHpBar(idbase, hpC)}
       <div class="fighter-states" id="bt-states-${idbase}">${renderStates(hpC)}</div>
       <div class="fighter-move">
@@ -1232,6 +1236,7 @@ export function renderBattle(state, combat) {
     <section class="panel battle">
       <div class="arena-header">
         <span class="arena-zone">${zone.icon} ${esc(zone.name)}</span>
+        ${e.enraged ? '<span class="enrage-badge">⚡ ENRAGÉ</span>' : ""}
         <span class="arena-turn">Tour <strong id="bt-turn">${combat.turn}</strong></span>
       </div>
       <div class="turn-forecast" id="bt-forecast">${renderForecast(combat)}</div>

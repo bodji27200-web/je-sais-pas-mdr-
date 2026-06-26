@@ -216,6 +216,10 @@ sont rafraîchis de façon ciblée. **Contrainte forte à préserver.**
    aléatoire, résistances élémentaires d'affixes, cohérence classe/arme au craft,
    2e slot d'accessoire (boss) + 5 accessoires, Atelier compacté. Migration v9→v10.
    Tests : 7 cas. (Multijoueur reporté : solo d'abord, choix utilisateur.)
+14. ✅ Corrections UI + contenu (retours joueur) : boutons Aide/Options replacés
+   dans le topbar (fin du chevauchement avec l'or), modales scrollables (succès),
+   **ennemis/boss ENRAGÉS** (~2 %, +50 % stats, récompenses ×2, badge+aura),
+   **fond d'arène de la zone 1** = image fournie (assets/backgrounds/zone1.png).
 10. 2 nouvelles zones, 5 ennemis chacune, boss à phases.
 11. Familiers (première version complète).
 12. Guides contextuels, quêtes de découverte, succès.

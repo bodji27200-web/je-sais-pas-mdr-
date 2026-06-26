@@ -127,9 +127,7 @@ function renderAll() {
     return;
   }
   $("#topbar").innerHTML =
-    renderTopbar(state) +
-    `<button class="gear-btn help-btn" data-act="open-guide" title="Aide / Guide">?</button>` +
-    `<button class="gear-btn" data-act="open-options" title="Options">⚙</button>`;
+    renderTopbar(state); // les boutons Aide/Options sont dans le topbar (top-side)
   $("#tabs").innerHTML = renderTabs();
   $("#objectives").innerHTML = currentCombat ? "" : renderObjectives(state);
   $("#screen").innerHTML = renderScreen();

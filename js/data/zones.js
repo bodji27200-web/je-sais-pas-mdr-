@@ -7,8 +7,9 @@ export const ZONES = {
     name: "Forêt des Murmures",
     icon: "🌲",
     image: "assets/zones/whispering_forest.png",
-    // Décor d'arène (image plate, statique). Nouveau biome = nouvelle image ici.
-    arena: "assets/arenas/forest.png",
+    // Décor d'arène : image fournie par le joueur (fichier direct, pas de
+    // remplacement CSS/SVG). Paysage 1672×941.
+    arena: "assets/backgrounds/zone1.png",
     recommendedLevel: 1,
     desc:
       "Une forêt sombre où bruissent des présences hostiles. " +

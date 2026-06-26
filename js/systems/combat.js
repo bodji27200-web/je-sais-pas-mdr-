@@ -230,7 +230,13 @@ export function buildPlayerCombatant(state) {
   return player;
 }
 
-export function startCombat(state, enemyId) {
+// Ennemi/boss ENRAGÉ : rare, mais +50 % à toutes les stats et meilleures
+// récompenses (inspiré des mobs enragés de certains idle RPG).
+export const ENRAGE_CHANCE = 0.02; // ~2 %
+export const ENRAGE_MULT = 1.5;
+export const ENRAGE_REWARD_MULT = 2;
+
+export function startCombat(state, enemyId, opts = {}) {
   const enemy = getEnemy(enemyId);
   if (!enemy) return null;
 
@@ -265,19 +271,34 @@ export function startCombat(state, enemyId) {
   e.phaseName = null;
   e.planned = null; // action télégraphiée (intention)
 
+  // Enragé : +50 % à toutes les stats. Forçable pour les tests (opts.forceEnrage).
+  e.enraged = false;
+  if (opts.forceEnrage || Math.random() < ENRAGE_CHANCE) {
+    e.enraged = true;
+    e.maxHp = Math.round(e.maxHp * ENRAGE_MULT);
+    e.hp = e.maxHp;
+    e.atk = Math.round(e.atk * ENRAGE_MULT);
+    e.def = Math.round(e.def * ENRAGE_MULT);
+    e.spd = Math.max(1, Math.round(e.spd * ENRAGE_MULT));
+    e.crit = Math.round(e.crit * ENRAGE_MULT);
+  }
+
   // Bestiaire : on note la rencontre (les résistances se révèlent après le combat).
   if (state.bestiary) {
     const b = state.bestiary[enemy.id] || (state.bestiary[enemy.id] = { seen: false, resistKnown: false });
     b.seen = true;
   }
 
+  const intro = e.enraged
+    ? { text: `Un ${enemy.name} ENRAGÉ surgit ! Statistiques décuplées — récompenses accrues.`, kind: "enemy" }
+    : { text: `Un ${enemy.name} surgit !`, kind: "info" };
   const combat = {
     enemyId,
     player,
     enemy: e,
     turn: 1,
     pConsec: 0,
-    log: [{ text: `Un ${enemy.name} surgit !`, kind: "info" }],
+    log: [intro],
     status: "active",
     rewards: null,
     lastFx: [],
@@ -805,9 +826,11 @@ function finishCombat(state, combat, result) {
 
   const enemy = getEnemy(combat.enemyId);
   state.character.hpCurrent = combat.player.hp;
+  const enraged = !!combat.enemy.enraged;
+  const rewardMult = enraged ? ENRAGE_REWARD_MULT : 1;
 
   const drops = [];
-  const luck = enemyLuck(enemy);
+  const luck = enemyLuck(enemy) + (enraged ? 0.5 : 0); // enragé -> meilleur butin
   for (const d of enemy.drops || []) {
     if (Math.random() <= d.chance) {
       if (d.type === "resource") {
@@ -836,12 +859,14 @@ function finishCombat(state, combat, result) {
     drops.push({ type: "equipment", inst: extra, name: getEquipment(extra.baseId)?.name || extra.baseId, rarity: extra.rarity });
   }
 
-  addGold(enemy.gold);
-  const levels = gainCharXp(state, enemy.xp);
+  const goldGain = Math.round(enemy.gold * rewardMult);
+  const xpGain = Math.round(enemy.xp * rewardMult);
+  addGold(goldGain);
+  const levels = gainCharXp(state, xpGain);
   clampHp(state); // un familier a pu gonfler les PV max en combat : on borne au réel
 
   // Familier équipé : gagne de l'XP (plafonnée au niveau du héros) + du lien.
-  const famGain = gainEquippedFamiliarXp(state, enemy.xp);
+  const famGain = gainEquippedFamiliarXp(state, xpGain);
 
   state.counters.kills += 1;
   if (!state.counters.defeated) state.counters.defeated = {};
@@ -851,8 +876,8 @@ function finishCombat(state, combat, result) {
     state.flags.bossDefeated = true;
   }
 
-  combat.rewards = { xp: enemy.xp, gold: enemy.gold, drops, levels, familiar: famGain };
-  log(combat, `${enemy.name} est vaincu ! +${enemy.xp} XP, +${enemy.gold} or.`, "reward");
+  combat.rewards = { xp: xpGain, gold: goldGain, drops, levels, familiar: famGain, enraged };
+  log(combat, `${enemy.name}${enraged ? " (enragé)" : ""} est vaincu ! +${xpGain} XP, +${goldGain} or.`, "reward");
   if (levels > 0) log(combat, `Niveau supérieur ! Tu passes niveau ${state.character.level}.`, "reward");
   if (famGain && famGain.levels > 0) log(combat, `Ton familier gagne ${famGain.levels} niveau(x) !`, "reward");
 }
