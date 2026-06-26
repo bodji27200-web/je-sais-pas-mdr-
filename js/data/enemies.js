@@ -3,6 +3,8 @@
 //           skirmisher | brute | bruiser | tank | caster | boss
 // passive : passive ennemie (effet dynamique en combat ; voir data/skills.js).
 // skills  : compétences ennemies (l'attaque de base est implicite).
+// resist  : facteurs élémentaires { element: facteur }. <1 = résiste, >1 = faible.
+//           (Stratégie alternative, jamais obligatoire — voir cahier des charges.)
 // drops   : { item, type, min, max, chance } ; type "resource" ou "equipment".
 // xp / gold : récompenses de victoire.
 
@@ -19,6 +21,7 @@ export const ENEMIES = {
     stats: { hp: 62, atk: 13, def: 3, spd: 17, crit: 10 },
     skills: ["feral_bite", "rending_claws"],
     passive: null,
+    resist: { fire: 1.3, nature: 0.8 }, // pelage inflammable ; endurci à la nature
     xp: 18,
     gold: 4,
     drops: [{ item: "raw_hide", type: "resource", min: 1, max: 2, chance: 0.85 }],
@@ -35,6 +38,7 @@ export const ENEMIES = {
     stats: { hp: 88, atk: 16, def: 6, spd: 12, crit: 6 },
     skills: ["goblin_smash", "goblin_throw"],
     passive: "enrage",
+    resist: { fire: 0.8, water: 1.25 }, // coriace au feu, vulnérable à l'eau
     xp: 26,
     gold: 8,
     drops: [
@@ -54,6 +58,7 @@ export const ENEMIES = {
     stats: { hp: 150, atk: 18, def: 12, spd: 9, crit: 4 },
     skills: ["boar_charge", "boar_gore"],
     passive: "regeneration",
+    resist: { fire: 1.3, nature: 0.7 }, // sa régénération naturelle craint le feu
     xp: 36,
     gold: 11,
     drops: [
@@ -73,6 +78,7 @@ export const ENEMIES = {
     stats: { hp: 112, atk: 21, def: 8, spd: 15, crit: 14 },
     skills: ["bandit_shiv", "smoke_step"],
     passive: null,
+    resist: { water: 0.85, lightning: 1.25 }, // armure mouillée : conduit la foudre
     xp: 44,
     gold: 18,
     drops: [
@@ -94,6 +100,7 @@ export const ENEMIES = {
     stats: { hp: 680, atk: 30, def: 16, spd: 12, crit: 12 },
     skills: ["boss_cleave", "boss_roar", "boss_quake", "boss_guard"],
     passive: "enrage",
+    resist: { fire: 0.8, water: 1.25, lightning: 1.15 }, // Trempé puis foudroyé : combo gagnant
     xp: 240,
     gold: 90,
     drops: [

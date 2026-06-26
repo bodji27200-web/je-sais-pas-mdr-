@@ -180,14 +180,14 @@ export const SKILLS = {
   // -- Mage --
   fireball: {
     id: "fireball", name: "Boule de feu", type: "active", power: 1.9, cooldown: 2,
-    target: "enemy", anim: "magic", onHit: [{ type: "bleed", pctAtk: 0.4, turns: 3 }],
-    desc: "Explosion ardente (190 %) qui embrase la cible (40 % ATK/tour).",
+    target: "enemy", anim: "magic", element: "fire", inflicts: "burn",
+    desc: "Explosion ardente de Feu (190 %) qui embrase la cible (Brûlure : dégâts sur la durée, soins réduits).",
   },
   frost_nova: {
     id: "frost_nova", name: "Nova de givre", type: "active", power: 1.3, cooldown: 3,
-    target: "enemy", anim: "magic",
+    target: "enemy", anim: "magic", element: "water", inflicts: "wet",
     onHit: [{ type: "slow", amount: 0.35, turns: 2 }, { type: "atk_debuff", amount: 0.2, turns: 2 }],
-    desc: "Vague glaciale (130 %) qui ralentit (-35 % VIT) et affaiblit (-20 % ATK).",
+    desc: "Vague glaciale d'Eau (130 %) qui trempe la cible (+dégâts de Foudre subis), la ralentit et l'affaiblit.",
   },
   mana_shield: {
     id: "mana_shield", name: "Bouclier de mana", type: "active", power: 0, cooldown: 4,

@@ -13,8 +13,10 @@ import { getSkill } from "../data/skills.js";
 import { getClass } from "../data/classes.js";
 import { getEquipment } from "../data/equipment.js";
 import { getResource } from "../data/resources.js";
-import { getDerivedStats, gainCharXp, clampHp, getActiveSpec, activeMaterialBehaviors } from "../core/character.js";
+import { getDerivedStats, gainCharXp, clampHp, getActiveSpec, activeMaterialBehaviors, familyCounts } from "../core/character.js";
 import { MATERIAL_BEHAVIOR } from "../data/materials.js";
+import { getState as getStateDef } from "../data/states.js";
+import { ELEMENT_ORDER } from "../data/elements.js";
 import { rollAmount } from "../core/progression.js";
 import { addGold, addResource, addEquipmentInstance } from "../core/state.js";
 import { makeInstance, rollRarity, enemyLuck, rollGearDrop } from "../core/items.js";
@@ -49,12 +51,75 @@ function makeCombatant(name, stats, skillIds, passiveId) {
     pp: (passive && passive.passive) || {}, // bonus de passive utiles EN combat
     buffs: [], // [{ type:'atk_buff'|'def_buff'|'atk_debuff'|'slow', amount, turns }]
     dots: [], // [{ type:'poison'|'bleed', dmg, turns }]
+    states: [], // états élémentaires [{ id, turns, stacks, dotDmg }]
+    resist: {}, // résistances élémentaires { element: facteur } (1 = neutre)
     shield: 0,
     shieldTurns: 0,
     guard: null, // { reduce, turns }
     cooldowns: {},
     nextAt: 0,
   };
+}
+
+// --- États élémentaires : agrégations lues par le moteur ---------------------
+// Multiplicateur de dégâts subis par `target` pour un élément donné (résistances
+// + vulnérabilités d'état + « +X % de dégâts subis »).
+function incomingMultiplier(target, element) {
+  let m = 1;
+  if (element && target.resist && target.resist[element] != null) m *= target.resist[element];
+  for (const st of target.states) {
+    const d = getStateDef(st.id);
+    if (!d) continue;
+    if (d.damageTakenPct) m *= 1 + d.damageTakenPct;
+    if (d.vuln && element && d.vuln[element] != null) m *= 1 + d.vuln[element];
+  }
+  return Math.max(0, m);
+}
+function stateSlow(c) {
+  let s = 0;
+  for (const st of c.states) {
+    const d = getStateDef(st.id);
+    if (d && d.slow) s += d.slow;
+  }
+  return s;
+}
+function stateNoRegen(c) {
+  return c.states.some((st) => getStateDef(st.id)?.noRegen);
+}
+function healingMult(c) {
+  let m = 1;
+  for (const st of c.states) {
+    const d = getStateDef(st.id);
+    if (d && d.healingTakenMod) m += d.healingTakenMod;
+  }
+  return Math.max(0, m);
+}
+
+// Applique (ou rafraîchit / cumule) un état élémentaire sur la cible.
+function applyState(combat, target, stateId, sourceAtk, who) {
+  const def = getStateDef(stateId);
+  if (!def) return;
+  const max = def.maxStacks || 1;
+  let entry = target.states.find((s) => s.id === stateId);
+  const dotDmg = def.dot ? Math.max(1, Math.round(sourceAtk * def.dot.pctAtk)) : 0;
+  if (!entry) {
+    entry = { id: stateId, turns: def.duration, stacks: 1, dotDmg };
+    target.states.push(entry);
+  } else {
+    entry.turns = def.duration;
+    entry.stacks = Math.min(max, entry.stacks + 1);
+    if (dotDmg) entry.dotDmg = dotDmg;
+  }
+  log(combat, `${target.name} subit ${def.name}${entry.stacks > 1 ? ` ×${entry.stacks}` : ""}.`, who);
+
+  // Décharge (Foudre) : au seuil de cumul, éclate en dégâts puis se dissipe.
+  if (def.charge && entry.stacks >= def.charge.dischargeAt) {
+    const dmg = Math.max(1, Math.round(sourceAtk * def.charge.pctAtk));
+    target.hp = Math.max(0, target.hp - dmg);
+    combat.lastFx.push({ target: target === combat.enemy ? "enemy" : "player", dmg, crit: false, dot: true });
+    log(combat, `Décharge ! ${target.name} subit ${dmg} dégâts de Foudre.`, who);
+    target.states = target.states.filter((s) => s !== entry);
+  }
 }
 
 // Fusionne des bonus de passive dans le « pp » d'un combattant.
@@ -101,6 +166,12 @@ export function startCombat(state, enemyId) {
   player._concReady = false;
   player._stabilityUsed = false;
 
+  // Résistances élémentaires du joueur : le Tissu protège des éléments
+  // (identité du matériau). Plafonnée pour rester équilibrée.
+  const clothCount = familyCounts(state).cloth || 0;
+  const clothResist = Math.min(0.3, clothCount * 0.06);
+  if (clothResist > 0) for (const el of ELEMENT_ORDER) player.resist[el] = 1 - clothResist;
+
   const e = makeCombatant(
     enemy.name,
     { maxHp: enemy.stats.hp, atk: enemy.stats.atk, def: enemy.stats.def, spd: enemy.stats.spd, crit: enemy.stats.crit },
@@ -113,6 +184,13 @@ export function startCombat(state, enemyId) {
   e.sprite = enemy.sprite;
   e.isBoss = enemy.isBoss;
   e.role = enemy.role || null;
+  e.resist = enemy.resist || {}; // résistances/vulnérabilités élémentaires
+
+  // Bestiaire : on note la rencontre (les résistances se révèlent après le combat).
+  if (state.bestiary) {
+    const b = state.bestiary[enemy.id] || (state.bestiary[enemy.id] = { seen: false, resistKnown: false });
+    b.seen = true;
+  }
 
   return {
     enemyId,
@@ -147,7 +225,7 @@ function effectiveDef(c) {
   return Math.max(0, c.def * (1 + sumBuff(c, "def_buff")));
 }
 export function effectiveSpd(c) {
-  return Math.max(1, c.spd * (1 + sumBuff(c, "spd_buff") - sumBuff(c, "slow")));
+  return Math.max(1, c.spd * (1 + sumBuff(c, "spd_buff") - sumBuff(c, "slow") - stateSlow(c)));
 }
 
 function hasNegative(c) {
@@ -179,7 +257,8 @@ function applyEffect(target, eff, sourceAtk, combat, who) {
       break;
     }
     case "heal": {
-      const amt = Math.round(target.maxHp * eff.pctMaxHp);
+      // Les soins reçus peuvent être réduits par un état (Brûlure).
+      const amt = Math.round(target.maxHp * eff.pctMaxHp * healingMult(target));
       target.hp = Math.min(target.maxHp, target.hp + amt);
       log(combat, `${target.name} récupère ${amt} PV.`, who);
       break;
@@ -219,6 +298,9 @@ function dealDamage(combat, attacker, defender, power, opts = {}) {
 
   // Défense (rendements décroissants).
   base *= 1 - defReduction(effectiveDef(defender));
+
+  // Élément : résistances/vulnérabilités de la cible + états (Trempé, Exposé...).
+  base *= incomingMultiplier(defender, opts.element || null);
 
   base *= 0.9 + Math.random() * 0.2; // variance ±10 %
   const critChance = attacker.crit + (opts.critBonus || 0) + sumBuff(attacker, "crit_buff");
@@ -281,7 +363,7 @@ function useSkill(combat, actor, other, skillId) {
     let total = 0;
     let anyCrit = false;
     for (let i = 0; i < hits && other.hp > 0; i++) {
-      const r = dealDamage(combat, actor, other, skill.power, { skillId, critBonus: skill.critBonus || 0, concBonus });
+      const r = dealDamage(combat, actor, other, skill.power, { skillId, critBonus: skill.critBonus || 0, concBonus, element: skill.element || null });
       total += r.dmg;
       anyCrit = anyCrit || r.isCrit;
       landed = true;
@@ -297,6 +379,8 @@ function useSkill(combat, actor, other, skillId) {
 
   // Effets sur la cible touchée (poison, malus...).
   if (landed && skill.onHit) for (const eff of skill.onHit) applyEffect(other, eff, actor.atk, combat, kind);
+  // État élémentaire infligé par la compétence (Brûlure, Trempé, Charge...).
+  if (landed && skill.inflicts) applyState(combat, other, skill.inflicts, actor.atk, kind);
 
   // Recharge réduite par la Vitesse (plafonnée). Une compétence garde toujours
   // au moins 1 tour de recharge.
@@ -430,11 +514,22 @@ function upkeep(combat) {
         log(combat, `${c.name} subit ${dot} dégâts de poison/saignement.`, c === combat.enemy ? "player" : "enemy");
       }
     }
+    // États élémentaires : dégâts sur la durée + décrément des durées.
+    if (c.states && c.states.length) {
+      let sdot = 0;
+      for (const st of c.states) if (st.dotDmg) sdot += st.dotDmg;
+      c.states = c.states.filter((st) => --st.turns > 0);
+      if (sdot > 0 && c.hp > 0) {
+        c.hp = Math.max(0, c.hp - sdot);
+        combat.lastFx.push({ target: c === combat.enemy ? "enemy" : "player", dmg: sdot, crit: false, dot: true });
+        log(combat, `${c.name} subit ${sdot} dégâts élémentaires.`, c === combat.enemy ? "player" : "enemy");
+      }
+    }
   }
-  // Régénération passive (joueur ou ennemi : Endurance, Régénération...).
+  // Régénération passive (Endurance, Régénération...) — annulée par Marque funéraire.
   if (combat.status === "active") {
     for (const c of [combat.player, combat.enemy]) {
-      if (c.hp > 0 && c.pp.hpRegenPct && c.hp < c.maxHp) {
+      if (c.hp > 0 && c.pp.hpRegenPct && c.hp < c.maxHp && !stateNoRegen(c)) {
         const heal = Math.round(c.maxHp * c.pp.hpRegenPct);
         if (heal > 0) c.hp = Math.min(c.maxHp, c.hp + heal);
       }
@@ -520,6 +615,8 @@ export function resolveRound(state, combat, playerSkillId) {
 
 function finishCombat(state, combat, result) {
   combat.status = result;
+  // Toute tentative (victoire OU défaite) révèle les résistances dans le bestiaire.
+  if (state.bestiary && state.bestiary[combat.enemyId]) state.bestiary[combat.enemyId].resistKnown = true;
   if (result === "lost") {
     log(combat, `${combat.player.name} est vaincu...`, "enemy");
     state.character.hpCurrent = 1;

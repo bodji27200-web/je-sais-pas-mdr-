@@ -51,6 +51,7 @@ import {
   renderBattleLog,
   renderBattleControls,
   renderForecast,
+  renderStates,
   renderObjectives,
   topbarActivityInner,
 } from "./ui/views.js";
@@ -275,6 +276,10 @@ function updateBattle(state, combat) {
   setText("bt-turn", combat.turn);
   const fc = document.getElementById("bt-forecast");
   if (fc) fc.innerHTML = renderForecast(combat);
+  const sp = document.getElementById("bt-states-player");
+  if (sp) sp.innerHTML = renderStates(combat.player);
+  const se = document.getElementById("bt-states-enemy");
+  if (se) se.innerHTML = renderStates(combat.enemy);
   const lg = document.getElementById("battle-log");
   if (lg) {
     lg.innerHTML = renderBattleLog(combat);

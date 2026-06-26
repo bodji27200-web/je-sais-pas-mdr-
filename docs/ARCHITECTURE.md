@@ -152,7 +152,8 @@ sont rafraîchis de façon ciblée. **Contrainte forte à préserver.**
    section dédiée dans l'écran Personnage. Migration v5→v6.
 6. ✅ Stats lisibles (décomposition base/équip/bonus), aperçu de l'ordre des
    tours, Vitesse → recharge réduite plafonnée, réduction de défense affichée.
-7. Éléments, résistances, états.
+7. ✅ Éléments (8), états (Brûlure/Trempé/Charge/…), résistances ennemies,
+   bestiaire de découverte. Moteur : multiplicateur élémentaire + états génériques.
 8. Ressources de classe, cooldowns, rééquilibrage des compétences.
 9. Audit/équilibrage des 15 spécialisations (simulateur).
 10. 2 nouvelles zones, 5 ennemis chacune, boss à phases.

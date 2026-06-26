@@ -304,6 +304,18 @@ a { color: var(--gold); }
 .fc-chip.you { border-color: var(--gold-dim); color: var(--gold); }
 .fc-chip.foe { border-color: #6e3a3a; color: #e08a86; }
 
+/* États élémentaires (combat) */
+.fighter-states { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; min-height: 18px; margin-top: 2px; }
+.state-chip {
+  font-size: 0.78rem; line-height: 1; padding: 2px 4px; border-radius: 6px;
+  border: 1px solid var(--border-soft); background: rgba(0,0,0,0.25);
+}
+.state-chip b { font-size: 0.62rem; vertical-align: super; }
+.el-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+.el-tag { display: inline-block; font-size: 0.72rem; padding: 1px 6px; border-radius: 999px; border: 1px solid; }
+.bestiary-line { margin-top: 3px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.bestiary { display: block; margin-top: 3px; font-style: italic; }
+
 .slot-list { display: flex; flex-direction: column; gap: 8px; }
 .slot {
   display: flex;

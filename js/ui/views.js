@@ -18,6 +18,8 @@ import { enemyUnlock, zoneProgress } from "../systems/zoneprog.js";
 import { getDerivedStats, getStatDetails, canWieldWeapon, getActiveSpec, specUnlocked, nextRespecCost, familyCounts, activeMaterialBonuses } from "../core/character.js";
 import { MATERIALS } from "../data/materials.js";
 import { forecastTurns, DEF_K, DEF_CAP } from "../systems/combat.js";
+import { getState as getStateDef } from "../data/states.js";
+import { getElement } from "../data/elements.js";
 import { specsForClass, SPEC_UNLOCK_LEVEL } from "../data/specializations.js";
 import { charXpToNext, jobXpToNext } from "../core/progression.js";
 import { activityProgress, activityRemainingMs, activeTier } from "../systems/jobs.js";
@@ -727,6 +729,23 @@ export function renderInventory(state) {
 // ---------------------------------------------------------------------------
 // Écran Combat — sélection de zone / d'ennemi
 // ---------------------------------------------------------------------------
+// Ligne de bestiaire d'un ennemi : résistances/faiblesses, cachées tant qu'on
+// ne l'a pas affronté (découverte progressive).
+function bestiaryLine(state, enemy) {
+  const resist = enemy.resist || {};
+  const keys = Object.keys(resist);
+  if (!keys.length) return "";
+  const known = state.bestiary && state.bestiary[enemy.id] && state.bestiary[enemy.id].resistKnown;
+  if (!known) return `<span class="muted small bestiary">⚲ Résistances inconnues — affronte-le pour les révéler</span>`;
+  const tag = (k, cls) => {
+    const el = getElement(k);
+    return el ? `<span class="el-tag ${cls}" style="border-color:${el.color};color:${el.color}">${el.icon} ${esc(el.name)}</span>` : "";
+  };
+  const weak = keys.filter((k) => resist[k] > 1).map((k) => tag(k, "weak")).join(" ");
+  const res = keys.filter((k) => resist[k] < 1).map((k) => tag(k, "res")).join(" ");
+  return `<div class="bestiary-line small">${weak ? `<span class="muted">Faible : </span>${weak} ` : ""}${res ? `<span class="muted">Résiste : </span>${res}` : ""}</div>`;
+}
+
 export function renderZones(state) {
   const zone = Object.values(ZONES)[0];
   const prog = zoneProgress(state, zone.id);
@@ -746,7 +765,7 @@ export function renderZones(state) {
       return `
         <div class="enemy-card ${u.unlocked ? "" : "locked"}">
           ${sigil(e.image, e.icon)}
-          <div class="enemy-info"><strong>${esc(e.name)}</strong><span class="muted small">${sub}</span></div>
+          <div class="enemy-info"><strong>${esc(e.name)}</strong><span class="muted small">${sub}</span>${bestiaryLine(state, e)}</div>
           ${btn}
         </div>`;
     })
@@ -786,6 +805,25 @@ export function renderZones(state) {
 // ---------------------------------------------------------------------------
 // Écran Combat — la bataille
 // ---------------------------------------------------------------------------
+// Pastille d'élément (couleur + infobulle).
+function elementDot(elementId) {
+  const el = getElement(elementId);
+  if (!el) return "";
+  return `<span class="el-dot" style="background:${el.color}" title="${esc(el.name)}"></span>`;
+}
+
+// Icônes des états actifs d'un combattant (avec cumul et infobulle).
+export function renderStates(c) {
+  if (!c || !c.states || !c.states.length) return "";
+  return c.states
+    .map((st) => {
+      const d = getStateDef(st.id);
+      if (!d) return "";
+      return `<span class="state-chip" style="border-color:${d.color}" title="${esc(d.name)} — ${esc(d.desc)}">${d.icon}${st.stacks > 1 ? `<b>${st.stacks}</b>` : ""}</span>`;
+    })
+    .join("");
+}
+
 // Aperçu de l'ordre probable des prochains tours (chips Toi / Adversaire).
 export function renderForecast(combat) {
   const order = forecastTurns(combat, 6);
@@ -812,7 +850,7 @@ export function renderBattleControls(state, combat) {
         const s = getSkill(id);
         const cd = combat.player.cooldowns[id] || 0;
         return `<button class="btn skill-btn" data-act="skill" data-id="${id}" ${cd > 0 ? "disabled" : ""} title="${esc(s.desc)}">
-            ${esc(s.name)}${cd > 0 ? ` <span class="cd">(${cd})</span>` : ""}
+            ${s.element ? elementDot(s.element) : ""}${esc(s.name)}${cd > 0 ? ` <span class="cd">(${cd})</span>` : ""}
           </button>`;
       })
       .join("");
@@ -891,6 +929,7 @@ function renderFighter(side, spritePath, emoji, hpC, idbase, isBoss) {
   return `
     <div class="fighter ${side}${isBoss ? " boss" : ""}" id="bt-${side}">
       ${renderHpBar(idbase, hpC)}
+      <div class="fighter-states" id="bt-states-${idbase}">${renderStates(hpC)}</div>
       <div class="fighter-move">
         <div class="fighter-shadow"></div>
         <div class="fighter-sprite">

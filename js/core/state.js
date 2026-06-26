@@ -21,7 +21,7 @@ export const SAVE_KEY = "idle_rpg_save_v1";
 // Copie de sécurité écrite AVANT toute migration : si une migration tournait mal
 // dans une future version, on garde une trace de la sauvegarde d'origine.
 export const BACKUP_KEY = "idle_rpg_save_backup";
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 
 let state = null;
 
@@ -77,6 +77,8 @@ export function newGame(name, classId) {
     },
     gold: 0,
     counters: { kills: 0, bossKills: 0, crafted: 0, harvested: 0 },
+    // Bestiaire : { [enemyId]: { seen, resistKnown } } — découvert au fil des combats.
+    bestiary: {},
     flags: { bossDefeated: false },
     objectives: {
       woodcut: false,
@@ -166,6 +168,11 @@ function migrate(parsed) {
       }
     }
     parsed.version = 6;
+  }
+  // v6 -> v7 : éléments, états et bestiaire de découverte.
+  if (parsed.version === 6) {
+    if (!parsed.bestiary) parsed.bestiary = {};
+    parsed.version = 7;
   }
   return parsed.version === SAVE_VERSION ? parsed : null;
 }
