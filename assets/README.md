@@ -1,11 +1,15 @@
 # Illustrations (assets)
 
-Le jeu fonctionne **sans aucune image** : tant qu'un fichier est absent, un emoji
-de secours s'affiche dans le médaillon. Dès qu'une image est déposée au bon
-chemin, elle recouvre automatiquement l'emoji (aucun code à modifier).
+Chaîne de secours automatique pour chaque médaillon : **PNG → SVG → emoji**.
+- Des **illustrations vectorielles `.svg`** sont déjà livrées pour la classe, la
+  zone, les ennemis et le boss (rendu dark fantasy stylisé).
+- Pour remplacer l'une d'elles par une vraie illustration générée (IA), **dépose
+  un `.png` au même chemin et même nom** : il recouvre automatiquement le SVG,
+  sans toucher au code.
+- Si ni PNG ni SVG ne sont présents, un emoji de secours reste affiché.
 
-Format conseillé : **PNG carré opaque** (ex. 256×256 ou 512×512), fond intégré,
-style cohérent dark fantasy.
+Format conseillé pour les PNG : **carré opaque** (ex. 256×256 ou 512×512), fond
+intégré, style cohérent dark fantasy.
 
 ## Chemins attendus
 

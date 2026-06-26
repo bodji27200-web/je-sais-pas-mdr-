@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#23314a"/>
+      <stop offset="45%" stop-color="#1a2740"/>
+      <stop offset="100%" stop-color="#0c1322"/>
+    </linearGradient>
+    <radialGradient id="moon" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fbf3d8"/>
+      <stop offset="70%" stop-color="#e8dcae"/>
+      <stop offset="100%" stop-color="#b9a86f"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#cfe0ff" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#cfe0ff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="256" height="256" fill="url(#sky)"/>
+  <circle cx="168" cy="78" r="60" fill="url(#glow)"/>
+  <circle cx="168" cy="78" r="34" fill="url(#moon)"/>
+  <circle cx="182" cy="70" r="34" fill="#1a2740" opacity="0.55"/>
+  <!-- brume -->
+  <ellipse cx="128" cy="186" rx="150" ry="26" fill="#3a4a66" opacity="0.30"/>
+  <ellipse cx="128" cy="206" rx="170" ry="30" fill="#48597a" opacity="0.25"/>
+  <!-- sapins arrière-plan -->
+  <g fill="#16243a">
+    <polygon points="40,210 64,150 88,210"/>
+    <polygon points="92,214 120,138 148,214"/>
+    <polygon points="150,210 176,150 202,210"/>
+    <polygon points="200,214 226,146 252,214"/>
+    <polygon points="0,214 22,156 44,214"/>
+  </g>
+  <!-- sapins premier plan -->
+  <g fill="#0c1626">
+    <polygon points="60,232 96,140 132,232"/>
+    <polygon points="124,236 168,128 212,236"/>
+    <polygon points="0,236 30,160 60,236"/>
+    <polygon points="196,236 230,150 256,236"/>
+  </g>
+  <rect x="0" y="224" width="256" height="32" fill="#070d18"/>
+  <radialGradient id="vigz" cx="50%" cy="45%" r="62%">
+    <stop offset="68%" stop-color="#000" stop-opacity="0"/>
+    <stop offset="100%" stop-color="#000" stop-opacity="0.5"/>
+  </radialGradient>
+  <rect width="256" height="256" fill="url(#vigz)"/>
+</svg>

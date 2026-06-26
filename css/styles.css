@@ -498,3 +498,78 @@ a { color: var(--gold); }
   .top-activity { text-align: left; }
   .tab-lbl { font-size: 0.72rem; }
 }
+
+/* --- Objectifs de départ ------------------------------------------------- */
+#objectives:empty { display: none; }
+.objectives-card {
+  margin-bottom: 14px;
+  padding: 12px 16px;
+  background: linear-gradient(180deg, rgba(224, 178, 87, 0.08), rgba(27, 20, 38, 0.6));
+  border: 1px solid var(--gold-dim);
+  border-radius: var(--radius);
+}
+.obj-title {
+  display: block;
+  color: var(--gold);
+  font-family: "Cinzel", serif;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+}
+.obj-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.obj { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 0.9rem; }
+.obj .obj-mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 1px solid var(--border); font-size: 0.7rem;
+}
+.obj.done { color: var(--good); text-decoration: line-through; text-decoration-color: rgba(79,176,133,0.5); }
+.obj.done .obj-mark { border-color: var(--good); color: var(--good); background: rgba(79,176,133,0.12); }
+
+/* --- Compte à rebours de récolte ---------------------------------------- */
+.action-progress { display: flex; align-items: center; gap: 8px; }
+.action-progress .bar { width: 90px; }
+.remain { font-size: 0.8rem; color: var(--gold); min-width: 56px; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* --- Game-feel : combat -------------------------------------------------- */
+.combatant { position: relative; }
+.dmg-float {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: "Cinzel", serif;
+  font-weight: 700;
+  font-size: 1.2rem;
+  color: #ff7a6e;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+  z-index: 5;
+  animation: dmgRise 0.9s ease-out forwards;
+}
+.dmg-float.crit { color: var(--gold); font-size: 1.7rem; }
+@keyframes dmgRise {
+  0% { opacity: 0; transform: translate(-50%, 6px) scale(0.7); }
+  20% { opacity: 1; transform: translate(-50%, -6px) scale(1.1); }
+  100% { opacity: 0; transform: translate(-50%, -42px) scale(1); }
+}
+.sigil.fx-hit { animation: hitShake 0.32s ease; }
+.sigil.fx-crit { animation: critShake 0.42s ease; }
+@keyframes hitShake {
+  0% { transform: translateX(0); filter: brightness(1); }
+  20% { transform: translateX(-5px); filter: brightness(2.2); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-3px); filter: brightness(1.4); }
+  100% { transform: translateX(0); filter: brightness(1); }
+}
+@keyframes critShake {
+  0% { transform: translate(0,0) rotate(0); filter: brightness(1); box-shadow: 0 0 0 rgba(224,178,87,0); }
+  15% { transform: translate(-7px,-2px) rotate(-3deg); filter: brightness(2.6); box-shadow: 0 0 22px rgba(224,178,87,0.8); }
+  35% { transform: translate(7px,2px) rotate(3deg); }
+  55% { transform: translate(-4px,0) rotate(-2deg); filter: brightness(1.6); }
+  100% { transform: translate(0,0) rotate(0); filter: brightness(1); box-shadow: 0 0 0 rgba(224,178,87,0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dmg-float { animation-duration: 0.6s; }
+  .sigil.fx-hit, .sigil.fx-crit { animation: none; }
+}

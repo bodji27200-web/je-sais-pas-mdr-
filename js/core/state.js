@@ -57,6 +57,14 @@ export function newGame(name, classId) {
     gold: 0,
     counters: { kills: 0, bossKills: 0, crafted: 0, harvested: 0 },
     flags: { bossDefeated: false },
+    objectives: {
+      woodcut: false,
+      ingot: false,
+      weapon: false,
+      equipWeapon: false,
+      firstKill: false,
+    },
+    settings: { muted: false },
   };
   save();
   return state;

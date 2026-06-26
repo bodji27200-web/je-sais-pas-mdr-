@@ -2,7 +2,7 @@
 // l'état et produisent du HTML ; les interactions passent par des attributs
 // data-act gérés dans main.js.
 
-import { esc, sigil, bar, fmt } from "./dom.js";
+import { esc, sigil, bar, fmt, fmtDuration } from "./dom.js";
 import { getClass, CLASSES } from "../data/classes.js";
 import { getSkill } from "../data/skills.js";
 import { JOBS } from "../data/jobs.js";
@@ -13,8 +13,9 @@ import { ENEMIES, getEnemy } from "../data/enemies.js";
 import { ZONES } from "../data/zones.js";
 import { getDerivedStats } from "../core/character.js";
 import { charXpToNext, jobXpToNext } from "../core/progression.js";
-import { activityProgress } from "../systems/jobs.js";
+import { activityProgress, activityRemainingMs } from "../systems/jobs.js";
 import { craftableTimes, canCraft } from "../systems/crafting.js";
+import { OBJECTIVES } from "../systems/objectives.js";
 
 const STAT_LABELS = { maxHp: "PV max", atk: "Attaque", def: "Défense", spd: "Vitesse", crit: "Critique" };
 const STAT_ICONS = { maxHp: "❤️", atk: "⚔️", def: "🛡️", spd: "💨", crit: "🎯" };
@@ -56,6 +57,23 @@ function classEmoji(id) {
 }
 
 // ---------------------------------------------------------------------------
+// Objectifs de départ (bandeau)
+// ---------------------------------------------------------------------------
+export function renderObjectives(state) {
+  const o = state.objectives || {};
+  if (OBJECTIVES.every((ob) => o[ob.id])) return ""; // tout accompli -> on masque
+  const items = OBJECTIVES.map((ob) => {
+    const done = !!o[ob.id];
+    return `<li class="obj ${done ? "done" : ""}"><span class="obj-mark">${done ? "✓" : "○"}</span>${esc(ob.label)}</li>`;
+  }).join("");
+  return `
+    <div class="objectives-card">
+      <span class="obj-title">⚜ Premiers pas</span>
+      <ul class="obj-list">${items}</ul>
+    </div>`;
+}
+
+// ---------------------------------------------------------------------------
 // Barre supérieure (toujours visible)
 // ---------------------------------------------------------------------------
 export function renderTopbar(state) {
@@ -69,8 +87,9 @@ export function renderTopbar(state) {
     const job = JOBS[state.activity.jobId];
     const action = job.actions.find((a) => a.id === state.activity.actionId);
     const p = activityProgress(state) * 100;
+    const remain = fmtDuration(activityRemainingMs(state));
     activityHtml = `
-      <span class="activity-label">${job.icon} ${esc(action ? action.name : "")}</span>
+      <span class="activity-label">${job.icon} ${esc(action ? action.name : "")} · <strong>${remain}</strong></span>
       <div class="bar tiny"><div class="bar-fill" style="width:${p}%"></div></div>`;
   }
 
@@ -215,9 +234,13 @@ function renderJobAction(state, job, a) {
   if (locked) control = `<button class="btn tiny" disabled>Niv. ${a.levelReq}</button>`;
   else if (isActive) {
     const p = activityProgress(state) * 100;
+    const remain = fmtDuration(activityRemainingMs(state));
     control = `
       <div class="action-active">
-        <div class="bar"><div class="bar-fill" style="width:${p}%"></div></div>
+        <div class="action-progress">
+          <div class="bar"><div class="bar-fill" style="width:${p}%"></div></div>
+          <span class="remain">${remain}</span>
+        </div>
         <button class="btn tiny danger" data-act="stop-activity">Arrêter</button>
       </div>`;
   } else {
@@ -425,6 +448,7 @@ export function renderBattle(state, combat) {
         </div>
         <div class="vs">⚔</div>
         <div class="combatant player-side">
+          ${sigil(getClass(state.character.classId).image, classEmoji(state.character.classId), "lg")}
           <strong>${esc(p.name)}</strong>
           <div class="bar-row">${bar(p.hp, p.maxHp, "hp")}<span class="bar-num">${fmt(p.hp)}/${fmt(p.maxHp)}</span></div>
         </div>

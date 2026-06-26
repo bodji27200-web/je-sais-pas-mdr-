@@ -61,6 +61,7 @@ export function startCombat(state, enemyId) {
     log: [{ text: `Un ${enemy.name} surgit !`, kind: "info" }],
     status: "active", // active | won | lost
     rewards: null,
+    lastFx: [], // effets du dernier tour (dégâts) pour l'UI
   };
 }
 
@@ -84,6 +85,8 @@ function dealDamage(combat, attacker, defender, power) {
   if (isCrit) base *= 1.5;
   const dmg = Math.max(1, Math.round(base));
   defender.hp = Math.max(0, defender.hp - dmg);
+  // Effet visuel/sonore pour l'UI (rejoué une fois après chaque tour).
+  combat.lastFx.push({ target: defender === combat.enemy ? "enemy" : "player", dmg, crit: isCrit });
   return { dmg, isCrit };
 }
 
@@ -167,6 +170,8 @@ export function playerCanUse(combat, skillId) {
 export function resolveRound(state, combat, playerSkillId) {
   if (combat.status !== "active") return combat;
   if (!playerCanUse(combat, playerSkillId)) return combat;
+
+  combat.lastFx = []; // effets de ce tour
 
   // Ordre selon la vitesse (égalité : joueur en premier).
   const playerFirst = combat.player.spd >= combat.enemy.spd;

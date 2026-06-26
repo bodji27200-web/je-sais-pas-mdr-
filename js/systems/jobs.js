@@ -34,6 +34,15 @@ export function activityProgress(state, now = Date.now()) {
   return Math.max(0, Math.min(1, elapsed / action.durationMs));
 }
 
+// Temps restant (ms) avant la fin du cycle en cours.
+export function activityRemainingMs(state, now = Date.now()) {
+  const act = state.activity;
+  if (!act) return 0;
+  const action = getJobAction(act.jobId, act.actionId);
+  if (!action) return 0;
+  return Math.max(0, action.durationMs - (now - act.cycleStart));
+}
+
 // Octroie le butin d'un cycle terminé. Renvoie un agrégat { resources, xp, levels }.
 function grantCycle(state, jobId, action, agg) {
   for (const drop of action.drops) {
