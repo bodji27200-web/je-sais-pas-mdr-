@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 40" shape-rendering="crispEdges" width="64" height="80">
+  <!-- Gobelin pillard, face à droite. -->
+  <!-- Jambes / pieds -->
+  <rect x="11" y="29" width="5" height="7" fill="#4d722f"/>
+  <rect x="17" y="29" width="5" height="7" fill="#446628"/>
+  <rect x="10" y="35" width="6" height="4" fill="#2c1c12"/>
+  <rect x="17" y="35" width="6" height="4" fill="#241710"/>
+  <!-- Pagne -->
+  <rect x="10" y="24" width="13" height="7" fill="#6b4a2a"/>
+  <!-- Torse -->
+  <rect x="11" y="16" width="11" height="9" fill="#6f9544"/>
+  <rect x="12" y="17" width="5" height="6" fill="#7fae54"/>
+  <!-- Bras arrière -->
+  <rect x="9" y="17" width="3" height="8" fill="#5c8038"/>
+  <!-- Bras avant + main + dague -->
+  <rect x="21" y="17" width="3" height="7" fill="#6f9544"/>
+  <rect x="22" y="22" width="3" height="3" fill="#7fae54"/>
+  <rect x="24" y="14" width="2" height="9" fill="#cfd6e0"/>
+  <rect x="23" y="22" width="4" height="2" fill="#8a6d2f"/>
+  <!-- Tête -->
+  <rect x="13" y="7" width="9" height="9" fill="#7fae54"/>
+  <!-- Grande oreille -->
+  <polygon points="13,9 5,6 12,14" fill="#6f9544"/>
+  <polygon points="22,9 28,7 23,13" fill="#6f9544"/>
+  <!-- Œil + nez + croc -->
+  <rect x="18" y="10" width="3" height="2" fill="#ffd84a"/>
+  <rect x="19" y="10" width="1" height="2" fill="#2a1500"/>
+  <polygon points="22,12 25,13 22,15" fill="#5c8038"/>
+  <rect x="18" y="15" width="1" height="2" fill="#eef3df"/>
+</svg>

@@ -3,6 +3,11 @@
 // power: multiplicateur appliqué à l'ATK pour les dégâts (0 = pas de dégâts directs).
 // cooldown: nombre de tours avant réutilisation.
 // effect: effets annexes (buff, poison, soin...).
+// anim: type d'animation visuelle (data-driven). Valeurs gérées par l'UI :
+//   "dash"  -> petit déplacement vers la cible + impact + retour
+//   "heavy" -> impact plus fort, secousse accentuée
+//   "buff"  -> aura/pulsation autour du lanceur, sans déplacement
+// (un type inconnu retombe proprement sur "dash" côté UI).
 
 export const SKILLS = {
   // --- Commun ---
@@ -13,6 +18,7 @@ export const SKILLS = {
     power: 1.0,
     cooldown: 0,
     target: "enemy",
+    anim: "dash",
     desc: "Une attaque simple infligeant 100 % de tes dégâts.",
   },
 
@@ -24,6 +30,7 @@ export const SKILLS = {
     power: 1.7,
     cooldown: 2,
     target: "enemy",
+    anim: "heavy",
     desc: "Une frappe puissante infligeant 170 % de tes dégâts. (Récup. 2 tours)",
   },
   war_cry: {
@@ -33,6 +40,7 @@ export const SKILLS = {
     power: 0,
     cooldown: 4,
     target: "self",
+    anim: "buff",
     effect: { type: "atk_buff", amount: 0.3, turns: 3 },
     desc: "Augmente ton attaque de 30 % pendant 3 tours. (Récup. 4 tours)",
   },
@@ -52,6 +60,7 @@ export const SKILLS = {
     power: 1.4,
     cooldown: 3,
     target: "enemy",
+    anim: "dash",
     desc: "Une morsure sauvage infligeant 140 % des dégâts.",
   },
   goblin_smash: {
@@ -61,6 +70,7 @@ export const SKILLS = {
     power: 1.6,
     cooldown: 2,
     target: "enemy",
+    anim: "heavy",
     desc: "Un coup brutal infligeant 160 % des dégâts.",
   },
   boss_cleave: {
@@ -70,6 +80,7 @@ export const SKILLS = {
     power: 2.0,
     cooldown: 3,
     target: "enemy",
+    anim: "heavy",
     desc: "Une frappe dévastatrice infligeant 200 % des dégâts.",
   },
   boss_roar: {
@@ -79,6 +90,7 @@ export const SKILLS = {
     power: 0,
     cooldown: 5,
     target: "self",
+    anim: "buff",
     effect: { type: "atk_buff", amount: 0.4, turns: 3 },
     desc: "Le chef hurle et augmente son attaque de 40 % pendant 3 tours.",
   },

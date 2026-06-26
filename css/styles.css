@@ -410,26 +410,151 @@ a { color: var(--gold); }
 .boss-tag { border-color: var(--danger); color: #e88; }
 .hint { margin-top: 16px; }
 
-/* --- Bataille ------------------------------------------------------------ */
-.battle-arena {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  gap: 12px;
-  align-items: center;
-  margin-bottom: 14px;
+/* --- Arène de combat ----------------------------------------------------- */
+.battle { overflow: hidden; }
+.arena-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 8px;
+  font-family: "Cinzel", serif;
 }
-.combatant { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px; }
-.combatant .bar-row { width: 100%; }
-.vs { font-size: 1.6rem; color: var(--gold-dim); }
+.arena-zone { color: var(--gold); font-size: 0.95rem; }
+.arena-turn { color: var(--muted); font-size: 0.82rem; }
+.arena-turn strong { color: var(--gold); }
+
+.arena {
+  position: relative;
+  width: 100%;
+  height: clamp(220px, 40vh, 380px);
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, #15203a 0%, #0c1322 60%, #0a0e18 100%);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: flex-end;
+  isolation: isolate;
+}
+.arena-bg-img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; z-index: 0;
+  filter: brightness(0.62) saturate(0.92);
+}
+.arena-ground {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 24%;
+  z-index: 1;
+  background: linear-gradient(180deg, rgba(8,6,12,0) 0%, rgba(8,6,12,0.5) 55%, rgba(5,4,9,0.82) 100%);
+  box-shadow: inset 0 16px 28px -16px rgba(0,0,0,0.85);
+}
+.arena.arena-shake { animation: arenaShake 0.3s ease; }
+@keyframes arenaShake {
+  0%,100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  50% { transform: translateX(5px); }
+  75% { transform: translateX(-3px); }
+}
+
+.team {
+  position: relative; z-index: 2;
+  display: flex; align-items: flex-end; gap: 14px;
+  padding: 0 4% 3%;
+  flex: 1; min-width: 0;
+}
+.team-left { justify-content: flex-start; }
+.team-right { justify-content: flex-end; }
+
+.fighter {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center;
+  width: 46%; max-width: 200px;
+  will-change: transform;
+}
+.fighter-status {
+  width: 100%; max-width: 168px;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  margin-bottom: 4px; z-index: 3;
+}
+.fighter-name {
+  font-family: "Cinzel", serif; font-size: 0.78rem; color: var(--text);
+  text-shadow: 0 1px 3px #000; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+}
+.hpbar {
+  width: 100%; height: 9px; border-radius: 6px;
+  background: #0c0913; border: 1px solid rgba(0,0,0,0.6);
+  overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+.hpbar-fill { height: 100%; transition: width 0.3s ease; background: linear-gradient(90deg, var(--hp2), var(--hp1)); }
+.hpbar-fill.enemy { background: linear-gradient(90deg, #7a1f1f, #d34b3b); }
+.hp-num { font-size: 0.7rem; color: var(--muted); font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px #000; }
+.states { display: flex; gap: 4px; }
+
+.fighter-sprite {
+  position: relative; width: 100%;
+  min-height: clamp(100px, 22vh, 176px);
+  display: flex; justify-content: center; align-items: flex-end;
+  will-change: transform, filter;
+}
+.sprite-emoji {
+  position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
+  font-size: 3.4rem; z-index: 0; filter: drop-shadow(0 6px 6px rgba(0,0,0,0.6));
+}
+.fighter.enemy .sprite-emoji { transform: translateX(-50%) scaleX(-1); }
+.sprite-anim { display: flex; justify-content: center; align-items: flex-end; animation: idleBob 2.6s ease-in-out infinite; }
+.fighter.enemy .sprite-anim { animation-delay: -1.3s; }
+.sprite-img {
+  height: clamp(100px, 22vh, 176px); width: auto; max-width: 100%;
+  object-fit: contain; image-rendering: pixelated; z-index: 1;
+  filter: drop-shadow(0 8px 6px rgba(0,0,0,0.55));
+}
+.fighter.enemy .sprite-img { transform: scaleX(-1); } /* l'ennemi fait face au héros */
+
+@keyframes idleBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+
+/* Attaquant : dash / frappe lourde */
+@keyframes dashRight { 0%{transform:translateX(0);} 35%{transform:translateX(38px);} 55%{transform:translateX(34px);} 100%{transform:translateX(0);} }
+@keyframes dashLeft  { 0%{transform:translateX(0);} 35%{transform:translateX(-38px);} 55%{transform:translateX(-34px);} 100%{transform:translateX(0);} }
+.fighter.atk-dash-right { animation: dashRight 0.42s ease; }
+.fighter.atk-dash-left  { animation: dashLeft 0.42s ease; }
+@keyframes heavyRight { 0%{transform:translateX(0) scale(1);} 25%{transform:translateX(-12px) scale(1.04);} 50%{transform:translateX(58px) scale(1.07);} 66%{transform:translateX(50px);} 100%{transform:translateX(0) scale(1);} }
+@keyframes heavyLeft  { 0%{transform:translateX(0) scale(1);} 25%{transform:translateX(12px) scale(1.04);} 50%{transform:translateX(-58px) scale(1.07);} 66%{transform:translateX(-50px);} 100%{transform:translateX(0) scale(1);} }
+.fighter.atk-heavy-right { animation: heavyRight 0.54s cubic-bezier(.5,-0.2,.3,1.4); }
+.fighter.atk-heavy-left  { animation: heavyLeft 0.54s cubic-bezier(.5,-0.2,.3,1.4); }
+
+/* Défenseur : recul + flash (sur le sprite, pour ne pas gêner l'idle) */
+@keyframes hitRight { 0%{transform:translateX(0);filter:brightness(1);} 15%{transform:translateX(12px);filter:brightness(2.3);} 60%{transform:translateX(4px);filter:brightness(1.3);} 100%{transform:translateX(0);filter:brightness(1);} }
+@keyframes hitLeft  { 0%{transform:translateX(0);filter:brightness(1);} 15%{transform:translateX(-12px);filter:brightness(2.3);} 60%{transform:translateX(-4px);filter:brightness(1.3);} 100%{transform:translateX(0);filter:brightness(1);} }
+.fighter-sprite.hit-right { animation: hitRight 0.3s ease; }
+.fighter-sprite.hit-left  { animation: hitLeft 0.3s ease; }
+@keyframes critRight { 0%{transform:translateX(0) rotate(0);filter:brightness(1);} 12%{transform:translateX(20px) rotate(3deg);filter:brightness(3) saturate(1.5);} 42%{transform:translateX(8px) rotate(-2deg);} 72%{transform:translateX(3px);filter:brightness(1.5);} 100%{transform:translateX(0) rotate(0);filter:brightness(1);} }
+@keyframes critLeft  { 0%{transform:translateX(0) rotate(0);filter:brightness(1);} 12%{transform:translateX(-20px) rotate(-3deg);filter:brightness(3) saturate(1.5);} 42%{transform:translateX(-8px) rotate(2deg);} 72%{transform:translateX(-3px);filter:brightness(1.5);} 100%{transform:translateX(0) rotate(0);filter:brightness(1);} }
+.fighter-sprite.crit-right { animation: critRight 0.5s ease; }
+.fighter-sprite.crit-left  { animation: critLeft 0.5s ease; }
+
+/* Buff : aura dorée pulsée, sans déplacement */
+.fighter.anim-buff::before {
+  content: ""; position: absolute; left: 50%; bottom: 8%; transform: translateX(-50%);
+  width: 130px; height: 130px; border-radius: 50%; z-index: 0; pointer-events: none;
+  background: radial-gradient(circle, rgba(224,178,87,0.55), rgba(224,178,87,0) 70%);
+  animation: buffPulse 0.76s ease-out;
+}
+@keyframes buffPulse { 0%{opacity:0;transform:translateX(-50%) scale(0.5);} 30%{opacity:1;} 100%{opacity:0;transform:translateX(-50%) scale(1.6);} }
+
+/* Journal de combat (secondaire, repliable) */
+.battle-log-wrap { margin-top: 2px; }
+.battle-log-wrap > summary {
+  cursor: pointer; color: var(--muted); font-size: 0.82rem;
+  list-style: none; padding: 6px 2px; user-select: none;
+}
+.battle-log-wrap > summary::-webkit-details-marker { display: none; }
+.battle-log-wrap > summary:hover { color: var(--gold); }
 .battle-log {
-  height: 200px;
+  height: 124px;
   overflow-y: auto;
-  padding: 12px;
+  padding: 10px 12px;
   background: #0c0913;
   border: 1px solid var(--border);
   border-radius: 10px;
-  font-size: 0.88rem;
-  margin-bottom: 14px;
+  font-size: 0.84rem;
 }
 .log-line { padding: 2px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.03); }
 .log-line.player { color: #bfe3c6; }
@@ -535,16 +660,16 @@ a { color: var(--gold); }
 .combatant { position: relative; }
 .dmg-float {
   position: absolute;
-  top: 6px;
+  top: 24%;
   left: 50%;
   transform: translateX(-50%);
   font-family: "Cinzel", serif;
   font-weight: 700;
-  font-size: 1.2rem;
+  font-size: 1.35rem;
   color: #ff7a6e;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.85);
   pointer-events: none;
-  z-index: 5;
+  z-index: 6;
   animation: dmgRise 0.9s ease-out forwards;
 }
 .dmg-float.crit { color: var(--gold); font-size: 1.7rem; }
@@ -572,4 +697,17 @@ a { color: var(--gold); }
 @media (prefers-reduced-motion: reduce) {
   .dmg-float { animation-duration: 0.6s; }
   .sigil.fx-hit, .sigil.fx-crit { animation: none; }
+  .sprite-anim { animation: none; }
+  .fighter[class*="atk-"], .arena.arena-shake,
+  .fighter-sprite[class*="hit-"], .fighter-sprite[class*="crit-"],
+  .fighter.anim-buff::before { animation: none !important; }
+}
+
+/* Arène en largeur réduite (mobile / portrait) */
+@media (max-width: 560px) {
+  .arena { height: clamp(200px, 34vh, 300px); }
+  .sprite-img { height: clamp(84px, 18vh, 130px); }
+  .sprite-emoji { font-size: 2.6rem; }
+  .fighter { width: 48%; }
+  .fighter-name { font-size: 0.72rem; }
 }

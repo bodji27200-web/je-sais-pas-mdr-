@@ -8,6 +8,7 @@ export const CLASSES = {
     name: "Guerrier",
     locked: false,
     image: "assets/classes/warrior.png",
+    sprite: "assets/sprites/warrior.png", // corps entier pour l'arène (PNG -> SVG)
     tagline: "Dégâts physiques et survie.",
     desc:
       "Un combattant robuste qui encaisse autant qu'il frappe. " +

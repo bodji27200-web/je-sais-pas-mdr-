@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 30" shape-rendering="crispEdges" width="80" height="60">
+  <!-- Sanglier de profil, face à droite. -->
+  <!-- Queue -->
+  <rect x="4" y="10" width="3" height="2" fill="#33261d"/>
+  <!-- Pattes -->
+  <rect x="10" y="21" width="4" height="8" fill="#2b201a"/>
+  <rect x="16" y="21" width="4" height="8" fill="#33261d"/>
+  <rect x="25" y="21" width="4" height="8" fill="#2b201a"/>
+  <rect x="30" y="21" width="4" height="8" fill="#33261d"/>
+  <!-- Corps massif -->
+  <rect x="7" y="9" width="26" height="13" fill="#5a4536"/>
+  <rect x="7" y="9" width="26" height="3" fill="#6a523f"/>
+  <!-- Crête de poils -->
+  <rect x="12" y="6" width="12" height="3" fill="#3a2c20"/>
+  <!-- Tête -->
+  <rect x="30" y="11" width="8" height="11" fill="#4a3a2d"/>
+  <!-- Oreille -->
+  <polygon points="31,8 35,7 33,12" fill="#3a2c20"/>
+  <!-- Groin -->
+  <rect x="37" y="15" width="3" height="5" fill="#2b201a"/>
+  <!-- Œil -->
+  <rect x="33" y="13" width="2" height="2" fill="#ffcf5e"/>
+  <!-- Défenses -->
+  <polygon points="37,20 39,16 40,17 38,21" fill="#efe8d2"/>
+  <polygon points="36,21 37,17 38,18 37,22" fill="#d8d2bc"/>
+</svg>
