@@ -27,13 +27,9 @@ export function ensureObjectives(state) {
 
 function ownsAnyWeapon(state) {
   if (state.character.equipment.weapon) return true;
-  for (const id of Object.keys(state.inventory.equipment)) {
-    if (state.inventory.equipment[id] > 0) {
-      const it = getEquipment(id);
-      if (it && it.slot === "weapon") return true;
-    }
-  }
-  return false;
+  return state.inventory.equipment.some(
+    (inst) => getEquipment(inst.baseId)?.slot === "weapon"
+  );
 }
 
 // Met à jour les objectifs et renvoie la liste des ids nouvellement accomplis.

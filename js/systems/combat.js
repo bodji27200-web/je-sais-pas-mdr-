@@ -14,7 +14,8 @@ import {
   clampHp,
 } from "../core/character.js";
 import { rollAmount } from "../core/progression.js";
-import { addGold, addResource, addEquipment } from "../core/state.js";
+import { addGold, addResource, addEquipmentInstance } from "../core/state.js";
+import { makeInstance, rollRarity, enemyLuck, rollGearDrop } from "../core/items.js";
 
 function makeCombatant(name, stats, skillIds, passiveId) {
   return {
@@ -221,18 +222,29 @@ function finishCombat(state, combat, result) {
   state.character.hpCurrent = combat.player.hp;
 
   const drops = [];
+  const luck = enemyLuck(enemy);
   for (const d of enemy.drops || []) {
     if (Math.random() <= d.chance) {
-      const qty = rollAmount(d.min, d.max);
-      if (qty <= 0) continue;
       if (d.type === "resource") {
+        const qty = rollAmount(d.min, d.max);
+        if (qty <= 0) continue;
         addResource(d.item, qty);
         drops.push({ id: d.item, qty, name: getResource(d.item)?.name || d.item, type: "resource" });
       } else if (d.type === "equipment") {
-        addEquipment(d.item, qty);
-        drops.push({ id: d.item, qty, name: getEquipment(d.item)?.name || d.item, type: "equipment" });
+        // Drop scripté : une instance avec rareté tirée selon la chance de l'ennemi.
+        const inst = makeInstance(d.item, rollRarity(luck));
+        if (!inst) continue;
+        addEquipmentInstance(inst);
+        drops.push({ type: "equipment", inst, name: getEquipment(d.item)?.name || d.item, rarity: inst.rarity });
       }
     }
+  }
+
+  // Loot d'équipement aléatoire (boss : garanti). C'est le moteur du « refarm ».
+  const extra = rollGearDrop(enemy, enemy.isBoss);
+  if (extra) {
+    addEquipmentInstance(extra);
+    drops.push({ type: "equipment", inst: extra, name: getEquipment(extra.baseId)?.name || extra.baseId, rarity: extra.rarity });
   }
 
   addGold(enemy.gold);

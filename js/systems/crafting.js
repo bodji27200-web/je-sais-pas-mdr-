@@ -6,8 +6,9 @@ import {
   resourceCount,
   removeResource,
   addResource,
-  addEquipment,
+  addEquipmentInstance,
 } from "../core/state.js";
+import { makeInstance } from "../core/items.js";
 
 // Le joueur peut-il lancer cette recette ? Renvoie { ok, reason }.
 export function canCraft(state, recipe) {
@@ -39,9 +40,18 @@ export function craft(state, recipeId) {
   for (const input of recipe.inputs) removeResource(input.resource, input.qty);
 
   const out = recipe.output;
-  if (out.type === "resource") addResource(out.id, out.qty);
-  else if (out.type === "equipment") addEquipment(out.id, out.qty);
+  let instance = null;
+  if (out.type === "resource") {
+    addResource(out.id, out.qty);
+  } else if (out.type === "equipment") {
+    // Forge : pièce commune (rareté via le loot). Stats légèrement variables.
+    const n = out.qty || 1;
+    for (let i = 0; i < n; i++) {
+      instance = makeInstance(out.id, "common");
+      addEquipmentInstance(instance);
+    }
+  }
 
   state.counters.crafted += 1;
-  return { ok: true, output: out };
+  return { ok: true, output: out, instance };
 }

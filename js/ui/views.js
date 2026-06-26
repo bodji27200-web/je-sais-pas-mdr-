@@ -8,6 +8,8 @@ import { getSkill } from "../data/skills.js";
 import { JOBS } from "../data/jobs.js";
 import { RESOURCES, getResource } from "../data/resources.js";
 import { EQUIPMENT, getEquipment, SLOTS, ARMOR_FAMILIES } from "../data/equipment.js";
+import { statScore } from "../core/items.js";
+import { getRarity } from "../data/rarities.js";
 import { RECIPES, STATIONS } from "../data/recipes.js";
 import { ENEMIES, getEnemy } from "../data/enemies.js";
 import { ZONES, allZones } from "../data/zones.js";
@@ -136,18 +138,19 @@ export function renderCharacter(state) {
 
   const slots = Object.keys(SLOTS)
     .map((slot) => {
-      const itemId = ch.equipment[slot];
-      if (!itemId) {
+      const inst = ch.equipment[slot];
+      if (!inst) {
         return `<div class="slot empty"><span class="slot-name">${SLOTS[slot]}</span><span class="muted">— vide —</span></div>`;
       }
-      const item = getEquipment(itemId);
+      const item = getEquipment(inst.baseId);
+      const r = getRarity(inst.rarity);
       return `
-        <div class="slot filled">
+        <div class="slot filled" style="border-left:3px solid ${r.color}">
           ${sigil(item.image, item.icon)}
           <div class="slot-info">
             <span class="slot-name">${SLOTS[slot]}</span>
-            <strong>${esc(item.name)} ${familyTag(item)}</strong>
-            <span class="muted small">${statLine(item.stats)}</span>
+            <div class="gear-title"><strong style="color:${r.color}">${esc(item.name)}</strong>${rarityTag(inst)}${familyTag(item)}</div>
+            <span class="muted small">${statLine(inst.stats)}</span>
           </div>
           <button class="btn tiny" data-act="unequip" data-slot="${slot}">Retirer</button>
         </div>`;
@@ -187,6 +190,11 @@ function familyTag(item) {
   if (!item.family) return "";
   const f = ARMOR_FAMILIES[item.family];
   return f ? `<span class="tag" style="border-color:${f.color};color:${f.color}">${f.name}</span>` : "";
+}
+
+function rarityTag(inst) {
+  const r = getRarity(inst.rarity);
+  return `<span class="tag rarity" style="border-color:${r.color};color:${r.color}">${r.name}</span>`;
 }
 
 function statLine(stats) {
@@ -332,25 +340,37 @@ export function renderInventory(state) {
         .join("")
     : '<p class="muted">Aucune ressource. Lance un métier !</p>';
 
-  const eqIds = Object.keys(state.inventory.equipment).filter((id) => state.inventory.equipment[id] > 0);
-  const eqHtml = eqIds.length
-    ? eqIds
-        .map((id) => {
-          const item = getEquipment(id);
+  const instances = state.inventory.equipment.slice().sort((a, b) => {
+    const ta = getEquipment(a.baseId), tb = getEquipment(b.baseId);
+    const sa = Object.keys(SLOTS).indexOf(ta?.slot), sb = Object.keys(SLOTS).indexOf(tb?.slot);
+    if (sa !== sb) return sa - sb;
+    const ra = getRarity(a.rarity).rank, rb = getRarity(b.rarity).rank;
+    if (ra !== rb) return rb - ra;
+    return statScore(b.stats) - statScore(a.stats);
+  });
+  const eqHtml = instances.length
+    ? instances
+        .map((inst) => {
+          const item = getEquipment(inst.baseId);
+          if (!item) return "";
+          const r = getRarity(inst.rarity);
           const canEquip = state.character.level >= (item.levelReq || 0);
+          // Flèche d'upgrade : la pièce bat-elle celle équipée dans ce slot ?
+          const equipped = state.character.equipment[item.slot];
+          const isUpgrade = canEquip && statScore(inst.stats) > statScore(equipped ? equipped.stats : {});
           return `
-            <div class="inv-gear">
+            <div class="inv-gear" style="border-left:3px solid ${r.color}">
               ${sigil(item.image, item.icon)}
               <div class="inv-gear-info">
-                <strong>${esc(item.name)} ${familyTag(item)}</strong>
-                <span class="muted small">${SLOTS[item.slot]} · ${statLine(item.stats)}</span>
-                <span class="muted small">×${state.inventory.equipment[id]}${item.levelReq ? " · Niv. " + item.levelReq : ""}</span>
+                <div class="gear-title"><strong style="color:${r.color}">${esc(item.name)}</strong>${rarityTag(inst)}${familyTag(item)}</div>
+                <span class="muted small">${SLOTS[item.slot]} · ${statLine(inst.stats)}</span>
+                <span class="muted small">${item.levelReq ? "Niv. " + item.levelReq : "Aucun prérequis"}${isUpgrade ? ' · <span class="upgrade">▲ amélioration</span>' : ""}</span>
               </div>
-              <button class="btn tiny ${canEquip ? "primary" : ""}" data-act="equip" data-id="${id}" ${canEquip ? "" : "disabled"}>${canEquip ? "Équiper" : "Niv. " + item.levelReq}</button>
+              <button class="btn tiny ${canEquip ? "primary" : ""}" data-act="equip" data-uid="${inst.uid}" ${canEquip ? "" : "disabled"}>${canEquip ? "Équiper" : "Niv. " + item.levelReq}</button>
             </div>`;
         })
         .join("")
-    : '<p class="muted">Aucun équipement. Forge-en à l\'atelier !</p>';
+    : '<p class="muted">Aucun équipement. Forge-en à l\'atelier ou pille des ennemis !</p>';
 
   return `
     <section class="panel">
@@ -429,7 +449,15 @@ export function renderBattleControls(state, combat) {
   const won = combat.status === "won";
   let rewardHtml = "";
   if (won && combat.rewards) {
-    const drops = combat.rewards.drops.map((d) => `<li>${esc(d.name)} ×${d.qty}</li>`).join("");
+    const drops = combat.rewards.drops
+      .map((d) => {
+        if (d.type === "equipment") {
+          const r = getRarity(d.rarity);
+          return `<li style="color:${r.color}">${esc(d.name)} <span class="tag rarity" style="border-color:${r.color};color:${r.color}">${r.name}</span></li>`;
+        }
+        return `<li>${esc(d.name)} ×${d.qty}</li>`;
+      })
+      .join("");
     rewardHtml = `
       <div class="reward-box">
         <p>+${combat.rewards.xp} XP · +${combat.rewards.gold} 🪙</p>

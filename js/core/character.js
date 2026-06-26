@@ -4,9 +4,9 @@ import { getClass } from "../data/classes.js";
 import { getEquipment } from "../data/equipment.js";
 import { getSkill } from "../data/skills.js";
 import {
-  addEquipment,
-  removeEquipment,
-  equipmentCount,
+  addEquipmentInstance,
+  removeEquipmentInstance,
+  findEquipmentInstance,
 } from "./state.js";
 import { applyXp, charXpToNext } from "./progression.js";
 
@@ -26,14 +26,12 @@ export function getDerivedStats(state) {
     stats[k] = base + growth;
   }
 
-  // Bonus d'équipement.
+  // Bonus d'équipement (chaque slot porte une instance avec ses stats tirées).
   for (const slot of Object.keys(ch.equipment)) {
-    const itemId = ch.equipment[slot];
-    if (!itemId) continue;
-    const item = getEquipment(itemId);
-    if (!item) continue;
-    for (const k of Object.keys(item.stats)) {
-      stats[k] = (stats[k] || 0) + item.stats[k];
+    const inst = ch.equipment[slot];
+    if (!inst || !inst.stats) continue;
+    for (const k of Object.keys(inst.stats)) {
+      stats[k] = (stats[k] || 0) + inst.stats[k];
     }
   }
 
@@ -69,33 +67,33 @@ export function regenOutOfCombat(state, deltaMs) {
   state.character.hpCurrent = Math.min(maxHp, state.character.hpCurrent + heal);
 }
 
-// Équipe un objet depuis l'inventaire. Renvoie { ok, error }.
-export function equip(state, equipmentId) {
-  const item = getEquipment(equipmentId);
-  if (!item) return { ok: false, error: "Objet inconnu." };
-  if (equipmentCount(equipmentId) <= 0)
-    return { ok: false, error: "Tu ne possèdes pas cet objet." };
-  if (state.character.level < (item.levelReq || 0))
-    return { ok: false, error: `Niveau ${item.levelReq} requis.` };
+// Équipe une instance (par uid) depuis l'inventaire. Renvoie { ok, error, name }.
+export function equip(state, uid) {
+  const inst = findEquipmentInstance(uid);
+  if (!inst) return { ok: false, error: "Objet introuvable." };
+  const tpl = getEquipment(inst.baseId);
+  if (!tpl) return { ok: false, error: "Objet inconnu." };
+  if (state.character.level < (tpl.levelReq || 0))
+    return { ok: false, error: `Niveau ${tpl.levelReq} requis.` };
 
-  const slot = item.slot;
+  const slot = tpl.slot;
   const previous = state.character.equipment[slot];
 
   // Retire de l'inventaire, place dans le slot, rend l'ancien à l'inventaire.
-  removeEquipment(equipmentId, 1);
-  state.character.equipment[slot] = equipmentId;
-  if (previous) addEquipment(previous, 1);
+  removeEquipmentInstance(uid);
+  state.character.equipment[slot] = inst;
+  if (previous) addEquipmentInstance(previous);
 
   clampHp(state);
-  return { ok: true };
+  return { ok: true, name: tpl.name };
 }
 
-// Déséquipe le slot indiqué et rend l'objet à l'inventaire.
+// Déséquipe le slot indiqué et rend l'instance à l'inventaire.
 export function unequip(state, slot) {
-  const itemId = state.character.equipment[slot];
-  if (!itemId) return { ok: false, error: "Rien à retirer." };
+  const inst = state.character.equipment[slot];
+  if (!inst) return { ok: false, error: "Rien à retirer." };
   state.character.equipment[slot] = null;
-  addEquipment(itemId, 1);
+  addEquipmentInstance(inst);
   clampHp(state);
   return { ok: true };
 }

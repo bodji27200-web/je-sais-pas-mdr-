@@ -3,9 +3,10 @@
 // à versionner et à étendre.
 
 import { getClass } from "../data/classes.js";
+import { makeInstance } from "./items.js";
 
 const SAVE_KEY = "idle_rpg_save_v1";
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 let state = null;
 
@@ -52,7 +53,7 @@ export function newGame(name, classId) {
     activity: null,
     inventory: {
       resources: {}, // { resourceId: qty }
-      equipment: {}, // { equipmentId: qty }
+      equipment: [], // liste d'instances uniques (voir core/items.js)
     },
     gold: 0,
     counters: { kills: 0, bossKills: 0, crafted: 0, harvested: 0 },
@@ -70,13 +71,41 @@ export function newGame(name, classId) {
   return state;
 }
 
+// Migre une sauvegarde vers la version courante. Renvoie null si impossible.
+function migrate(parsed) {
+  if (!parsed) return null;
+  // v1 -> v2 : l'équipement empilé { id: qty } devient une liste d'instances
+  // uniques (rareté commune) ; les slots équipés deviennent des instances.
+  if (parsed.version === 1) {
+    const oldInv = parsed.inventory?.equipment || {};
+    const list = [];
+    for (const id of Object.keys(oldInv)) {
+      const qty = oldInv[id] || 0;
+      for (let i = 0; i < qty; i++) {
+        const inst = makeInstance(id, "common");
+        if (inst) list.push(inst);
+      }
+    }
+    if (!parsed.inventory) parsed.inventory = { resources: {} };
+    parsed.inventory.equipment = list;
+
+    const slots = parsed.character?.equipment || {};
+    for (const slot of Object.keys(slots)) {
+      const val = slots[slot];
+      if (typeof val === "string") slots[slot] = makeInstance(val, "common");
+    }
+    parsed.version = 2;
+  }
+  return parsed.version === SAVE_VERSION ? parsed : null;
+}
+
 export function load() {
   if (!storageAvailable()) return null;
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || parsed.version !== SAVE_VERSION) return null;
+    const parsed = migrate(JSON.parse(raw));
+    if (!parsed) return null;
     state = parsed;
     return state;
   } catch (e) {
@@ -125,20 +154,24 @@ export function resourceCount(id) {
   return state.inventory.resources[id] || 0;
 }
 
-export function addEquipment(id, qty = 1) {
-  const inv = state.inventory.equipment;
-  inv[id] = (inv[id] || 0) + qty;
+// Équipement : liste d'instances uniques (plus de comptage par id).
+export function addEquipmentInstance(inst) {
+  if (inst) state.inventory.equipment.push(inst);
 }
 
-export function removeEquipment(id, qty = 1) {
-  const inv = state.inventory.equipment;
-  if (!inv[id]) return;
-  inv[id] -= qty;
-  if (inv[id] <= 0) delete inv[id];
+export function removeEquipmentInstance(uid) {
+  const arr = state.inventory.equipment;
+  const i = arr.findIndex((e) => e.uid === uid);
+  if (i === -1) return null;
+  return arr.splice(i, 1)[0];
 }
 
-export function equipmentCount(id) {
-  return state.inventory.equipment[id] || 0;
+export function findEquipmentInstance(uid) {
+  return state.inventory.equipment.find((e) => e.uid === uid) || null;
+}
+
+export function equipmentList() {
+  return state.inventory.equipment;
 }
 
 export function addGold(amount) {

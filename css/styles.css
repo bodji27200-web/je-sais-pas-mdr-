@@ -222,6 +222,8 @@ a { color: var(--gold); }
   color: var(--muted);
   vertical-align: middle;
 }
+.tag.rarity { font-size: 0.62rem; letter-spacing: 0.04em; text-transform: uppercase; }
+.upgrade { color: var(--good); font-weight: 700; }
 
 /* --- Création de personnage ---------------------------------------------- */
 .creation { text-align: center; }
@@ -390,7 +392,8 @@ a { color: var(--gold); }
   border: 1px solid var(--border-soft);
   border-radius: 10px;
 }
-.inv-gear-info { flex: 1; display: flex; flex-direction: column; }
+.inv-gear-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.gear-title { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
 /* --- Zones & combat ------------------------------------------------------ */
 .zone-head { display: flex; gap: 16px; align-items: center; margin-bottom: 8px; }

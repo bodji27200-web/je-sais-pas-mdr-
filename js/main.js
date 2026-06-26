@@ -361,9 +361,9 @@ const handlers = {
     renderAll();
   },
   equip: (el) => {
-    const r = equip(getState(), el.dataset.id);
+    const r = equip(getState(), el.dataset.uid);
     if (!r.ok) return toast(r.error, "warn");
-    toast("Équipé : " + getEquipment(el.dataset.id).name, "good");
+    toast("Équipé : " + (r.name || "objet"), "good");
     save();
     renderAll();
   },
