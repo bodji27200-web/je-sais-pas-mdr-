@@ -747,3 +747,9 @@ a { color: var(--gold); }
   .dmg-float { font-size: 1.05rem; }
   .dmg-float.crit { font-size: 1.35rem; }
 }
+
+/* --- Progression de zone / ennemis verrouillés --------------------------- */
+.zone-prog { display: flex; align-items: center; gap: 10px; margin: 10px 0 4px; }
+.zone-prog .bar { flex: 1; }
+.enemy-card.locked { opacity: 0.6; }
+.enemy-card.locked .btn { filter: grayscale(0.4); }
