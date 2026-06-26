@@ -340,6 +340,34 @@ a { color: var(--gold); }
 .action-active { display: flex; align-items: center; gap: 8px; }
 .action-active .bar { width: 90px; }
 
+/* Activité principale évolutive (une par métier) */
+.job-activity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--panel);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+}
+.job-activity.active { border-color: var(--gold-dim); box-shadow: inset 0 0 0 1px rgba(224, 178, 87, 0.2); }
+.yield.primary { color: var(--gold); font-weight: 600; }
+.tier-select { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.tier-chip {
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-soft);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.tier-chip:hover { border-color: var(--gold-dim); color: var(--text); }
+.tier-chip.selected { border-color: var(--gold); color: var(--gold); background: rgba(224, 178, 87, 0.08); }
+.next-tier { margin-top: 8px; }
+
 /* --- Craft --------------------------------------------------------------- */
 .craft-station { margin-bottom: 12px; }
 .recipe-grid {

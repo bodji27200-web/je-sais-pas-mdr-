@@ -9,7 +9,7 @@ export const SAVE_KEY = "idle_rpg_save_v1";
 // Copie de sécurité écrite AVANT toute migration : si une migration tournait mal
 // dans une future version, on garde une trace de la sauvegarde d'origine.
 export const BACKUP_KEY = "idle_rpg_save_backup";
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 let state = null;
 
@@ -54,7 +54,8 @@ export function newGame(name, classId) {
       woodcutting: { level: 1, xp: 0 },
       mining: { level: 1, xp: 0 },
     },
-    // Une seule activité de récolte active à la fois : { jobId, actionId, cycleStart }.
+    // Une seule activité de récolte active à la fois :
+    // { jobId, tierId, cycleStart, auto }. `auto` suit le meilleur palier.
     activity: null,
     inventory: {
       resources: {}, // { resourceId: qty }
@@ -108,6 +109,18 @@ function migrate(parsed) {
       if (parsed.character.specChanges === undefined) parsed.character.specChanges = 0;
     }
     parsed.version = 3;
+  }
+  // v3 -> v4 : métiers à activité principale évolutive. L'activité passe de
+  // { jobId, actionId, cycleStart } à { jobId, tierId, cycleStart, auto }.
+  // Les ids de palier sont identiques aux anciens ids d'action -> mapping direct.
+  if (parsed.version === 3) {
+    const act = parsed.activity;
+    if (act) {
+      if (act.tierId === undefined) act.tierId = act.actionId || null;
+      delete act.actionId;
+      if (act.auto === undefined) act.auto = true; // suit le meilleur palier par défaut
+    }
+    parsed.version = 4;
   }
   return parsed.version === SAVE_VERSION ? parsed : null;
 }

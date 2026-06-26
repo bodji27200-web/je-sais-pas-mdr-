@@ -5,7 +5,7 @@
 import { esc, sigil, bar, fmt, fmtDuration, chainImg } from "./dom.js";
 import { getClass, CLASSES } from "../data/classes.js";
 import { getSkill } from "../data/skills.js";
-import { JOBS } from "../data/jobs.js";
+import { JOBS, unlockedTiers, bestTier, nextTier } from "../data/jobs.js";
 import { RESOURCES, getResource } from "../data/resources.js";
 import { EQUIPMENT, getEquipment, SLOTS, ARMOR_FAMILIES } from "../data/equipment.js";
 import { effectiveStats, MAX_UPGRADE } from "../core/items.js";
@@ -18,7 +18,7 @@ import { enemyUnlock, zoneProgress } from "../systems/zoneprog.js";
 import { getDerivedStats, canWieldWeapon, getActiveSpec, specUnlocked, nextRespecCost } from "../core/character.js";
 import { specsForClass, SPEC_UNLOCK_LEVEL } from "../data/specializations.js";
 import { charXpToNext, jobXpToNext } from "../core/progression.js";
-import { activityProgress, activityRemainingMs } from "../systems/jobs.js";
+import { activityProgress, activityRemainingMs, activeTier } from "../systems/jobs.js";
 import { craftableTimes, canCraft } from "../systems/crafting.js";
 import { OBJECTIVES } from "../systems/objectives.js";
 
@@ -92,11 +92,11 @@ export function renderObjectives(state) {
 export function topbarActivityInner(state) {
   if (!state.activity) return '<span class="muted">Aucune activité</span>';
   const job = JOBS[state.activity.jobId];
-  const action = job.actions.find((a) => a.id === state.activity.actionId);
+  const tier = activeTier(state);
   const p = activityProgress(state) * 100;
   const remain = fmtDuration(activityRemainingMs(state));
   return `
-    <span class="activity-label">${job.icon} ${esc(action ? action.name : "")} · <strong>${remain}</strong></span>
+    <span class="activity-label">${job.icon} ${esc(tier ? tier.name : "")} · <strong>${remain}</strong></span>
     <div class="bar tiny"><div class="bar-fill" style="width:${p}%"></div></div>`;
 }
 
@@ -330,68 +330,92 @@ function costLine(state, cost) {
 // ---------------------------------------------------------------------------
 export function renderJobs(state) {
   const blocks = Object.values(JOBS)
-    .map((job) => {
-      const jp = state.jobs[job.id];
-      const xpNext = jobXpToNext(jp.level);
-      const actions = job.actions
-        .map((a) => renderJobAction(state, job, a))
-        .join("");
-      return `
-        <div class="job-block">
-          <div class="job-head">
-            ${sigil(job.image, job.icon)}
-            <div class="job-id">
-              <strong>${esc(job.name)}</strong> <span class="muted">Niv. ${jp.level}</span>
-              ${bar(jp.xp, xpNext, "xp")}
-              <span class="muted small">${fmt(jp.xp)}/${fmt(xpNext)} XP</span>
-            </div>
-          </div>
-          <div class="action-list">${actions}</div>
-        </div>`;
-    })
+    .map((job) => renderJobBlock(state, job))
     .join("");
-
-  return `<section class="panel"><h2>Métiers</h2><p class="muted">Une seule activité de récolte à la fois. Elle continue même hors-ligne.</p>${blocks}</section>`;
+  return `<section class="panel"><h2>Métiers</h2><p class="muted">Une seule activité à la fois. Elle progresse même hors-ligne (efficacité réduite). L'activité principale évolue automatiquement quand ton métier monte de niveau.</p>${blocks}</section>`;
 }
 
-function renderJobAction(state, job, a) {
-  const jp = state.jobs[job.id];
-  const locked = jp.level < a.levelReq;
-  const isActive = state.activity && state.activity.jobId === job.id && state.activity.actionId === a.id;
-  const yields = a.drops
+// Liste des butins d'un palier (ressource principale + secondaires + chances).
+function tierYields(tier) {
+  return tier.drops
     .map((d) => {
       const r = getResource(d.resource);
       const range = d.min === d.max ? `${d.min}` : `${d.min}-${d.max}`;
-      const chance = d.chance < 1 ? ` ${Math.round(d.chance * 100)}%` : "";
-      return `<span class="yield">${r.icon} ${esc(r.name)} ×${range}${chance}</span>`;
+      const chance = d.chance < 1 ? ` <span class="muted">${Math.round(d.chance * 100)}%</span>` : "";
+      const primary = d.resource === tier.resource ? " primary" : "";
+      return `<span class="yield${primary}">${r.icon} ${esc(r.name)} ×${range}${chance}</span>`;
     })
     .join("");
+}
 
-  let control;
-  if (locked) control = `<button class="btn tiny" disabled>Niv. ${a.levelReq}</button>`;
-  else if (isActive) {
-    const p = activityProgress(state) * 100;
-    const remain = fmtDuration(activityRemainingMs(state));
-    control = `
-      <div class="action-active">
-        <div class="action-progress">
-          <div class="bar"><div class="bar-fill" id="job-active-fill" style="width:${p}%"></div></div>
-          <span class="remain" id="job-active-remain">${remain}</span>
-        </div>
-        <button class="btn tiny danger" data-act="stop-activity">Arrêter</button>
-      </div>`;
+// Un métier = une activité principale évolutive + un sélecteur de palier optionnel.
+function renderJobBlock(state, job) {
+  const jp = state.jobs[job.id];
+  const xpNext = jobXpToNext(jp.level);
+  const unlocked = unlockedTiers(job.id, jp.level); // meilleur -> moindre
+  const isJobActive = state.activity && state.activity.jobId === job.id;
+  const shownTier = isJobActive ? activeTier(state) : bestTier(job.id, jp.level);
+  const nxt = nextTier(job.id, jp.level);
+
+  let body;
+  if (!shownTier) {
+    body = `<p class="muted small">Aucun palier disponible.</p>`;
   } else {
-    control = `<button class="btn tiny" data-act="start-activity" data-job="${job.id}" data-id="${a.id}">Démarrer</button>`;
+    const isActive = isJobActive;
+    let control;
+    if (isActive) {
+      const p = activityProgress(state) * 100;
+      const remain = fmtDuration(activityRemainingMs(state));
+      control = `
+        <div class="action-active">
+          <div class="action-progress">
+            <div class="bar"><div class="bar-fill" id="job-active-fill" style="width:${p}%"></div></div>
+            <span class="remain" id="job-active-remain">${remain}</span>
+          </div>
+          <button class="btn tiny danger" data-act="stop-activity">Arrêter</button>
+        </div>`;
+    } else {
+      control = `<button class="btn tiny primary" data-act="start-activity" data-job="${job.id}" data-auto="1">Démarrer</button>`;
+    }
+
+    // Sélecteur de palier : actif seulement si plusieurs paliers sont débloqués.
+    let selector = "";
+    if (unlocked.length > 1) {
+      const chips = unlocked
+        .slice()
+        .sort((a, b) => a.minLevel - b.minLevel)
+        .map((t) => {
+          const sel = shownTier && t.id === shownTier.id ? " selected" : "";
+          return `<button class="tier-chip${sel}" data-act="start-activity" data-job="${job.id}" data-tier="${t.id}" title="${esc(getResource(t.resource)?.name || t.name)}">${esc(t.name)}</button>`;
+        })
+        .join("");
+      selector = `<div class="tier-select"><span class="muted small">Palier :</span>${chips}</div>`;
+    }
+
+    body = `
+      <div class="job-activity ${isActive ? "active" : ""}">
+        <div class="action-main">
+          <strong>${esc(shownTier.name)}</strong>
+          <span class="muted small">⏱ ${(shownTier.durationMs / 1000).toFixed(0)} s · +${shownTier.xp} XP</span>
+          <div class="yields">${tierYields(shownTier)}</div>
+        </div>
+        <div class="action-ctrl">${control}</div>
+      </div>
+      ${selector}
+      ${nxt ? `<p class="muted small next-tier">🔒 Prochain palier : <strong>${esc(nxt.name)}</strong> au niveau ${nxt.minLevel}</p>` : `<p class="muted small">Palier maximal atteint.</p>`}`;
   }
 
   return `
-    <div class="action ${locked ? "locked" : ""} ${isActive ? "active" : ""}">
-      <div class="action-main">
-        <strong>${esc(a.name)}</strong>
-        <span class="muted small">⏱ ${(a.durationMs / 1000).toFixed(0)} s · +${a.xp} XP</span>
-        <div class="yields">${yields}</div>
+    <div class="job-block">
+      <div class="job-head">
+        ${sigil(job.image, job.icon)}
+        <div class="job-id">
+          <strong>${esc(job.name)}</strong> <span class="muted">Niv. ${jp.level}</span>
+          ${bar(jp.xp, xpNext, "xp")}
+          <span class="muted small">${fmt(jp.xp)}/${fmt(xpNext)} XP</span>
+        </div>
       </div>
-      <div class="action-ctrl">${control}</div>
+      ${body}
     </div>`;
 }
 

@@ -75,13 +75,19 @@ sont rafraîchis de façon ciblée. **Contrainte forte à préserver.**
 - **Limite** : pas d'aperçu de l'ordre des tours, pas de réduction de recharge
   liée à la vitesse.
 
-### Métiers (`jobs.js` + `data/jobs.js`)
-- Une activité active à la fois ; cycles chronométrés, hors-ligne plafonné 8 h à
-  **100 %** d'efficacité.
-- **Limite majeure (Lot 2/3)** : chaque métier expose plusieurs actions comme des
-  boutons permanents (ex. « bois tendre » + « chêne ») au lieu d'une activité
-  principale évolutive. Seulement 2 métiers, pas de transformation (fonte/forge
-  comme métiers), pas de courbe 1..100, pas de paliers de ressources, pas d'outils.
+### Métiers (`jobs.js` + `data/jobs.js`) — refondus Lot 2
+- **Une activité principale par métier**, structurée en **paliers** (`tiers`) :
+  le jeu propose toujours le meilleur palier maîtrisé et évolue automatiquement
+  au niveau (mode `auto`). Le joueur peut choisir un palier inférieur (sélecteur
+  de chips → mode manuel). Notification une fois par nouveau palier.
+- Activité : `{ jobId, tierId, cycleStart, auto }` (migration v3→v4).
+- Courbe d'XP **data-driven** (`js/data/curves.js`), plafonnée au **niveau 100**
+  (`applyXp` cappé via `MAX_LEVEL`).
+- Hors-ligne plafonné 8 h, **efficacité 70 %** (`OFFLINE_EFFICIENCY`) : la récolte
+  active reste préférable.
+- **Reste à faire (Lot 3+)** : paliers de ressources supplémentaires (avec leurs
+  usages craft pour éviter les ressources orphelines), métiers de transformation
+  (fonte/forge/alchimie/cuisine) avec niveau propre, outils de métier.
 
 ### Combat & IA (`combat.js`)
 - DoT (poison/saignement), buffs/debuffs, garde, bouclier, soin, vol de vie,
@@ -122,8 +128,9 @@ sont rafraîchis de façon ciblée. **Contrainte forte à préserver.**
 
 ## Plan des lots
 1. ✅ Audit, sécurité de sauvegarde, infrastructure de tests, doc.
-2. Métiers : une activité principale évolutive par métier.
-3. Courbe 1..100, paliers de ressources, hors-ligne équilibré (<100 %).
+2. ✅ Métiers : une activité principale évolutive par métier (+ courbe 1..100
+   data-driven, hors-ligne 70 %).
+3. Paliers de ressources supplémentaires (avec usages), métiers de transformation.
 4. Atelier : organisation fonctionnelle + cohérence des recettes.
 5. Matériaux d'armure : passifs intrinsèques + bonus hybrides 2/4 + comparaison.
 6. Stats lisibles (base/équip/classe), Vitesse documentée, rendements décroissants.

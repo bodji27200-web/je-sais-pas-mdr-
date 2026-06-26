@@ -1,13 +1,18 @@
-// Courbes d'XP et montée de niveau, centralisées et donc faciles à équilibrer.
+// Montée de niveau : la logique vit ici, les COURBES (paramètres) dans
+// js/data/curves.js (tunables, data-driven).
+
+import { charXpAt, jobXpAt, MAX_LEVEL } from "../data/curves.js";
+
+export { MAX_LEVEL };
 
 // XP nécessaire pour passer du niveau `level` au suivant (personnage).
 export function charXpToNext(level) {
-  return Math.round(80 * Math.pow(level, 1.4));
+  return charXpAt(level);
 }
 
 // XP nécessaire pour passer au niveau suivant (métier).
 export function jobXpToNext(level) {
-  return Math.round(50 * Math.pow(level, 1.3));
+  return jobXpAt(level);
 }
 
 // Applique de l'XP à un objet { level, xp } et renvoie le nombre de niveaux gagnés.
@@ -16,12 +21,14 @@ export function applyXp(holder, amount, xpToNext) {
   holder.xp += amount;
   let gained = 0;
   let need = xpToNext(holder.level);
-  while (holder.xp >= need) {
+  while (holder.level < MAX_LEVEL && holder.xp >= need) {
     holder.xp -= need;
     holder.level += 1;
     gained += 1;
     need = xpToNext(holder.level);
   }
+  // Au niveau maximum, l'XP excédentaire n'est plus accumulée.
+  if (holder.level >= MAX_LEVEL) holder.xp = 0;
   return gained;
 }
 

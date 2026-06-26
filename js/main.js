@@ -289,6 +289,11 @@ function tick() {
 
   // Les métiers tournent même pendant un combat.
   const cycle = processActivity(state, now);
+  // Notification une seule fois quand l'activité principale évolue de palier.
+  if (cycle && cycle.evolved) {
+    toast(`Nouveau palier : ${cycle.evolved.name} !`, "good");
+    playDing();
+  }
   checkObjectives();
   checkSpecUnlock();
   if (!(currentCombat && currentCombat.status === "active")) {
@@ -315,11 +320,17 @@ function showOfflineSummary(summary) {
   const lines = Object.keys(summary.resources)
     .map((id) => `<li>${getResource(id)?.icon || ""} ${esc(getResource(id)?.name || id)} ×${fmt(summary.resources[id])}</li>`)
     .join("");
+  const levelsLine = summary.levels > 0 ? `<p class="muted small">⬆ +${summary.levels} niveau(x) de métier</p>` : "";
+  const evolvedLine = summary.evolved
+    ? `<p class="lvlup">Nouveau palier débloqué : ${esc(summary.evolved.name)} !</p>`
+    : "";
   showModal(`
     <h2>De retour !</h2>
-    <p class="muted">Pendant ton absence, ${summary.cycles} cycle(s) de récolte se sont achevés.</p>
+    <p class="muted">Pendant ton absence, ${summary.cycles} cycle(s) de récolte se sont achevés (efficacité hors-ligne réduite).</p>
     ${lines ? `<ul class="drop-list">${lines}</ul>` : ""}
     <p class="muted small">+${fmt(summary.xp)} XP de métier</p>
+    ${levelsLine}
+    ${evolvedLine}
     <button class="btn primary" data-act="close-modal">Continuer</button>
   `);
 }
@@ -370,7 +381,11 @@ const handlers = {
     renderAll();
   },
   "start-activity": (el) => {
-    const r = startActivity(getState(), el.dataset.job, el.dataset.id);
+    const tier = el.dataset.tier || null;
+    // data-auto="1" (bouton Démarrer) -> suit le meilleur palier ; un palier
+    // explicitement choisi (chip) -> mode manuel.
+    const auto = el.dataset.auto === "1" ? true : tier ? false : true;
+    const r = startActivity(getState(), el.dataset.job, tier, auto);
     if (!r.ok) return toast(r.error, "warn");
     save();
     renderAll();

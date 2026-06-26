@@ -98,6 +98,36 @@ test("une migration crée une copie de sécurité de la sauvegarde d'origine", (
   assert.equal(parsed.version, 1, "la copie de sécurité conserve la version d'origine");
 });
 
+test("migration v3 -> v4 : l'activité passe de actionId à tierId + auto", () => {
+  resetSave();
+  const v3 = {
+    version: 3,
+    character: {
+      name: "Bucheron",
+      classId: "warrior",
+      level: 5,
+      xp: 0,
+      hpCurrent: 100,
+      equipment: { weapon: null, head: null, chest: null, legs: null, accessory: null },
+      specId: null,
+      specChanges: 0,
+    },
+    jobs: { woodcutting: { level: 3, xp: 0 }, mining: { level: 1, xp: 0 } },
+    activity: { jobId: "woodcutting", actionId: "chop_oak", cycleStart: Date.now() },
+    inventory: { resources: {}, equipment: [] },
+    gold: 0,
+    counters: { kills: 0, bossKills: 0, crafted: 0, harvested: 0 },
+    flags: {},
+  };
+  localStorage.setItem(SAVE_KEY, JSON.stringify(v3));
+  const loaded = load();
+  assert.ok(loaded);
+  assert.equal(loaded.version, SAVE_VERSION);
+  assert.equal(loaded.activity.tierId, "chop_oak");
+  assert.equal(loaded.activity.auto, true);
+  assert.equal(loaded.activity.actionId, undefined, "l'ancien champ actionId doit être retiré");
+});
+
 test("une sauvegarde corrompue ne casse pas et n'écrase pas l'original", () => {
   resetSave();
   localStorage.setItem(SAVE_KEY, "{ ceci n'est pas du JSON valide");
