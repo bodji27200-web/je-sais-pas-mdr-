@@ -11,6 +11,18 @@ import {
 } from "../core/state.js";
 import { makeInstance } from "../core/items.js";
 import { applyXp, jobXpToNext } from "../core/progression.js";
+import { getEquipment } from "../data/equipment.js";
+import { getClass } from "../data/classes.js";
+
+// Cohérence classe/arme (Lot 13) : on ne peut pas fabriquer une arme que sa
+// classe ne peut pas manier (sinon objet inutile). Armures/accessoires = universels.
+export function recipeAllowedForClass(state, recipe) {
+  if (!recipe || !recipe.output || recipe.output.type !== "equipment") return true;
+  const tpl = getEquipment(recipe.output.id);
+  if (!tpl || tpl.slot !== "weapon" || !tpl.wtype) return true;
+  const cls = getClass(state.character.classId);
+  return !cls || !cls.weapons || cls.weapons.includes(tpl.wtype);
+}
 
 // Niveau du métier de transformation d'une station (1 si non initialisé).
 export function professionLevel(state, stationId) {
@@ -21,6 +33,8 @@ export function professionLevel(state, stationId) {
 // Le joueur peut-il lancer cette recette ? Renvoie { ok, reason }.
 // L'ordre des vérifications produit un message clair (la cause la plus haute).
 export function canCraft(state, recipe) {
+  if (!recipeAllowedForClass(state, recipe))
+    return { ok: false, reason: "Classe incompatible" };
   if (state.character.level < (recipe.levelReq || 0))
     return { ok: false, reason: `Niveau ${recipe.levelReq} requis` };
   const profReq = recipe.profReq || 1;

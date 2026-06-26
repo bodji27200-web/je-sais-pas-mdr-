@@ -13,7 +13,7 @@ import { getSkill } from "../data/skills.js";
 import { getClass } from "../data/classes.js";
 import { getEquipment } from "../data/equipment.js";
 import { getResource } from "../data/resources.js";
-import { getDerivedStats, gainCharXp, clampHp, getActiveSpec, activeMaterialBehaviors, familyCounts } from "../core/character.js";
+import { getDerivedStats, gainCharXp, clampHp, getActiveSpec, activeMaterialBehaviors, familyCounts, gearCombatBonuses, equippedWeaponElement } from "../core/character.js";
 import { MATERIAL_BEHAVIOR } from "../data/materials.js";
 import { getState as getStateDef } from "../data/states.js";
 import { ELEMENT_ORDER } from "../data/elements.js";
@@ -189,10 +189,26 @@ export function buildPlayerCombatant(state) {
   player._concReady = false;
   player._stabilityUsed = false;
 
-  // Résistances élémentaires du joueur : le Tissu protège des éléments.
+  // Résistances élémentaires du joueur : le Tissu protège de TOUS les éléments
+  // (légère résistance générique), les affixes « resist » protègent d'un élément
+  // PRÉCIS (cumulables = défense ciblée -> un build oriente le combat).
   const clothCount = familyCounts(state).cloth || 0;
   const clothResist = Math.min(0.3, clothCount * 0.06);
-  if (clothResist > 0) for (const el of ELEMENT_ORDER) player.resist[el] = 1 - clothResist;
+  const gear = gearCombatBonuses(state);
+  for (const el of ELEMENT_ORDER) {
+    const affixResist = gear.resist[el] || 0;
+    const total = Math.min(0.7, clothResist + affixResist); // plafond global 70 %
+    if (total > 0) player.resist[el] = (player.resist[el] != null ? player.resist[el] : 1) * (1 - total);
+  }
+
+  // Élément de l'arme : les attaques sans élément propre prennent celui de l'arme.
+  player.weaponElement = equippedWeaponElement(state);
+
+  // Dégâts élémentaires bonus (affixes) — combinés au familier plus bas.
+  player.elementDmg = { ...gear.elementDmg };
+
+  // Effets de combat issus des affixes (vol de vie, régén).
+  if (gear.pp && Object.keys(gear.pp).length) mergePp(player.pp, gear.pp);
 
   // Familier équipé (Lot 11) : SOUTIEN LÉGER appliqué au héros en combat.
   const fam = effectiveFamiliarPassive(state);
@@ -207,7 +223,7 @@ export function buildPlayerCombatant(state) {
     const ppAdd = {};
     for (const k of ["skillPowerPct", "lifestealPct", "hpRegenPct"]) if (p[k]) ppAdd[k] = p[k];
     if (Object.keys(ppAdd).length) mergePp(player.pp, ppAdd);
-    player.familiarElementDmg = p.elementDmgPct || null;
+    if (p.elementDmgPct) for (const el of Object.keys(p.elementDmgPct)) player.elementDmg[el] = (player.elementDmg[el] || 0) + p.elementDmgPct[el];
     player.familiar = { id: fam.id, sprite: fam.sprite, image: fam.image, element: fam.element, role: fam.role, level: fam.level, link: fam.link };
   }
 
@@ -369,9 +385,9 @@ function dealDamage(combat, attacker, defender, power, opts = {}) {
   // Élément : résistances/vulnérabilités de la cible + états (Trempé, Exposé...).
   base *= incomingMultiplier(defender, opts.element || null);
 
-  // Synergie de familier (Lot 11) : bonus léger aux dégâts de l'élément assorti.
-  if (attacker.familiarElementDmg && opts.element && attacker.familiarElementDmg[opts.element])
-    base *= 1 + attacker.familiarElementDmg[opts.element];
+  // Bonus de dégâts élémentaires (affixes d'arme/accessoire + familier).
+  if (attacker.elementDmg && opts.element && attacker.elementDmg[opts.element])
+    base *= 1 + attacker.elementDmg[opts.element];
 
   base *= 0.9 + Math.random() * 0.2; // variance ±10 %
   const critChance = attacker.crit + (opts.critBonus || 0) + sumBuff(attacker, "crit_buff");
@@ -443,7 +459,7 @@ function useSkill(combat, actor, other, skillId) {
     let total = 0;
     let anyCrit = false;
     for (let i = 0; i < hits && other.hp > 0; i++) {
-      const r = dealDamage(combat, actor, other, skill.power, { skillId, critBonus: skill.critBonus || 0, concBonus, element: skill.element || actor.element || null });
+      const r = dealDamage(combat, actor, other, skill.power, { skillId, critBonus: skill.critBonus || 0, concBonus, element: skill.element || actor.weaponElement || actor.element || null });
       total += r.dmg;
       anyCrit = anyCrit || r.isCrit;
       landed = true;

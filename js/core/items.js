@@ -10,6 +10,8 @@
 
 import { EQUIPMENT, getEquipment } from "../data/equipment.js";
 import { RARITIES, RARITY_ORDER, getRarity } from "../data/rarities.js";
+import { rollAffixes } from "../data/affixes.js";
+import { ELEMENT_ORDER } from "../data/elements.js";
 
 // Amplitude de variation des stats autour de la valeur attendue (±8 %).
 const VARIANCE = 0.08;
@@ -57,17 +59,25 @@ function rollStats(base, rarity) {
 }
 
 // Crée une instance d'un objet à partir de son modèle et d'une rareté.
+// - Les ARMES reçoivent un ÉLÉMENT aléatoire (le même modèle peut donner une
+//   arme de Feu, d'Eau, etc. -> chaque craft est différent, builds variés).
+// - Des AFFIXES sont tirés selon la rareté (qualité, pas juste +stats globales).
 export function makeInstance(baseId, rarityId = "common") {
   const tpl = getEquipment(baseId);
   if (!tpl) return null;
   const rarity = getRarity(rarityId);
-  return {
+  const inst = {
     uid: uid(),
     baseId,
     rarity: rarity.id,
     stats: rollStats(tpl.stats, rarity),
     lvl: 0,
   };
+  // Catégorie d'affixes selon l'emplacement.
+  const cat = tpl.slot === "weapon" ? "weapon" : tpl.slot === "accessory" ? "accessory" : "armor";
+  if (tpl.slot === "weapon") inst.element = ELEMENT_ORDER[Math.floor(Math.random() * ELEMENT_ORDER.length)];
+  inst.affixes = rollAffixes(cat, rarity.id, inst.element || null);
+  return inst;
 }
 
 // « Chance » d'un ennemi : décale le tirage vers les raretés supérieures.

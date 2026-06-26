@@ -146,8 +146,15 @@ sont rafraîchis de façon ciblée. **Contrainte forte à préserver.**
   par matériau, implémenté dans le combat : Tissu *Concentration* (compétence
   renforcée après 2 compétences différentes), Cuir *Souplesse* (esquive + crit),
   Métal *Stabilité* (1re attaque subie réduite). Migration v5→v6.
-- **Limite (Lot 19)** : la rareté multiplie encore TOUTES les stats au lieu de
-  piloter des **affixes** par familles cohérentes.
+- **Lot 13 (profondeur de build)** : **affixes** pilotés par la rareté
+  (`data/affixes.js`, 0→4 selon Commun→Légendaire) sur armes/armures/accessoires ;
+  **élément d'arme aléatoire** par instance (re-craft = build différent) ;
+  **résistances élémentaires par affixe** cumulables (défense ciblée) ;
+  `getDerivedStats` applique les affixes de stat (visibles), `gearCombatBonuses`
+  agrège résist/dégâts élém./pp pour le combat. **Cohérence classe/arme au craft**
+  (`recipeAllowedForClass` + Atelier masque les armes hors-classe par défaut).
+  **2e emplacement d'accessoire** débloqué en battant un boss + 5 accessoires.
+  Atelier **compacté** (cartes plus petites, méta raccourcie). Migration v9→v10.
 
 ### Sauvegarde (`state.js`)
 - `SAVE_VERSION = 8`. Migrations v1→v8 (instances, spécialisations, métiers,
@@ -205,6 +212,10 @@ sont rafraîchis de façon ciblée. **Contrainte forte à préserver.**
 12. ✅ Guides contextuels (1×/système, réouvrables, désactivables), quêtes de
    découverte (récompenses, indices adaptés à la classe), succès/badges (14,
    évalués en direct). Migration v8→v9. Tests : 8 cas.
+13. ✅ Profondeur de build (retours joueur) : affixes par rareté, élément d'arme
+   aléatoire, résistances élémentaires d'affixes, cohérence classe/arme au craft,
+   2e slot d'accessoire (boss) + 5 accessoires, Atelier compacté. Migration v9→v10.
+   Tests : 7 cas. (Multijoueur reporté : solo d'abord, choix utilisateur.)
 10. 2 nouvelles zones, 5 ennemis chacune, boss à phases.
 11. Familiers (première version complète).
 12. Guides contextuels, quêtes de découverte, succès.

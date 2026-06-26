@@ -19,7 +19,7 @@ import { RECIPES, STATIONS } from "../data/recipes.js";
 import { ENEMIES, getEnemy } from "../data/enemies.js";
 import { ZONES, allZones } from "../data/zones.js";
 import { enemyUnlock, zoneProgress, zoneUnlocked } from "../systems/zoneprog.js";
-import { getDerivedStats, getStatDetails, canWieldWeapon, getActiveSpec, specUnlocked, nextRespecCost, familyCounts, activeMaterialBonuses } from "../core/character.js";
+import { getDerivedStats, getStatDetails, canWieldWeapon, getActiveSpec, specUnlocked, nextRespecCost, familyCounts, activeMaterialBonuses, accessory2Unlocked } from "../core/character.js";
 import { MATERIALS } from "../data/materials.js";
 import { forecastTurns, whyCannotUse, enemyIntentInfo, DEF_K, DEF_CAP } from "../systems/combat.js";
 import { getState as getStateDef } from "../data/states.js";
@@ -27,7 +27,7 @@ import { getElement } from "../data/elements.js";
 import { specsForClass, SPEC_UNLOCK_LEVEL } from "../data/specializations.js";
 import { charXpToNext, jobXpToNext } from "../core/progression.js";
 import { activityProgress, activityRemainingMs, activeTier } from "../systems/jobs.js";
-import { craftableTimes, canCraft } from "../systems/crafting.js";
+import { craftableTimes, canCraft, recipeAllowedForClass } from "../systems/crafting.js";
 import { OBJECTIVES, objectiveHint, rewardLabel } from "../systems/objectives.js";
 import { getGuide } from "../data/guides.js";
 import { evaluateAchievements, unlockedCount } from "../systems/achievements.js";
@@ -184,10 +184,14 @@ export function renderCharacter(state) {
     })
     .join("");
 
+  const acc2Locked = !accessory2Unlocked(state);
   const slots = Object.keys(SLOTS)
     .map((slot) => {
       const inst = ch.equipment[slot];
       if (!inst) {
+        if (slot === "accessory2" && acc2Locked) {
+          return `<div class="slot empty locked"><span class="slot-name">${SLOTS[slot]}</span><span class="muted small">🔒 Vaincre un boss pour débloquer</span></div>`;
+        }
         return `<div class="slot empty"><span class="slot-name">${SLOTS[slot]}</span><span class="muted">— vide —</span></div>`;
       }
       const item = getEquipment(inst.baseId);
@@ -197,8 +201,9 @@ export function renderCharacter(state) {
           ${sigil(item.image, item.icon)}
           <div class="slot-info">
             <span class="slot-name">${SLOTS[slot]}</span>
-            <div class="gear-title"><strong style="color:${r.color}">${esc(item.name)}</strong>${upgradeSuffix(inst)}${rarityTag(inst)}${familyTag(item)}</div>
+            <div class="gear-title"><strong style="color:${r.color}">${esc(item.name)}</strong>${upgradeSuffix(inst)}${rarityTag(inst)}${familyTag(item)}${elementBadge(inst)}</div>
             <span class="muted small">${statLine(effectiveStats(inst))}</span>
+            ${affixList(inst)}
           </div>
           <button class="btn tiny" data-act="unequip" data-slot="${slot}">Retirer</button>
         </div>`;
@@ -348,6 +353,31 @@ function statLine(stats) {
       return `${v > 0 ? "+" : ""}${v} ${label}`;
     })
     .join(" · ");
+}
+
+// Badge d'élément d'une arme (Lot 13).
+function elementBadge(inst) {
+  if (!inst || !inst.element) return "";
+  const el = getElement(inst.element);
+  if (!el) return "";
+  return ` <span class="el-tag" style="border-color:${el.color};color:${el.color}">${el.icon} ${esc(el.name)}</span>`;
+}
+
+// Texte lisible d'un affixe (Lot 13).
+function affixText(af) {
+  const el = af.element ? getElement(af.element) : null;
+  if (af.kind === "resist") return `Résist. ${el ? el.icon + " " + el.name : ""} +${Math.round(af.value * 100)} %`;
+  if (af.kind === "elementDmg") return `Dégâts ${el ? el.icon + " " + el.name : ""} +${Math.round(af.value * 100)} %`;
+  if (af.kind === "combat") return `${af.label} +${Math.round(af.value * 100)} %`;
+  // stat
+  if (af.stat === "critFlat") return `Crit +${af.value} %`;
+  return `${af.label} +${Math.round(af.value * 100)} %`;
+}
+
+// Liste d'affixes d'une instance (puces). Vide si aucun.
+function affixList(inst) {
+  if (!inst || !inst.affixes || !inst.affixes.length) return "";
+  return `<div class="affixes">${inst.affixes.map((af) => `<span class="affix">${esc(affixText(af))}</span>`).join("")}</div>`;
 }
 
 const STAT_SHORT = { hp: "PV", atk: "ATK", def: "DEF", spd: "VIT", crit: "CRIT" };
@@ -587,7 +617,7 @@ export function renderCraft(state, filters = defaultCraftFilters()) {
   return `
     <section class="panel">
       <h2>Atelier</h2>
-      <p class="muted">Transforme tes ressources en équipement. Chaque métier de transformation gagne un niveau en fabriquant, ce qui débloque des recettes plus avancées.</p>
+      <p class="muted small">Transforme tes ressources en équipement. Chaque arme forgée reçoit un élément et des affixes aléatoires : re-craft pour varier ton build.</p>
       ${renderProfessionsSummary(state)}
       ${renderCraftFilterBar(state, filters)}
       <div id="craft-results">${renderCraftResults(state, filters)}</div>
@@ -598,6 +628,10 @@ export function renderCraft(state, filters = defaultCraftFilters()) {
 export function renderCraftResults(state, filters = defaultCraftFilters()) {
   const f = filters;
   let recipes = RECIPES.filter((r) => {
+    // Cohérence : par défaut (filtre « toutes classes »), on masque les armes que
+    // TA classe ne peut pas manier. Choisir une classe précise reste possible
+    // pour consulter ses recettes (navigation).
+    if (f.cls === "all" && !recipeAllowedForClass(state, r)) return false;
     if (f.cat !== "all" && recipeCategory(r) !== f.cat) return false;
     if (!matchesClass(r, f.cls)) return false;
     if (!matchesSearch(r, f.search)) return false;
@@ -647,18 +681,15 @@ function renderRecipe(state, recipe) {
       ? "Matériau"
       : { weapon: "Arme", head: "Tête", chest: "Torse", legs: "Jambes", accessory: "Accessoire" }[outDef.slot] || "Objet";
   const profReq = recipe.profReq || 1;
-  const metaParts = [
-    `${typeLabel}`,
-    `${station ? station.icon + " " + esc(station.name) : ""} niv. ${profReq}`,
-  ];
-  if (out.type === "equipment" && outDef.slot === "weapon" && outDef.wtype) {
-    const classes = classesForWtype(outDef.wtype).map((c) => esc(c.name));
-    if (classes.length) metaParts.push("⚔ " + classes.join(", "));
-  }
-  if (recipe.levelReq) metaParts.push("Héros niv. " + recipe.levelReq);
-  const meta = `<span class="recipe-meta muted small">${metaParts.filter(Boolean).join(" · ")}</span>`;
+  const metaParts = [typeLabel, `${station ? esc(station.name) : ""} niv. ${profReq}`];
+  if (recipe.levelReq) metaParts.push("Niv. " + recipe.levelReq);
+  const meta = `<span class="recipe-meta muted">${metaParts.filter(Boolean).join(" · ")}</span>`;
 
-  const stats = out.type === "equipment" ? `<span class="muted small">${statLine(outDef.stats)} ${familyTag(outDef)}</span>` : `<span class="muted small">+${recipe.profXp || 0} XP ${esc(station ? station.name : "métier")}</span>`;
+  const isWeapon = out.type === "equipment" && outDef.slot === "weapon";
+  const extra = out.type === "equipment" ? `<span class="recipe-meta muted">✦ ${isWeapon ? "Élément + affixes" : "Affixes"} aléatoires</span>` : "";
+  const stats = out.type === "equipment"
+    ? `<span class="muted small">${statLine(outDef.stats)} ${familyTag(outDef)}</span>${extra}`
+    : `<span class="muted small">+${recipe.profXp || 0} XP ${esc(station ? station.name : "métier")}</span>`;
 
   return `
     <div class="recipe ${check.ok ? "" : "cant"}">
@@ -726,9 +757,10 @@ export function renderInventory(state) {
             <div class="inv-gear" style="border-left:3px solid ${r.color}">
               ${sigil(item.image, item.icon)}
               <div class="inv-gear-info">
-                <div class="gear-title"><strong style="color:${r.color}">${esc(item.name)}</strong>${upgradeSuffix(inst)}${rarityTag(inst)}${familyTag(item)}</div>
+                <div class="gear-title"><strong style="color:${r.color}">${esc(item.name)}</strong>${upgradeSuffix(inst)}${rarityTag(inst)}${familyTag(item)}${elementBadge(inst)}</div>
                 <span class="muted small">${SLOTS[item.slot]} · ${statLine(effectiveStats(inst))}</span>
                 <span class="muted small">${item.levelReq ? "Niv. " + item.levelReq : "Aucun prérequis"} · ${cmp}</span>
+                ${affixList(inst)}
                 ${upLine}
               </div>
               <div class="inv-gear-actions">

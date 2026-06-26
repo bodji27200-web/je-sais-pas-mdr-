@@ -49,6 +49,12 @@ function buildGearedState(classId, specId) {
     const piece = bestOf((e) => e.slot === slot && e.family === fam);
     if (piece) s.character.equipment[slot] = makeInstance(piece.id, RARITY);
   }
+  // Équilibrage « sans avantage élémentaire » (cahier des charges) : on neutralise
+  // l'élément d'arme et les affixes aléatoires pour mesurer la classe/voie pure.
+  for (const slot of Object.keys(s.character.equipment)) {
+    const inst = s.character.equipment[slot];
+    if (inst) { inst.element = null; inst.affixes = []; }
+  }
   s.character.hpCurrent = getDerivedStats(s).maxHp;
   return s;
 }

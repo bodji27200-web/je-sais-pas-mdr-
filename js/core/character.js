@@ -85,6 +85,21 @@ export function getDerivedStats(state) {
     if (m.critFlat) stats.crit = (stats.crit || 0) + m.critFlat;
   }
 
+  // Affixes de stat (Lot 13) : % cumulés depuis toutes les pièces équipées.
+  // Visibles sur la fiche -> deux mêmes objets de raretés différentes diffèrent.
+  for (const slot of Object.keys(ch.equipment)) {
+    const inst = ch.equipment[slot];
+    if (!inst || !inst.affixes) continue;
+    for (const af of inst.affixes) {
+      if (af.kind !== "stat") continue;
+      if (af.stat === "pctAtk") stats.atk *= 1 + af.value;
+      else if (af.stat === "pctDef") stats.def *= 1 + af.value;
+      else if (af.stat === "pctHp") stats.hp *= 1 + af.value;
+      else if (af.stat === "spdPct") stats.spd *= 1 + af.value;
+      else if (af.stat === "critFlat") stats.crit = (stats.crit || 0) + af.value;
+    }
+  }
+
   // Passive de classe (parties permanentes des stats).
   const pp = cls.passive ? getSkill(cls.passive)?.passive : null;
   if (pp) {
@@ -215,6 +230,31 @@ export function regenOutOfCombat(state, deltaMs) {
   state.character.hpCurrent = Math.min(maxHp, state.character.hpCurrent + heal);
 }
 
+// Agrège les affixes de COMBAT des pièces équipées (Lot 13) : résistances
+// élémentaires (cumulables, plafonnées à 60 %/élément), dégâts élémentaires
+// bonus, et effets dynamiques (vol de vie, régén). Lu par buildPlayerCombatant.
+export function gearCombatBonuses(state) {
+  const resist = {}; // { element: réduction cumulée (0..0.6) }
+  const elementDmg = {}; // { element: bonus de dégâts }
+  const pp = {}; // { lifestealPct, hpRegenPct }
+  for (const slot of Object.keys(state.character.equipment)) {
+    const inst = state.character.equipment[slot];
+    if (!inst || !inst.affixes) continue;
+    for (const af of inst.affixes) {
+      if (af.kind === "resist" && af.element) resist[af.element] = Math.min(0.6, (resist[af.element] || 0) + af.value);
+      else if (af.kind === "elementDmg" && af.element) elementDmg[af.element] = (elementDmg[af.element] || 0) + af.value;
+      else if (af.kind === "combat" && af.pp) pp[af.pp] = (pp[af.pp] || 0) + af.value;
+    }
+  }
+  return { resist, elementDmg, pp };
+}
+
+// Élément de l'arme équipée (oriente les attaques sans élément propre).
+export function equippedWeaponElement(state) {
+  const w = state.character.equipment.weapon;
+  return (w && w.element) || null;
+}
+
 // Une arme est-elle maniable par la classe du personnage ?
 // On ne contrôle QUE les armes (slot weapon) ayant un type (`wtype`) ; les
 // armures et accessoires restent universels. Sans liste `weapons` -> tout permis.
@@ -238,7 +278,16 @@ export function equip(state, uid) {
     return { ok: false, error: `${cls.name} ne peut pas manier cette arme.` };
   }
 
-  const slot = tpl.slot;
+  // Choix de l'emplacement. Les accessoires ont DEUX emplacements possibles ;
+  // le 2e n'est utilisable qu'après avoir vaincu un boss (Lot 13).
+  let slot = tpl.slot;
+  if (tpl.slot === "accessory") {
+    const second = accessory2Unlocked(state);
+    if (!state.character.equipment.accessory) slot = "accessory";
+    else if (second && !state.character.equipment.accessory2) slot = "accessory2";
+    else slot = "accessory"; // les deux pleins (ou 2e verrouillé) -> remplace le 1er
+  }
+
   const previous = state.character.equipment[slot];
 
   // Retire de l'inventaire, place dans le slot, rend l'ancien à l'inventaire.
@@ -248,6 +297,11 @@ export function equip(state, uid) {
 
   clampHp(state);
   return { ok: true, name: tpl.name };
+}
+
+// Le 2e emplacement d'accessoire est-il débloqué ? (un boss vaincu).
+export function accessory2Unlocked(state) {
+  return !!(state.flags && state.flags.bossDefeated) || (state.counters && state.counters.bossKills > 0);
 }
 
 // Déséquipe le slot indiqué et rend l'instance à l'inventaire.

@@ -6,6 +6,7 @@ import { getClass } from "../data/classes.js";
 import { STATIONS } from "../data/recipes.js";
 import { getEquipment } from "../data/equipment.js";
 import { makeInstance } from "./items.js";
+import { ELEMENT_ORDER } from "../data/elements.js";
 
 // Métiers de transformation (Fonte, Forge, etc.) : niveau propre qui monte en
 // fabriquant. Un par station de craft (data-driven). Niveau 1 au départ.
@@ -21,7 +22,7 @@ export const SAVE_KEY = "idle_rpg_save_v1";
 // Copie de sécurité écrite AVANT toute migration : si une migration tournait mal
 // dans une future version, on garde une trace de la sauvegarde d'origine.
 export const BACKUP_KEY = "idle_rpg_save_backup";
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
 
 let state = null;
 
@@ -58,7 +59,7 @@ export function newGame(name, classId) {
       level: 1,
       xp: 0,
       hpCurrent: cls.baseStats.hp, // ajusté ensuite par les stats dérivées
-      equipment: { weapon: null, head: null, chest: null, hands: null, legs: null, feet: null, accessory: null },
+      equipment: { weapon: null, head: null, chest: null, hands: null, legs: null, feet: null, accessory: null, accessory2: null },
       specId: null, // voie de spécialisation (choisie au niveau 10)
       specChanges: 0, // nombre de changements de voie payés (coût croissant)
     },
@@ -202,6 +203,21 @@ function migrate(parsed) {
     if (!parsed.achievements) parsed.achievements = { seen: {} };
     if (!parsed.achievements.seen) parsed.achievements.seen = {};
     parsed.version = 9;
+  }
+  // v9 -> v10 : 2e emplacement d'accessoire + élément sur les armes existantes
+  // (les anciennes armes n'avaient pas d'élément). Affixes : les anciennes pièces
+  // restent sans affixe (toléré ; les nouvelles en reçoivent).
+  if (parsed.version === 9) {
+    const eq = parsed.character && parsed.character.equipment;
+    if (eq && eq.accessory2 === undefined) eq.accessory2 = null;
+    const assignEl = (inst) => {
+      if (!inst || !inst.baseId) return;
+      const t = getEquipment(inst.baseId);
+      if (t && t.slot === "weapon" && !inst.element) inst.element = ELEMENT_ORDER[Math.floor(Math.random() * ELEMENT_ORDER.length)];
+    };
+    if (eq) for (const k of Object.keys(eq)) assignEl(eq[k]);
+    if (parsed.inventory && Array.isArray(parsed.inventory.equipment)) parsed.inventory.equipment.forEach(assignEl);
+    parsed.version = 10;
   }
   return parsed.version === SAVE_VERSION ? parsed : null;
 }

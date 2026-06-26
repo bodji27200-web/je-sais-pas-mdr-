@@ -23,7 +23,12 @@ export const SLOTS = {
   legs: "Jambes",
   feet: "Bottes",
   accessory: "Accessoire",
+  accessory2: "Accessoire 2", // 2e emplacement, débloqué en battant un boss (Lot 13)
 };
+
+// Emplacements partageant un même type d'objet (un accessoire va dans l'un OU
+// l'autre des deux emplacements d'accessoire).
+export const SLOT_ALIASES = { accessory: ["accessory", "accessory2"] };
 
 export const EQUIPMENT = {
   // --- Armes ---
@@ -222,6 +227,33 @@ export const EQUIPMENT = {
     id: "silver_amulet", name: "Amulette d'argent", slot: "accessory", family: null,
     levelReq: 9, icon: "📿", image: "assets/equipment/silver_amulet.png",
     stats: { atk: 6, crit: 10, hp: 14 }, desc: "Un travail d'orfèvre : critiques affûtés et vitalité renforcée.",
+  },
+  // Accessoires variés (orientations de build différentes ; les affixes ajoutent
+  // éléments/résistances/passifs). Universels (toutes classes).
+  copper_ring: {
+    id: "copper_ring", name: "Anneau de cuivre", slot: "accessory", family: null,
+    levelReq: 2, icon: "💍", image: "assets/equipment/copper_ring.png",
+    stats: { atk: 3, hp: 8 }, desc: "Un anneau simple : un peu de force, un peu de vigueur.",
+  },
+  warding_charm: {
+    id: "warding_charm", name: "Charme protecteur", slot: "accessory", family: null,
+    levelReq: 4, icon: "🧿", image: "assets/equipment/warding_charm.png",
+    stats: { def: 5, hp: 18 }, desc: "Un talisman défensif : encaisse mieux les coups.",
+  },
+  swift_band: {
+    id: "swift_band", name: "Bracelet véloce", slot: "accessory", family: null,
+    levelReq: 4, icon: "💨", image: "assets/equipment/swift_band.png",
+    stats: { spd: 3, crit: 6 }, desc: "Un bracelet léger qui accélère le geste.",
+  },
+  vital_pendant: {
+    id: "vital_pendant", name: "Pendentif vital", slot: "accessory", family: null,
+    levelReq: 7, icon: "❤", image: "assets/equipment/vital_pendant.png",
+    stats: { hp: 34, def: 3 }, desc: "Un cœur de gemme qui fait battre plus fort la vie.",
+  },
+  arcane_seal: {
+    id: "arcane_seal", name: "Sceau arcanique", slot: "accessory", family: null,
+    levelReq: 8, icon: "🔯", image: "assets/equipment/arcane_seal.png",
+    stats: { atk: 9, crit: 5 }, desc: "Un sceau gravé qui amplifie la puissance des coups.",
   },
 };
 
