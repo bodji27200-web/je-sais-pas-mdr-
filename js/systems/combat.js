@@ -150,13 +150,12 @@ function mergePp(pp, extra) {
   return pp;
 }
 
-export function startCombat(state, enemyId) {
-  const enemy = getEnemy(enemyId);
-  if (!enemy) return null;
-
+// Construit le combattant JOUEUR à partir de l'état (stats dérivées, kit de
+// classe + spécialisation, ressource de classe, passifs de matériaux, résistance
+// du Tissu). Extrait pour être réutilisé par le simulateur d'équilibrage (Lot 9).
+export function buildPlayerCombatant(state) {
   const ds = getDerivedStats(state);
   const cls = getClass(state.character.classId);
-
   const spec = getActiveSpec(state);
   const player = makeCombatant(
     state.character.name,
@@ -188,11 +187,19 @@ export function startCombat(state, enemyId) {
   player._concReady = false;
   player._stabilityUsed = false;
 
-  // Résistances élémentaires du joueur : le Tissu protège des éléments
-  // (identité du matériau). Plafonnée pour rester équilibrée.
+  // Résistances élémentaires du joueur : le Tissu protège des éléments.
   const clothCount = familyCounts(state).cloth || 0;
   const clothResist = Math.min(0.3, clothCount * 0.06);
   if (clothResist > 0) for (const el of ELEMENT_ORDER) player.resist[el] = 1 - clothResist;
+
+  return player;
+}
+
+export function startCombat(state, enemyId) {
+  const enemy = getEnemy(enemyId);
+  if (!enemy) return null;
+
+  const player = buildPlayerCombatant(state);
 
   const e = makeCombatant(
     enemy.name,
@@ -721,4 +728,130 @@ function finishCombat(state, combat, result) {
   combat.rewards = { xp: enemy.xp, gold: enemy.gold, drops, levels };
   log(combat, `${enemy.name} est vaincu ! +${enemy.xp} XP, +${enemy.gold} or.`, "reward");
   if (levels > 0) log(combat, `Niveau supérieur ! Tu passes niveau ${state.character.level}.`, "reward");
+}
+
+// ===========================================================================
+// SIMULATEUR D'ÉQUILIBRAGE (Lot 9)
+// ---------------------------------------------------------------------------
+// Outil headless réutilisant le VRAI moteur (useSkill/dealDamage/états/ressources
+// /matériaux/passifs). Il sert à mesurer l'équilibre relatif des classes et des
+// 15 spécialisations. Le duel est une approximation SYMÉTRIQUE : chaque
+// combattant subit son entretien (cooldowns, DoT, régén, ressource) au DÉBUT de
+// son propre tour. Les deux camps étant traités à l'identique, les taux de
+// victoire relatifs sont significatifs (ce n'est pas une reproduction exacte de
+// la cadence PvE, qui n'a pas lieu d'être ici).
+
+// Score générique d'une compétence pour un acteur quelconque (≠ scoreEnemySkill
+// qui est figé sur combat.enemy). Ne propose jamais une compétence inabordable.
+export function pickSkillGeneric(actor, other) {
+  const ready = (id) => {
+    const s = getSkill(id);
+    if (!s) return false;
+    if ((actor.cooldowns[id] || 0) > 0) return false;
+    if (actor.res && s.cost && actor.res.cur < s.cost) return false;
+    return true;
+  };
+  const score = (id) => {
+    const s = getSkill(id);
+    if (!s) return -Infinity;
+    const hpPct = actor.hp / actor.maxHp;
+    // Compétences de soutien (sur soi).
+    if (s.self && (!s.power || s.power === 0)) {
+      let sc = 0;
+      for (const eff of s.self) {
+        if (eff.type === "heal") sc += (1 - hpPct) * 220 - 20;
+        else if (eff.type === "shield" || eff.type === "guard" || eff.type === "def_buff") {
+          const danger = hpPct < 0.5 ? 1 : 0.35;
+          const redundant = (eff.type === "def_buff" && actor.buffs.some((b) => b.type === "def_buff")) || (eff.type === "guard" && actor.guard);
+          sc += danger * 120 - (redundant ? 200 : 0);
+        } else if (eff.type === "atk_buff") sc += actor.buffs.some((b) => b.type === "atk_buff") ? -200 : 60 + hpPct * 40;
+        else if (eff.type === "spd_buff") sc += actor.buffs.some((b) => b.type === "spd_buff") ? -100 : 40;
+      }
+      return sc;
+    }
+    // Compétences offensives.
+    let sc = expectedDamage(actor, other, s);
+    const lethal = sc >= other.hp;
+    const otherLow = other.hp / other.maxHp < 0.4;
+    if (lethal) sc += 1000;
+    else if (otherLow && (s.power || 0) >= 1.6) sc += 120;
+    for (const eff of s.onHit || []) {
+      if (eff.type === "poison" || eff.type === "bleed") sc += other.dots.some((d) => d.type === eff.type) ? -40 : 70;
+      else if (eff.type === "atk_debuff") sc += other.buffs.some((b) => b.type === "atk_debuff") ? -30 : 55;
+      else if (eff.type === "slow") sc += other.buffs.some((b) => b.type === "slow") ? -30 : 45;
+    }
+    if (s.inflicts && !other.states.some((st) => st.id === s.inflicts)) sc += 40;
+    if ((s.cooldown || 0) >= 3 && !lethal && !otherLow) sc -= 25;
+    return sc;
+  };
+
+  const options = actor.skills.filter(ready);
+  let best = "basic_attack";
+  let bestScore = score("basic_attack");
+  for (const id of options) {
+    const sc = score(id) * (0.97 + Math.random() * 0.06);
+    if (sc > bestScore) { bestScore = sc; best = id; }
+  }
+  return best;
+}
+
+// Entretien de DÉBUT de tour pour un seul combattant (cooldowns, buffs, garde,
+// bouclier, DoT, états, régén PV et ressource).
+function simStartTurnUpkeep(combat, c) {
+  for (const id of Object.keys(c.cooldowns)) if (c.cooldowns[id] > 0) c.cooldowns[id] -= 1;
+  c.buffs = c.buffs.filter((b) => --b.turns > 0);
+  if (c.guard && --c.guard.turns <= 0) c.guard = null;
+  if (c.shieldTurns > 0 && --c.shieldTurns <= 0) c.shield = 0;
+  let dot = 0;
+  for (const d of c.dots) dot += d.dmg;
+  c.dots = c.dots.filter((d) => --d.turns > 0);
+  let sdot = 0;
+  for (const st of c.states) if (st.dotDmg) sdot += st.dotDmg;
+  c.states = c.states.filter((st) => --st.turns > 0);
+  const total = dot + sdot;
+  if (total > 0 && c.hp > 0) c.hp = Math.max(0, c.hp - total);
+  if (c.hp > 0 && c.pp.hpRegenPct && c.hp < c.maxHp && !stateNoRegen(c)) {
+    c.hp = Math.min(c.maxHp, c.hp + Math.round(c.maxHp * c.pp.hpRegenPct));
+  }
+  if (c.hp > 0) gainResource(c, "regenPerTurn");
+}
+
+// Simule un duel entre deux builds (states A et B). Renvoie le vainqueur.
+//   opts : { maxTurns, policyA, policyB }
+// policy(actor, other) -> skillId (défaut : pickSkillGeneric).
+export function simulateDuel(stateA, stateB, opts = {}) {
+  const a = buildPlayerCombatant(stateA);
+  const b = buildPlayerCombatant(stateB);
+  a.hp = a.maxHp;
+  b.hp = b.maxHp;
+  // Initiative de départ pilotée par la vitesse (le plus rapide tend à ouvrir),
+  // avec un aléa pour éviter tout biais de « premier coup » systématique.
+  a.nextAt = (SPEED_UNIT / effectiveSpd(a)) * Math.random();
+  b.nextAt = (SPEED_UNIT / effectiveSpd(b)) * Math.random();
+  const combat = { player: a, enemy: b, turn: 1, status: "active", log: [], lastFx: [], lastActions: [] };
+  const policyA = opts.policyA || pickSkillGeneric;
+  const policyB = opts.policyB || pickSkillGeneric;
+  const maxTurns = opts.maxTurns || 80;
+  let safety = 0;
+  while (a.hp > 0 && b.hp > 0 && combat.turn <= maxTurns && safety < 2000) {
+    safety++;
+    const aFirst = a.nextAt <= b.nextAt + 1e-6;
+    const actor = aFirst ? a : b;
+    const other = aFirst ? b : a;
+    simStartTurnUpkeep(combat, actor);
+    if (actor.hp <= 0) break; // un DoT a pu l'achever
+    if (other.hp <= 0) break;
+    combat.lastFx = [];
+    combat.lastActions = [];
+    const id = (actor === a ? policyA : policyB)(actor, other);
+    useSkill(combat, actor, other, id);
+    actor.nextAt += SPEED_UNIT / effectiveSpd(actor);
+    combat.turn += 1;
+  }
+  let winner = "draw";
+  if (a.hp <= 0 && b.hp > 0) winner = "B";
+  else if (b.hp <= 0 && a.hp > 0) winner = "A";
+  else if (a.hp / a.maxHp > b.hp / b.maxHp) winner = "A"; // limite de tours : avantage au plus haut %
+  else if (b.hp / b.maxHp > a.hp / a.maxHp) winner = "B";
+  return { winner, turns: combat.turn, aHp: a.hp, bHp: b.hp };
 }

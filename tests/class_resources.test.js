@@ -39,11 +39,14 @@ test("le joueur démarre le combat avec sa ressource ; l'ennemi n'en a pas", () 
   }
 });
 
-test("l'attaque de base génère de la ressource (Guerrier part de 0)", () => {
+test("l'attaque de base génère de la ressource (la Rage du Guerrier monte)", () => {
   withSeed(11, () => {
     const s = readyState("warrior");
     const c = startCombat(s, "feral_wolf");
-    assert.equal(c.player.res.cur, 0);
+    // On part en dessous du plafond pour observer le gain (le départ exact est
+    // un paramètre d'équilibrage, on ne le code donc pas en dur ici).
+    c.player.res.cur = 0;
+    c.enemy.nextAt = 1e9; // isole le gain d'ouverture (pas de contre-attaque)
     resolveRound(s, c, "basic_attack");
     assert.ok(c.player.res.cur > 0, "la Rage doit monter après une attaque de base");
     assert.ok(c.player.res.cur <= c.player.res.max, "jamais au-dessus du plafond");

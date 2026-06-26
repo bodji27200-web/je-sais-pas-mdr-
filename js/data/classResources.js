@@ -29,7 +29,7 @@ export const CLASS_RESOURCES = {
     name: "Rage",
     color: "#e8533a",
     icon: "🔥",
-    start: 0,
+    start: 25, // un peu d'adrénaline d'ouverture (équilibrage Lot 9)
     max: 100,
     regenPerTurn: 0,
     onBasicAttack: 18, // frapper construit la Rage
@@ -88,7 +88,7 @@ export const CLASS_RESOURCES = {
     name: "Ombre",
     color: "#9b6dc9",
     icon: "🌙",
-    start: 0,
+    start: 35, // entre dans l'ombre avec une charge initiale (équilibrage Lot 9)
     max: 100,
     regenPerTurn: 0,
     onBasicAttack: 16,

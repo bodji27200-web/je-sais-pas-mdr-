@@ -109,8 +109,15 @@ sont rafraîchis de façon ciblée. **Contrainte forte à préserver.**
   rééquilibrées : l'attaque de base est gratuite et **génère** la ressource ;
   `playerCanUse`/`whyCannotUse` vérifient recharge **et** ressource. Les ennemis
   n'ont pas de ressource → leurs compétences sont sans coût (rétrocompatible).
-- **Limite** : boss = panoplie sans phases (Lot 10) ; spécialisations à
-  auditer/équilibrer via simulateur (Lot 9).
+- **Lot 9** : **simulateur de duel** (`simulateDuel`, `buildPlayerCombatant`,
+  `pickSkillGeneric` dans `combat.js`) réutilisant le vrai moteur (ressources,
+  coûts, états, matériaux, passifs). Sert à mesurer l'équilibre des 5 classes et
+  des 15 voies. Audit (`tests/balance.test.js`, équipement comparable) : **aucun
+  build dominant** (>60 % contre toutes), **aucun build inutile**, voies d'une
+  même classe resserrées. Ajustements : départ de ressource Guerrier/Assassin
+  (ouverture), Templier offensif, Rempart plus increvable, Rôdeur/Trappeur revus.
+- **Limite** : boss = panoplie sans phases (Lot 10). Le duel sous-estime les
+  tanks (valeur de mitigation surtout PvE) — à revalider avec le contenu Lot 10.
 
 ### Équipement & raretés (`items.js`, `rarities.js`)
 - Instances uniques : `{uid, baseId, rarity, stats, lvl}`. Rareté = multiplicateur
@@ -168,7 +175,9 @@ sont rafraîchis de façon ciblée. **Contrainte forte à préserver.**
    ressource en combat + explication sur la fiche perso. Tests : 12 cas dédiés
    (génération, coûts, plafonds, intégrité des coûts ≤ plafond). Pas de migration
    (ressource transitoire au combat).
-9. Audit/équilibrage des 15 spécialisations (simulateur).
+9. ✅ Simulateur de duel (réutilise le vrai moteur) + audit/équilibrage des 15
+   voies : aucun build dominant ni inutile, voies d'une classe resserrées.
+   Tests : 5 cas d'invariants d'équilibrage (round-robin, équipement comparable).
 10. 2 nouvelles zones, 5 ennemis chacune, boss à phases.
 11. Familiers (première version complète).
 12. Guides contextuels, quêtes de découverte, succès.
