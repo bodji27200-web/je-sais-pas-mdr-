@@ -14,6 +14,29 @@ import { RARITIES, RARITY_ORDER, getRarity } from "../data/rarities.js";
 // Amplitude de variation des stats autour de la valeur attendue (±8 %).
 const VARIANCE = 0.08;
 
+// Renforcement : +0 à +5, bonus modéré par niveau sur les stats positives.
+// Modéré (4 %/niv) -> la rareté reste plus importante que le renforcement
+// (un commun +5 = ×1.20 ne dépasse pas un rare +0 = ×1.38).
+export const MAX_UPGRADE = 5;
+export const UPGRADE_PER_LEVEL = 0.04;
+
+export function upgradeMult(lvl) {
+  return 1 + UPGRADE_PER_LEVEL * (lvl || 0);
+}
+
+// Stats FINALES affichées/appliquées : stats tirées × bonus de renforcement.
+// Les malus (valeurs négatives) ne sont jamais aggravés par le renforcement.
+export function effectiveStats(inst) {
+  if (!inst || !inst.stats) return {};
+  const m = upgradeMult(inst.lvl);
+  const out = {};
+  for (const k of Object.keys(inst.stats)) {
+    const v = inst.stats[k];
+    out[k] = v >= 0 ? Math.round(v * m) : v;
+  }
+  return out;
+}
+
 function uid() {
   return "eq_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }

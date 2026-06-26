@@ -24,6 +24,9 @@ import {
 } from "./systems/jobs.js";
 import { charXpToNext } from "./core/progression.js";
 import { craft } from "./systems/crafting.js";
+import { upgradeItem, dismantleItem, dismantleReward, needsDismantleConfirm } from "./systems/gear.js";
+import { findEquipmentInstance } from "./core/state.js";
+import { getRarity } from "./data/rarities.js";
 import { startCombat, resolveRound } from "./systems/combat.js";
 import { updateObjectives, ensureObjectives, objectiveLabel } from "./systems/objectives.js";
 import { setMuted, isMuted, playHit, playWin, playLose, playDing } from "./core/audio.js";
@@ -306,6 +309,15 @@ function showOfflineSummary(summary) {
 
 // --- Gestion des actions (délégation de clics) ------------------------------
 
+// Démantèle effectivement une pièce (après confirmation éventuelle).
+function doDismantle(uid) {
+  const r = dismantleItem(getState(), uid);
+  if (!r.ok) return toast(r.error, "warn");
+  toast(`Démantelé : +🪙${r.reward.gold} +✨${r.reward.essence}`, "good");
+  save();
+  renderAll();
+}
+
 const handlers = {
   "pick-class": (el) => {
     selectedClassId = el.dataset.id;
@@ -372,6 +384,40 @@ const handlers = {
     if (!r.ok) return toast(r.error, "warn");
     save();
     renderAll();
+  },
+  upgrade: (el) => {
+    const r = upgradeItem(getState(), el.dataset.uid);
+    if (!r.ok) return toast(r.error, "warn");
+    toast("Renforcé : +" + r.lvl, "good");
+    playDing();
+    save();
+    renderAll();
+  },
+  dismantle: (el) => {
+    const uid = el.dataset.uid;
+    const inst = findEquipmentInstance(uid);
+    if (!inst) return toast("Objet introuvable.", "warn");
+    // Confirmation pour les pièces rares et au-dessus.
+    if (needsDismantleConfirm(inst)) {
+      const item = getEquipment(inst.baseId);
+      const rar = getRarity(inst.rarity);
+      const dr = dismantleReward(inst);
+      showModal(`
+        <h2>Démanteler ?</h2>
+        <p><strong style="color:${rar.color}">${esc(item.name)}${inst.lvl > 0 ? " +" + inst.lvl : ""}</strong> <span style="color:${rar.color}">(${rar.name})</span></p>
+        <p class="muted">Cette pièce sera détruite définitivement.</p>
+        <p>Tu obtiendras 🪙 ${dr.gold} et ✨ ${dr.essence}.</p>
+        <div class="end-actions">
+          <button class="btn" data-act="close-modal">Annuler</button>
+          <button class="btn primary" data-act="dismantle-confirm" data-uid="${uid}">Démanteler</button>
+        </div>`);
+      return;
+    }
+    doDismantle(uid);
+  },
+  "dismantle-confirm": (el) => {
+    closeModal();
+    doDismantle(el.dataset.uid);
   },
   fight: (el) => {
     const state = getState();
@@ -458,9 +504,11 @@ function onClick(e) {
 // --- Amorçage ---------------------------------------------------------------
 
 function boot() {
-  document.getElementById("app").addEventListener("click", onClick);
+  // Sur `document` (pas seulement #app) pour couvrir aussi #modal, qui est un
+  // sibling de #app : sinon les boutons des modales ne réagissent pas.
+  document.addEventListener("click", onClick);
   // Entrée = valider la création.
-  document.getElementById("app").addEventListener("keydown", (e) => {
+  document.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && e.target.id === "hero-name") handlers["confirm-create"]();
   });
 

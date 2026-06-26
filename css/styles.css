@@ -394,6 +394,15 @@ a { color: var(--gold); }
 }
 .inv-gear-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
 .gear-title { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.inv-gear { align-items: stretch; }
+.inv-gear-actions { display: flex; flex-direction: column; gap: 6px; justify-content: center; min-width: 104px; }
+.inv-gear-actions .btn { width: 100%; }
+.plus { color: var(--gold); font-weight: 700; }
+.upgrade-preview { line-height: 1.5; }
+.upgrade-preview .cost { color: var(--muted); }
+.upgrade-preview .lack { color: var(--danger); }
+.btn.ghost { background: transparent; border-color: var(--border); color: var(--muted); }
+.btn.ghost:hover { color: var(--text); border-color: var(--danger); }
 
 /* --- Zones & combat ------------------------------------------------------ */
 .zone-head { display: flex; gap: 16px; align-items: center; margin-bottom: 8px; }

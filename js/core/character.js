@@ -8,6 +8,7 @@ import {
   removeEquipmentInstance,
   findEquipmentInstance,
 } from "./state.js";
+import { effectiveStats } from "./items.js";
 import { applyXp, charXpToNext } from "./progression.js";
 
 // Régénération hors combat : fraction des PV max récupérée par seconde.
@@ -26,12 +27,13 @@ export function getDerivedStats(state) {
     stats[k] = base + growth;
   }
 
-  // Bonus d'équipement (chaque slot porte une instance avec ses stats tirées).
+  // Bonus d'équipement : stats effectives (tirage × renforcement) de chaque slot.
   for (const slot of Object.keys(ch.equipment)) {
     const inst = ch.equipment[slot];
     if (!inst || !inst.stats) continue;
-    for (const k of Object.keys(inst.stats)) {
-      stats[k] = (stats[k] || 0) + inst.stats[k];
+    const es = effectiveStats(inst);
+    for (const k of Object.keys(es)) {
+      stats[k] = (stats[k] || 0) + es[k];
     }
   }
 

@@ -93,6 +93,15 @@ export const RESOURCES = {
     source: "Butin de combat",
     desc: "Un tissu rêche, base des armures de tissu.",
   },
+  equip_essence: {
+    id: "equip_essence",
+    name: "Essence d'équipement",
+    tier: 3,
+    icon: "✨",
+    image: "assets/resources/equip_essence.png",
+    source: "Démantèlement d'équipement",
+    desc: "Extraite des pièces démantelées. Sert à renforcer l'équipement.",
+  },
 };
 
 export function getResource(id) {
