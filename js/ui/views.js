@@ -5,6 +5,7 @@
 import { esc, sigil, bar, fmt, fmtDuration, chainImg } from "./dom.js";
 import { getClass, CLASSES } from "../data/classes.js";
 import { getSkill } from "../data/skills.js";
+import { getClassResource } from "../data/classResources.js";
 import { JOBS, unlockedTiers, bestTier, nextTier } from "../data/jobs.js";
 import { RESOURCES, getResource } from "../data/resources.js";
 import { EQUIPMENT, getEquipment, SLOTS, ARMOR_FAMILIES } from "../data/equipment.js";
@@ -17,7 +18,7 @@ import { ZONES, allZones } from "../data/zones.js";
 import { enemyUnlock, zoneProgress } from "../systems/zoneprog.js";
 import { getDerivedStats, getStatDetails, canWieldWeapon, getActiveSpec, specUnlocked, nextRespecCost, familyCounts, activeMaterialBonuses } from "../core/character.js";
 import { MATERIALS } from "../data/materials.js";
-import { forecastTurns, DEF_K, DEF_CAP } from "../systems/combat.js";
+import { forecastTurns, whyCannotUse, DEF_K, DEF_CAP } from "../systems/combat.js";
 import { getState as getStateDef } from "../data/states.js";
 import { getElement } from "../data/elements.js";
 import { specsForClass, SPEC_UNLOCK_LEVEL } from "../data/specializations.js";
@@ -191,12 +192,22 @@ export function renderCharacter(state) {
     })
     .join("");
 
-  const activeSkills = cls.skills
+  const res = getClassResource(cls.id);
+  const skillMeta = (s) => {
+    const bits = [];
+    if (s.cost) bits.push(`Coût ${s.cost}${res ? " " + res.name : ""}`);
+    if (s.cooldown > 0) bits.push(`Récup. ${s.cooldown}`);
+    return bits.length ? ` <span class="tag tiny">${esc(bits.join(" · "))}</span>` : "";
+  };
+  const activeSkills = ["basic_attack", ...cls.skills]
     .map((id) => getSkill(id))
     .filter(Boolean)
-    .map((s) => `<li><strong>${esc(s.name)}</strong> — <span class="muted">${esc(s.desc)}</span></li>`)
+    .map((s) => `<li><strong>${esc(s.name)}</strong>${skillMeta(s)} — <span class="muted">${esc(s.desc)}</span></li>`)
     .join("");
   const passive = cls.passive ? getSkill(cls.passive) : null;
+  const resLine = res
+    ? `<p class="muted small res-note"><span style="color:${res.color}">${res.icon || ""} <strong>${esc(res.name)}</strong></span> — ${esc(res.desc)}</p>`
+    : "";
 
   return `
     <section class="panel">
@@ -214,6 +225,7 @@ export function renderCharacter(state) {
       <div class="slot-list">${slots}</div>
       ${renderMaterialSection(state)}
       <h3 class="section-title">Compétences</h3>
+      ${resLine}
       <ul class="skill-list">
         ${activeSkills}
         ${passive ? `<li><strong>${esc(passive.name)}</strong> <span class="tag">Passive</span> — <span class="muted">${esc(passive.desc)}</span></li>` : ""}
@@ -842,19 +854,37 @@ export function renderBattleLog(combat) {
     .join("");
 }
 
+// Barre de ressource de classe (Mana, Rage, Garde, Concentration, Ombre).
+export function renderResourceBar(res) {
+  if (!res) return "";
+  const w = Math.max(0, Math.min(100, (res.cur / res.max) * 100));
+  return `
+    <div class="res-bar" title="${esc(res.name)} : ${res.cur}/${res.max}">
+      <span class="res-icon" style="color:${res.color}">${res.icon || ""}</span>
+      <span class="res-name">${esc(res.name)}</span>
+      <div class="res-track"><div class="res-fill" style="width:${w}%;background:${res.color}"></div></div>
+      <span class="res-val">${res.cur}/${res.max}</span>
+    </div>`;
+}
+
 // Contrôles : barre de compétences (combat actif) ou écran de fin (sans image).
 export function renderBattleControls(state, combat) {
   if (combat.status === "active") {
+    const res = combat.player.res;
     const btns = combat.player.skills
       .map((id) => {
         const s = getSkill(id);
         const cd = combat.player.cooldowns[id] || 0;
-        return `<button class="btn skill-btn" data-act="skill" data-id="${id}" ${cd > 0 ? "disabled" : ""} title="${esc(s.desc)}">
-            ${s.element ? elementDot(s.element) : ""}${esc(s.name)}${cd > 0 ? ` <span class="cd">(${cd})</span>` : ""}
+        const reason = whyCannotUse(combat, id);
+        const cost = s.cost || 0;
+        const costTag = cost > 0 ? ` <span class="sk-cost${reason === "resource" ? " lack" : ""}" style="${res ? `color:${res.color}` : ""}">${cost}</span>` : "";
+        const tip = `${s.desc}${cost > 0 && res ? ` — Coût : ${cost} ${res.name}` : ""}${s.cooldown > 0 ? ` — Récup. ${s.cooldown}` : ""}`;
+        return `<button class="btn skill-btn" data-act="skill" data-id="${id}" ${reason ? "disabled" : ""} title="${esc(tip)}">
+            ${s.element ? elementDot(s.element) : ""}${esc(s.name)}${costTag}${cd > 0 ? ` <span class="cd">(${cd})</span>` : ""}
           </button>`;
       })
       .join("");
-    return `<div class="skill-bar">${btns}</div>`;
+    return `${renderResourceBar(res)}<div class="skill-bar">${btns}</div>`;
   }
   const won = combat.status === "won";
   let rewardHtml = "";

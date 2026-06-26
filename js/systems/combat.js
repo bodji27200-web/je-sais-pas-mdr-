@@ -17,6 +17,7 @@ import { getDerivedStats, gainCharXp, clampHp, getActiveSpec, activeMaterialBeha
 import { MATERIAL_BEHAVIOR } from "../data/materials.js";
 import { getState as getStateDef } from "../data/states.js";
 import { ELEMENT_ORDER } from "../data/elements.js";
+import { getClassResource } from "../data/classResources.js";
 import { rollAmount } from "../core/progression.js";
 import { addGold, addResource, addEquipmentInstance } from "../core/state.js";
 import { makeInstance, rollRarity, enemyLuck, rollGearDrop } from "../core/items.js";
@@ -57,8 +58,19 @@ function makeCombatant(name, stats, skillIds, passiveId) {
     shieldTurns: 0,
     guard: null, // { reduce, turns }
     cooldowns: {},
+    res: null, // ressource de classe { id, name, color, icon, cur, max, gen } — joueur seulement
     nextAt: 0,
   };
+}
+
+// Gain de ressource de classe selon une règle (`onBasicAttack`, `onDealDamage`,
+// `onTakeDamage`, `onCrit`, `onGuardAbsorb`, `onDefensiveSkill`, `regenPerTurn`).
+// Sans effet si le combattant n'a pas de ressource (ennemis).
+function gainResource(c, key, mult = 1) {
+  if (!c.res) return;
+  const amt = (c.res.gen[key] || 0) * mult;
+  if (amt <= 0) return;
+  c.res.cur = Math.min(c.res.max, Math.round(c.res.cur + amt));
 }
 
 // --- États élémentaires : agrégations lues par le moteur ---------------------
@@ -154,6 +166,16 @@ export function startCombat(state, enemyId) {
   );
   // Passive de spécialisation : fusionnée aux effets de combat de la classe.
   if (spec && spec.passive) mergePp(player.pp, spec.passive);
+
+  // Ressource de classe (Lot 8) : transitoire au combat, jamais persistée.
+  const resDef = getClassResource(state.character.classId);
+  if (resDef) {
+    player.res = {
+      id: resDef.id, name: resDef.name, color: resDef.color, icon: resDef.icon,
+      cur: Math.min(resDef.max, resDef.start || 0), max: resDef.max,
+      gen: resDef, // les règles de gain sont lues directement depuis la définition
+    };
+  }
 
   // Passifs comportementaux des matériaux d'armure (4 pièces).
   const behaviors = new Set(activeMaterialBehaviors(state));
@@ -313,6 +335,7 @@ function dealDamage(combat, attacker, defender, power, opts = {}) {
   if (defender.guard) {
     dmg = Math.max(1, Math.round(dmg * (1 - defender.guard.reduce)));
     defender.guard = null;
+    gainResource(defender, "onGuardAbsorb"); // bloquer alimente la Garde
   }
   // Stabilité (Métal, 4 pièces) : la 1re attaque subie du combat est réduite.
   if (defender.mat && defender.mat.stability && !defender._stabilityUsed) {
@@ -327,6 +350,10 @@ function dealDamage(combat, attacker, defender, power, opts = {}) {
     dmg -= absorbed;
   }
   defender.hp = Math.max(0, defender.hp - dmg);
+
+  // Ressource de classe : encaisser un coup et placer un critique en génèrent.
+  if (dmg > 0) gainResource(defender, "onTakeDamage");
+  if (isCrit) gainResource(attacker, "onCrit");
 
   // Vol de vie éventuel (spécialisations).
   if (attacker.pp.lifestealPct && dmg > 0) {
@@ -343,6 +370,10 @@ function useSkill(combat, actor, other, skillId) {
   if (!skill) return;
   const isPlayer = actor === combat.player;
   const kind = isPlayer ? "player" : "enemy";
+
+  // Coût en ressource de classe (Lot 8) : déduit à l'usage. L'éligibilité est
+  // déjà vérifiée en amont (playerCanUse / IA), on borne par sécurité.
+  if (actor.res && skill.cost) actor.res.cur = Math.max(0, actor.res.cur - skill.cost);
 
   // Effets sur soi (buff, bouclier, garde, soin).
   if (skill.self) for (const eff of skill.self) applyEffect(actor, eff, actor.atk, combat, kind);
@@ -392,6 +423,16 @@ function useSkill(combat, actor, other, skillId) {
   if (actor.mat && actor.mat.concentration) {
     actor._distinct.add(skillId);
     if (actor._distinct.size >= MATERIAL_BEHAVIOR.concentration.skillsNeeded) actor._concReady = true;
+  }
+
+  // Génération de ressource de classe selon le TYPE d'action :
+  //  - attaque de base : gain dédié (toujours utile) ;
+  //  - compétence offensive ayant touché : gain « onDealDamage » (1×/action) ;
+  //  - compétence de soutien sur soi : gain « onDefensiveSkill ».
+  if (actor.res) {
+    if (skillId === "basic_attack") gainResource(actor, "onBasicAttack");
+    else if (landed) gainResource(actor, "onDealDamage");
+    else if (skill.self && (!skill.power || skill.power === 0)) gainResource(actor, "onDefensiveSkill");
   }
 
   combat.lastActions.push({
@@ -533,6 +574,8 @@ function upkeep(combat) {
         const heal = Math.round(c.maxHp * c.pp.hpRegenPct);
         if (heal > 0) c.hp = Math.min(c.maxHp, c.hp + heal);
       }
+      // Régénération de ressource de classe (Mana surtout).
+      if (c.hp > 0) gainResource(c, "regenPerTurn");
     }
   }
   combat.turn += 1;
@@ -544,8 +587,20 @@ function checkDeaths(state, combat) {
   else if (combat.player.hp <= 0) finishCombat(state, combat, "lost");
 }
 
+// Le joueur peut-il lancer la compétence ? (recharge terminée ET ressource
+// suffisante). Renvoie aussi la raison pour l'affichage (Lot 8).
 export function playerCanUse(combat, skillId) {
-  return (combat.player.cooldowns[skillId] || 0) <= 0;
+  return whyCannotUse(combat, skillId) === null;
+}
+
+// null = utilisable ; sinon "cooldown" ou "resource".
+export function whyCannotUse(combat, skillId) {
+  const s = getSkill(skillId);
+  if (!s) return "cooldown";
+  if ((combat.player.cooldowns[skillId] || 0) > 0) return "cooldown";
+  const res = combat.player.res;
+  if (res && s.cost && res.cur < s.cost) return "resource";
+  return null;
 }
 
 // Aperçu de l'ordre PROBABLE des prochains tours (initiative par vitesse).

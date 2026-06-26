@@ -4,11 +4,23 @@
 //   power     : multiplicateur de dégâts (0 = pas de dégâts directs)
 //   hits      : nombre de frappes (multi-hit ; défaut 1)
 //   cooldown  : tours de recharge
+//   cost      : coût en RESSOURCE DE CLASSE (Lot 8 ; 0/absent = gratuit). Seul le
+//               joueur a une ressource ; les ennemis ignorent ce champ.
 //   critBonus : bonus de crit (%) pour CETTE frappe uniquement
 //   target    : "enemy" | "self"
+//   element   : élément de la compétence (interactions/résistances)
+//   inflicts  : id d'état élémentaire appliqué si l'attaque touche
 //   anim      : catégorie d'animation (générique, gérée par l'UI)
 //   self      : effets appliqués au lanceur   [{ type, ... }]
 //   onHit     : effets appliqués à la cible touchée [{ type, ... }]
+//
+// Rééquilibrage Lot 8 — principes :
+//   - chaque compétence a UNE fonction principale claire ;
+//   - les compétences ordinaires ont une recharge courte mais un petit coût ;
+//   - les gros bursts / contrôles / soins importants coûtent cher en ressource
+//     ET gardent une recharge : impossible de les enchaîner sans préparation ;
+//   - l'attaque de base ne coûte rien et GÉNÈRE la ressource (toujours utile).
+//   Le détail « Coût · Récup » est affiché par l'UI (plus codé dans les desc).
 //
 // Effets gérés par le moteur (systems/combat.js) :
 //   atk_buff {amount,turns}      attaque ×(1+amount)
@@ -31,20 +43,20 @@
 export const SKILLS = {
   // --- Commun ---
   basic_attack: {
-    id: "basic_attack", name: "Attaque", type: "active", power: 1.0, cooldown: 0,
-    target: "enemy", anim: "light", desc: "Une attaque simple infligeant 100 % de tes dégâts.",
+    id: "basic_attack", name: "Attaque", type: "active", power: 1.0, cooldown: 0, cost: 0,
+    target: "enemy", anim: "light", desc: "Une attaque simple (100 % des dégâts). Gratuite : elle génère ta ressource de classe.",
   },
 
-  // ===================== GUERRIER =====================
+  // ===================== GUERRIER (Rage) =====================
   heavy_strike: {
-    id: "heavy_strike", name: "Frappe lourde", type: "active", power: 1.7, cooldown: 2,
+    id: "heavy_strike", name: "Frappe lourde", type: "active", power: 1.7, cooldown: 1, cost: 20,
     target: "enemy", anim: "heavy",
-    desc: "Frappe puissante infligeant 170 % des dégâts. (Récup. 2)",
+    desc: "Frappe puissante infligeant 170 % des dégâts.",
   },
   war_cry: {
-    id: "war_cry", name: "Cri de guerre", type: "active", power: 0, cooldown: 4,
+    id: "war_cry", name: "Cri de guerre", type: "active", power: 0, cooldown: 3, cost: 30,
     target: "self", anim: "buff", self: [{ type: "atk_buff", amount: 0.3, turns: 3 }],
-    desc: "Augmente ton attaque de 30 % pendant 3 tours. (Récup. 4)",
+    desc: "Augmente ton attaque de 30 % pendant 3 tours.",
   },
   endurance: {
     id: "endurance", name: "Endurance", type: "passive",
@@ -52,17 +64,17 @@ export const SKILLS = {
     desc: "PV max +10 % et régénère ~3 % des PV chaque tour.",
   },
 
-  // ===================== GARDIEN =====================
+  // ===================== GARDIEN (Garde) =====================
   shield_bash: {
-    id: "shield_bash", name: "Coup de bouclier", type: "active", power: 1.1, cooldown: 2,
+    id: "shield_bash", name: "Coup de bouclier", type: "active", power: 1.1, cooldown: 1, cost: 25,
     target: "enemy", anim: "heavy", onHit: [{ type: "atk_debuff", amount: 0.25, turns: 2 }],
     desc: "Dégâts (110 %) et réduit l'attaque ennemie de 25 % pendant 2 tours.",
   },
   taunt_guard: {
-    id: "taunt_guard", name: "Provocation", type: "active", power: 0, cooldown: 3,
+    id: "taunt_guard", name: "Provocation", type: "active", power: 0, cooldown: 2, cost: 0,
     target: "self", anim: "buff",
     self: [{ type: "guard", reduce: 0.5, turns: 1 }, { type: "def_buff", amount: 0.4, turns: 2 }],
-    desc: "Réduit de 50 % la prochaine attaque reçue et augmente ta défense de 40 % pendant 2 tours. (Récup. 3)",
+    desc: "Réduit de 50 % la prochaine attaque reçue et augmente ta défense de 40 % pendant 2 tours. Gratuite : génère de la Garde.",
   },
   living_armor: {
     id: "living_armor", name: "Armure vivante", type: "passive",
@@ -70,14 +82,14 @@ export const SKILLS = {
     desc: "Défense +18 %, PV max +5 % et soigne 18 % des dégâts infligés (vol de vie).",
   },
 
-  // ===================== ARCHER =====================
+  // ===================== ARCHER (Concentration) =====================
   precise_shot: {
-    id: "precise_shot", name: "Tir précis", type: "active", power: 1.5, cooldown: 2,
+    id: "precise_shot", name: "Tir précis", type: "active", power: 1.5, cooldown: 2, cost: 30,
     target: "enemy", anim: "ranged", critBonus: 35,
     desc: "Tir puissant (150 %) avec +35 % de chances de critique sur ce coup.",
   },
   double_shot: {
-    id: "double_shot", name: "Double flèche", type: "active", power: 0.7, hits: 2, cooldown: 1,
+    id: "double_shot", name: "Double flèche", type: "active", power: 0.7, hits: 2, cooldown: 0, cost: 15,
     target: "enemy", anim: "ranged",
     desc: "Deux flèches infligeant chacune 70 % des dégâts.",
   },
@@ -87,16 +99,16 @@ export const SKILLS = {
     desc: "Critique +6 % et vitesse +10 %.",
   },
 
-  // ===================== MAGE =====================
+  // ===================== MAGE (Mana) =====================
   arcane_bolt: {
-    id: "arcane_bolt", name: "Projectile arcanique", type: "active", power: 1.7, cooldown: 1,
+    id: "arcane_bolt", name: "Projectile arcanique", type: "active", power: 1.7, cooldown: 0, cost: 25,
     target: "enemy", anim: "magic",
     desc: "Projectile magique infligeant 170 % des dégâts.",
   },
   arcane_barrier: {
-    id: "arcane_barrier", name: "Barrière arcanique", type: "active", power: 0, cooldown: 4,
+    id: "arcane_barrier", name: "Barrière arcanique", type: "active", power: 0, cooldown: 3, cost: 35,
     target: "self", anim: "buff", self: [{ type: "shield", pctMaxHp: 0.5, turns: 3 }],
-    desc: "Crée un bouclier absorbant jusqu'à 50 % de tes PV max pendant 3 tours. (Récup. 4)",
+    desc: "Crée un bouclier absorbant jusqu'à 50 % de tes PV max pendant 3 tours.",
   },
   arcane_influx: {
     id: "arcane_influx", name: "Afflux magique", type: "passive",
@@ -104,14 +116,14 @@ export const SKILLS = {
     desc: "Dégâts des compétences (hors attaque de base) +25 %.",
   },
 
-  // ===================== ASSASSIN =====================
+  // ===================== ASSASSIN (Ombre) =====================
   shadow_strike: {
-    id: "shadow_strike", name: "Frappe de l'ombre", type: "active", power: 1.3, cooldown: 1,
+    id: "shadow_strike", name: "Frappe de l'ombre", type: "active", power: 1.3, cooldown: 0, cost: 20,
     target: "enemy", anim: "light", critBonus: 30,
     desc: "Frappe rapide (130 %) avec +30 % de chances de critique.",
   },
   poison_blade: {
-    id: "poison_blade", name: "Lame empoisonnée", type: "active", power: 1.0, cooldown: 2,
+    id: "poison_blade", name: "Lame empoisonnée", type: "active", power: 1.0, cooldown: 1, cost: 25,
     target: "enemy", anim: "light", onHit: [{ type: "poison", pctAtk: 0.45, turns: 3 }],
     desc: "Dégâts immédiats (100 %) puis poison (45 % de l'ATK / tour, 3 tours).",
   },
@@ -124,36 +136,36 @@ export const SKILLS = {
   // ===================== SPÉCIALISATIONS =====================
   // -- Guerrier --
   bulwark: {
-    id: "bulwark", name: "Rempart", type: "active", power: 0, cooldown: 4,
+    id: "bulwark", name: "Rempart", type: "active", power: 0, cooldown: 3, cost: 30,
     target: "self", anim: "buff",
     self: [{ type: "def_buff", amount: 0.45, turns: 2 }, { type: "shield", pctMaxHp: 0.25, turns: 2 }],
-    desc: "Défense +45 % et bouclier (25 % des PV max) pendant 2 tours. (Récup. 4)",
+    desc: "Défense +45 % et bouclier (25 % des PV max) pendant 2 tours.",
   },
   reckless_swing: {
-    id: "reckless_swing", name: "Coup téméraire", type: "active", power: 2.2, cooldown: 3,
+    id: "reckless_swing", name: "Coup téméraire", type: "active", power: 2.2, cooldown: 3, cost: 45,
     target: "enemy", anim: "heavy", critBonus: 25,
-    desc: "Une frappe sauvage (220 %) avec +25 % de critique. (Récup. 3)",
+    desc: "Une frappe sauvage (220 %) avec +25 % de critique.",
   },
   rallying_strike: {
-    id: "rallying_strike", name: "Frappe de ralliement", type: "active", power: 1.3, cooldown: 3,
+    id: "rallying_strike", name: "Frappe de ralliement", type: "active", power: 1.3, cooldown: 2, cost: 25,
     target: "enemy", anim: "heavy", self: [{ type: "atk_buff", amount: 0.25, turns: 3 }],
     desc: "Frappe (130 %) et galvanise : attaque +25 % pendant 3 tours.",
   },
 
   // -- Gardien --
   fortress: {
-    id: "fortress", name: "Forteresse", type: "active", power: 0, cooldown: 5,
+    id: "fortress", name: "Forteresse", type: "active", power: 0, cooldown: 4, cost: 35,
     target: "self", anim: "buff",
     self: [{ type: "def_buff", amount: 0.6, turns: 3 }, { type: "guard", reduce: 0.5, turns: 1 }, { type: "shield", pctMaxHp: 0.3, turns: 3 }],
-    desc: "Défense +60 %, prochaine attaque -50 %, bouclier (30 % PV) sur 3 tours. (Récup. 5)",
+    desc: "Défense +60 %, prochaine attaque -50 %, bouclier (30 % PV) sur 3 tours.",
   },
   consecrate: {
-    id: "consecrate", name: "Consécration", type: "active", power: 1.4, cooldown: 3,
+    id: "consecrate", name: "Consécration", type: "active", power: 1.4, cooldown: 2, cost: 30,
     target: "enemy", anim: "heavy", self: [{ type: "heal", pctMaxHp: 0.18 }],
     desc: "Frappe sacrée (140 %) et te soigne de 18 % des PV max.",
   },
   pin_down: {
-    id: "pin_down", name: "Clouer au sol", type: "active", power: 1.2, cooldown: 3,
+    id: "pin_down", name: "Clouer au sol", type: "active", power: 1.2, cooldown: 2, cost: 25,
     target: "enemy", anim: "heavy",
     onHit: [{ type: "slow", amount: 0.3, turns: 2 }, { type: "atk_debuff", amount: 0.2, turns: 2 }],
     desc: "Empale (120 %), ralentit (-30 % VIT) et affaiblit (-20 % ATK).",
@@ -161,17 +173,17 @@ export const SKILLS = {
 
   // -- Archer --
   aimed_shot: {
-    id: "aimed_shot", name: "Tir ajusté", type: "active", power: 2.0, cooldown: 3,
+    id: "aimed_shot", name: "Tir ajusté", type: "active", power: 2.0, cooldown: 3, cost: 45,
     target: "enemy", anim: "ranged", critBonus: 50,
-    desc: "Un tir mortel (200 %) avec +50 % de chances de critique. (Récup. 3)",
+    desc: "Un tir mortel (200 %) avec +50 % de chances de critique.",
   },
   arrow_volley: {
-    id: "arrow_volley", name: "Volée de flèches", type: "active", power: 0.6, hits: 3, cooldown: 2,
+    id: "arrow_volley", name: "Volée de flèches", type: "active", power: 0.6, hits: 3, cooldown: 2, cost: 30,
     target: "enemy", anim: "ranged",
     desc: "Trois flèches infligeant chacune 60 % des dégâts.",
   },
   venom_shot: {
-    id: "venom_shot", name: "Tir empoisonné", type: "active", power: 1.1, cooldown: 2,
+    id: "venom_shot", name: "Tir empoisonné", type: "active", power: 1.1, cooldown: 2, cost: 30,
     target: "enemy", anim: "ranged",
     onHit: [{ type: "poison", pctAtk: 0.5, turns: 3 }, { type: "slow", amount: 0.25, turns: 2 }],
     desc: "Flèche toxique (110 %), poison (50 % ATK/tour) et ralentissement.",
@@ -179,41 +191,42 @@ export const SKILLS = {
 
   // -- Mage --
   fireball: {
-    id: "fireball", name: "Boule de feu", type: "active", power: 1.9, cooldown: 2,
+    id: "fireball", name: "Boule de feu", type: "active", power: 1.9, cooldown: 1, cost: 40,
     target: "enemy", anim: "magic", element: "fire", inflicts: "burn",
     desc: "Explosion ardente de Feu (190 %) qui embrase la cible (Brûlure : dégâts sur la durée, soins réduits).",
   },
   frost_nova: {
-    id: "frost_nova", name: "Nova de givre", type: "active", power: 1.3, cooldown: 3,
+    id: "frost_nova", name: "Nova de givre", type: "active", power: 1.3, cooldown: 2, cost: 35,
     target: "enemy", anim: "magic", element: "water", inflicts: "wet",
     onHit: [{ type: "slow", amount: 0.35, turns: 2 }, { type: "atk_debuff", amount: 0.2, turns: 2 }],
     desc: "Vague glaciale d'Eau (130 %) qui trempe la cible (+dégâts de Foudre subis), la ralentit et l'affaiblit.",
   },
   mana_shield: {
-    id: "mana_shield", name: "Bouclier de mana", type: "active", power: 0, cooldown: 4,
+    id: "mana_shield", name: "Bouclier de mana", type: "active", power: 0, cooldown: 3, cost: 40,
     target: "self", anim: "buff",
     self: [{ type: "shield", pctMaxHp: 0.4, turns: 3 }, { type: "heal", pctMaxHp: 0.12 }],
-    desc: "Bouclier (40 % PV) sur 3 tours et soin immédiat de 12 % des PV. (Récup. 4)",
+    desc: "Bouclier (40 % PV) sur 3 tours et soin immédiat de 12 % des PV.",
   },
 
   // -- Assassin --
   assassinate: {
-    id: "assassinate", name: "Assassinat", type: "active", power: 2.1, cooldown: 3,
+    id: "assassinate", name: "Assassinat", type: "active", power: 2.1, cooldown: 3, cost: 50,
     target: "enemy", anim: "light", critBonus: 45,
-    desc: "Frappe à la jugulaire (210 %) avec +45 % de critique. (Récup. 3)",
+    desc: "Frappe à la jugulaire (210 %) avec +45 % de critique.",
   },
   toxic_strike: {
-    id: "toxic_strike", name: "Frappe toxique", type: "active", power: 1.1, cooldown: 2,
+    id: "toxic_strike", name: "Frappe toxique", type: "active", power: 1.1, cooldown: 2, cost: 30,
     target: "enemy", anim: "light", onHit: [{ type: "poison", pctAtk: 0.6, turns: 3 }],
     desc: "Lame enduite (110 %) puis poison violent (60 % ATK/tour, 3 tours).",
   },
   flurry: {
-    id: "flurry", name: "Déluge de lames", type: "active", power: 0.6, hits: 3, cooldown: 2,
+    id: "flurry", name: "Déluge de lames", type: "active", power: 0.6, hits: 3, cooldown: 2, cost: 35,
     target: "enemy", anim: "light", critBonus: 10,
     desc: "Trois frappes rapides (60 % chacune) avec +10 % de critique.",
   },
 
   // ===================== ENNEMIS =====================
+  // (Pas de coût : les ennemis n'ont pas de ressource de classe.)
   // -- Skirmisher (loup) : rapide, saigne ses proies.
   feral_bite: {
     id: "feral_bite", name: "Morsure féroce", type: "active", power: 1.4, cooldown: 3,

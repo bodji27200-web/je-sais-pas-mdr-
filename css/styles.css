@@ -223,6 +223,8 @@ a { color: var(--gold); }
   vertical-align: middle;
 }
 .tag.rarity { font-size: 0.62rem; letter-spacing: 0.04em; text-transform: uppercase; }
+.tag.tiny { font-size: 0.6rem; padding: 0px 6px; }
+.res-note { margin: -2px 0 8px; }
 .upgrade { color: var(--good); font-weight: 700; }
 
 /* --- Création de personnage ---------------------------------------------- */
@@ -682,6 +684,17 @@ a { color: var(--gold); }
 .skill-bar.locked { pointer-events: none; opacity: 0.55; } /* pendant l'animation */
 .skill-btn { flex: 1 1 160px; max-width: 240px; }
 .cd { color: var(--muted); font-size: 0.8em; }
+
+/* Ressource de classe (combat) — Lot 8 */
+.res-bar { display: flex; align-items: center; gap: 8px; max-width: 420px; margin: 0 auto 10px; padding: 0 2px; }
+.res-icon { font-size: 0.9rem; line-height: 1; }
+.res-name { font-size: 0.74rem; color: var(--muted); min-width: 88px; }
+.res-track { flex: 1; height: 9px; border-radius: 999px; background: rgba(0,0,0,0.32); border: 1px solid var(--border-soft); overflow: hidden; }
+.res-fill { height: 100%; border-radius: 999px; transition: width 0.25s ease; }
+.res-val { font-size: 0.72rem; color: var(--muted); min-width: 52px; text-align: right; font-variant-numeric: tabular-nums; }
+.sk-cost { font-size: 0.78em; font-weight: 700; }
+.sk-cost.lack { color: var(--danger); }
+.skill-btn:disabled { opacity: 0.5; }
 
 .battle-end { text-align: center; }
 .battle-end h3 { font-size: 1.5rem; margin: 6px 0; }

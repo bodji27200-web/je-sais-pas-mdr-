@@ -100,8 +100,17 @@ sont rafraîchis de façon ciblée. **Contrainte forte à préserver.**
   passives dynamiques (execute, lowHpAtk, vsDebuff, skillPower).
 - IA par **scoring situationnel** (soin si bas, burst pour achever, ne double pas
   un DoT actif…). Bonne base à étendre.
-- **Limite** : pas d'éléments, pas d'états élémentaires, pas de ressources de
-  classe (mana/rage…), cooldowns à rééquilibrer, boss = panoplie sans phases.
+- **Lot 8** : **ressources de classe** (`data/classResources.js`) lues par le
+  moteur de façon générique (`player.res = { cur, max, gen }`, transitoire au
+  combat → **aucune migration**). Règles de gain (`onBasicAttack`, `onDealDamage`,
+  `onTakeDamage`, `onCrit`, `onGuardAbsorb`, `onDefensiveSkill`, `regenPerTurn`).
+  Rage (Guerrier), Garde (Gardien), Concentration (Archer), Mana (Mage), Ombre
+  (Assassin). Les compétences ont un **coût** (`skill.cost`) + recharges
+  rééquilibrées : l'attaque de base est gratuite et **génère** la ressource ;
+  `playerCanUse`/`whyCannotUse` vérifient recharge **et** ressource. Les ennemis
+  n'ont pas de ressource → leurs compétences sont sans coût (rétrocompatible).
+- **Limite** : boss = panoplie sans phases (Lot 10) ; spécialisations à
+  auditer/équilibrer via simulateur (Lot 9).
 
 ### Équipement & raretés (`items.js`, `rarities.js`)
 - Instances uniques : `{uid, baseId, rarity, stats, lvl}`. Rareté = multiplicateur
@@ -154,7 +163,11 @@ sont rafraîchis de façon ciblée. **Contrainte forte à préserver.**
    tours, Vitesse → recharge réduite plafonnée, réduction de défense affichée.
 7. ✅ Éléments (8), états (Brûlure/Trempé/Charge/…), résistances ennemies,
    bestiaire de découverte. Moteur : multiplicateur élémentaire + états génériques.
-8. Ressources de classe, cooldowns, rééquilibrage des compétences.
+8. ✅ Ressources de classe (Rage/Garde/Concentration/Mana/Ombre), coûts de
+   compétences + recharges rééquilibrées, attaque de base génératrice, barre de
+   ressource en combat + explication sur la fiche perso. Tests : 12 cas dédiés
+   (génération, coûts, plafonds, intégrité des coûts ≤ plafond). Pas de migration
+   (ressource transitoire au combat).
 9. Audit/équilibrage des 15 spécialisations (simulateur).
 10. 2 nouvelles zones, 5 ennemis chacune, boss à phases.
 11. Familiers (première version complète).
