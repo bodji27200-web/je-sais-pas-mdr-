@@ -370,7 +370,8 @@ function finishCombat(state, combat, result) {
     }
   }
 
-  const extra = rollGearDrop(enemy, enemy.isBoss);
+  const allowedWtypes = getClass(state.character.classId)?.weapons || null;
+  const extra = rollGearDrop(enemy, enemy.isBoss, allowedWtypes);
   if (extra) {
     addEquipmentInstance(extra);
     drops.push({ type: "equipment", inst: extra, name: getEquipment(extra.baseId)?.name || extra.baseId, rarity: extra.rarity });

@@ -60,6 +60,142 @@ export const RECIPES = [
     levelReq: 6,
   },
 
+  {
+    id: "craft_iron_mace",
+    station: "forge",
+    output: { type: "equipment", id: "iron_mace", qty: 1 },
+    inputs: [
+      { resource: "iron_ingot", qty: 3 },
+      { resource: "oak_wood", qty: 1 },
+    ],
+    levelReq: 4,
+  },
+
+  // --- Forge : armes du Gardien ---
+  {
+    id: "craft_oak_spear",
+    station: "forge",
+    output: { type: "equipment", id: "oak_spear", qty: 1 },
+    inputs: [
+      { resource: "oak_wood", qty: 2 },
+      { resource: "copper_ingot", qty: 1 },
+    ],
+    levelReq: 2,
+  },
+  {
+    id: "craft_iron_spear",
+    station: "forge",
+    output: { type: "equipment", id: "iron_spear", qty: 1 },
+    inputs: [
+      { resource: "iron_ingot", qty: 2 },
+      { resource: "oak_wood", qty: 1 },
+    ],
+    levelReq: 5,
+  },
+  {
+    id: "craft_iron_buckler",
+    station: "forge",
+    output: { type: "equipment", id: "iron_buckler", qty: 1 },
+    inputs: [{ resource: "iron_ingot", qty: 3 }],
+    levelReq: 3,
+  },
+
+  // --- Forge : armes de l'Archer ---
+  {
+    id: "craft_short_bow",
+    station: "forge",
+    output: { type: "equipment", id: "short_bow", qty: 1 },
+    inputs: [
+      { resource: "soft_wood", qty: 3 },
+      { resource: "coarse_cloth", qty: 1 },
+    ],
+    levelReq: 1,
+  },
+  {
+    id: "craft_oak_longbow",
+    station: "forge",
+    output: { type: "equipment", id: "oak_longbow", qty: 1 },
+    inputs: [
+      { resource: "oak_wood", qty: 3 },
+      { resource: "coarse_cloth", qty: 1 },
+    ],
+    levelReq: 4,
+  },
+  {
+    id: "craft_light_crossbow",
+    station: "forge",
+    output: { type: "equipment", id: "light_crossbow", qty: 1 },
+    inputs: [
+      { resource: "iron_ingot", qty: 1 },
+      { resource: "oak_wood", qty: 2 },
+    ],
+    levelReq: 5,
+  },
+
+  // --- Forge : armes du Mage ---
+  {
+    id: "craft_apprentice_wand",
+    station: "forge",
+    output: { type: "equipment", id: "apprentice_wand", qty: 1 },
+    inputs: [
+      { resource: "soft_wood", qty: 2 },
+      { resource: "copper_ingot", qty: 1 },
+    ],
+    levelReq: 1,
+  },
+  {
+    id: "craft_oak_staff",
+    station: "forge",
+    output: { type: "equipment", id: "oak_staff", qty: 1 },
+    inputs: [
+      { resource: "oak_wood", qty: 3 },
+      { resource: "rough_gem", qty: 1 },
+    ],
+    levelReq: 4,
+  },
+  {
+    id: "craft_arcane_orb",
+    station: "joaillerie",
+    output: { type: "equipment", id: "arcane_orb", qty: 1 },
+    inputs: [
+      { resource: "rough_gem", qty: 1 },
+      { resource: "copper_ingot", qty: 2 },
+    ],
+    levelReq: 5,
+  },
+
+  // --- Forge : armes de l'Assassin ---
+  {
+    id: "craft_rusty_dagger",
+    station: "forge",
+    output: { type: "equipment", id: "rusty_dagger", qty: 1 },
+    inputs: [
+      { resource: "copper_ingot", qty: 1 },
+      { resource: "soft_wood", qty: 1 },
+    ],
+    levelReq: 1,
+  },
+  {
+    id: "craft_short_blade",
+    station: "forge",
+    output: { type: "equipment", id: "short_blade", qty: 1 },
+    inputs: [
+      { resource: "iron_ingot", qty: 1 },
+      { resource: "copper_ingot", qty: 1 },
+    ],
+    levelReq: 3,
+  },
+  {
+    id: "craft_twin_daggers",
+    station: "forge",
+    output: { type: "equipment", id: "twin_daggers", qty: 1 },
+    inputs: [
+      { resource: "iron_ingot", qty: 2 },
+      { resource: "soft_wood", qty: 1 },
+    ],
+    levelReq: 4,
+  },
+
   // --- Forge : armures de métal ---
   {
     id: "craft_iron_helm",

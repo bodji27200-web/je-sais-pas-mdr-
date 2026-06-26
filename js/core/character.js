@@ -107,6 +107,16 @@ export function regenOutOfCombat(state, deltaMs) {
   state.character.hpCurrent = Math.min(maxHp, state.character.hpCurrent + heal);
 }
 
+// Une arme est-elle maniable par la classe du personnage ?
+// On ne contrôle QUE les armes (slot weapon) ayant un type (`wtype`) ; les
+// armures et accessoires restent universels. Sans liste `weapons` -> tout permis.
+export function canWieldWeapon(state, tpl) {
+  if (!tpl || tpl.slot !== "weapon" || !tpl.wtype) return true;
+  const cls = getClass(state.character.classId);
+  if (!cls || !cls.weapons) return true;
+  return cls.weapons.includes(tpl.wtype);
+}
+
 // Équipe une instance (par uid) depuis l'inventaire. Renvoie { ok, error, name }.
 export function equip(state, uid) {
   const inst = findEquipmentInstance(uid);
@@ -115,6 +125,10 @@ export function equip(state, uid) {
   if (!tpl) return { ok: false, error: "Objet inconnu." };
   if (state.character.level < (tpl.levelReq || 0))
     return { ok: false, error: `Niveau ${tpl.levelReq} requis.` };
+  if (!canWieldWeapon(state, tpl)) {
+    const cls = getClass(state.character.classId);
+    return { ok: false, error: `${cls.name} ne peut pas manier cette arme.` };
+  }
 
   const slot = tpl.slot;
   const previous = state.character.equipment[slot];

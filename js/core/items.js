@@ -95,17 +95,23 @@ export function rollRarity(luck = 0) {
 }
 
 // Pièces lootables par un ennemi : équipements de niveau requis adapté.
-function lootPool(enemy) {
+// `wtypes` (optionnel) : ne droppe que les armes maniables par la classe du
+// joueur (les armures/accessoires restent universels) -> butin pertinent.
+function lootPool(enemy, wtypes) {
   const cap = (enemy.level || 1) + 1;
-  return Object.values(EQUIPMENT).filter((it) => (it.levelReq || 0) <= cap);
+  return Object.values(EQUIPMENT).filter((it) => {
+    if ((it.levelReq || 0) > cap) return false;
+    if (it.slot === "weapon" && it.wtype && wtypes) return wtypes.includes(it.wtype);
+    return true;
+  });
 }
 
 // Loot d'équipement « aléatoire » d'un ennemi (en plus des drops scriptés).
 // Renvoie une instance ou null. `force` garantit une pièce (boss).
-export function rollGearDrop(enemy, force = false) {
+export function rollGearDrop(enemy, force = false, wtypes = null) {
   const chance = force ? 1 : enemy.isBoss ? 1 : 0.2;
   if (Math.random() > chance) return null;
-  const pool = lootPool(enemy);
+  const pool = lootPool(enemy, wtypes);
   if (!pool.length) return null;
   const base = pool[Math.floor(Math.random() * pool.length)];
   return makeInstance(base.id, rollRarity(enemyLuck(enemy)));
