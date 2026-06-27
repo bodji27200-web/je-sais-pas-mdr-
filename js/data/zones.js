@@ -59,7 +59,7 @@ export const ZONES = {
     name: "Cendres de Pyrelac",
     icon: "🌋",
     image: "assets/zones/pyrelake_ashes.png",
-    arena: "assets/zones/pyrelake_ashes.png",
+    arena: "assets/backgrounds/zone3.png",
     recommendedLevel: 10,
     elements: ["fire", "lightning"],
     desc:
