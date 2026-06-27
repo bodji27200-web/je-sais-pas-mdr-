@@ -19,7 +19,7 @@ export const AFFIXES = {
   def: { id: "def", kind: "stat", stat: "pctDef", label: "DEF", min: 0.05, max: 0.12 },
   hp: { id: "hp", kind: "stat", stat: "pctHp", label: "PV", min: 0.04, max: 0.1 },
   crit: { id: "crit", kind: "stat", stat: "critFlat", label: "Crit", min: 2, max: 6, int: true },
-  spd: { id: "spd", kind: "stat", stat: "spdPct", label: "Vitesse", min: 0.03, max: 0.08 },
+  spd: { id: "spd", kind: "stat", stat: "spdPct", label: "Clairvoyance", min: 0.03, max: 0.08 },
   lifesteal: { id: "lifesteal", kind: "combat", pp: "lifestealPct", label: "Vol de vie", min: 0.04, max: 0.09 },
   hpRegen: { id: "hpRegen", kind: "combat", pp: "hpRegenPct", label: "Régén.", min: 0.015, max: 0.035 },
   resist: { id: "resist", kind: "resist", label: "Résist.", min: 0.06, max: 0.14, perElement: true },

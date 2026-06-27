@@ -160,6 +160,44 @@ test("migration v5 -> v6 : les bottes de cuir passent du slot legs au slot feet"
   assert.equal(loaded.character.equipment.feet.baseId, "leather_boots");
 });
 
+test("migration v11 -> v12 : une sauvegarde de la version déployée reste chargeable", () => {
+  resetSave();
+  // Forme v11 (version actuellement déployée) : pas de stats stockées (dérivées).
+  const v11 = {
+    version: 11,
+    createdAt: Date.now(),
+    lastSeen: Date.now(),
+    character: {
+      name: "Ancien", classId: "assassin", level: 18, xp: 40, hpCurrent: 120,
+      equipment: { weapon: null, offhand: null, head: null, chest: null, hands: null, legs: null, feet: null, accessory: null, accessory2: null },
+      specId: "assassin_duelist", specChanges: 1,
+    },
+    jobs: { woodcutting: { level: 4, xp: 0 }, mining: { level: 3, xp: 0 } },
+    professions: {},
+    activity: null,
+    inventory: { resources: { stone: 7 }, equipment: [] },
+    gold: 321,
+    counters: { kills: 12, bossKills: 1, crafted: 3, harvested: 9 },
+    bestiary: {},
+    familiars: { owned: {}, eggs: {}, equipped: null, essence: 0 },
+    tutorials: { seen: {}, enabled: true },
+    achievements: { seen: {} },
+    flags: { bossDefeated: true },
+    objectives: { woodcut: true, ingot: true, weapon: true, equipWeapon: true, firstKill: true },
+    settings: { muted: false },
+  };
+  localStorage.setItem(SAVE_KEY, JSON.stringify(v11));
+  const loaded = load();
+  assert.ok(loaded, "la migration v11 -> v12 doit réussir");
+  assert.equal(loaded.version, SAVE_VERSION);
+  // Aucune perte : classe, voie, or, niveau, déblocage de boss préservés.
+  assert.equal(loaded.character.classId, "assassin");
+  assert.equal(loaded.character.specId, "assassin_duelist");
+  assert.equal(loaded.character.level, 18);
+  assert.equal(loaded.gold, 321);
+  assert.equal(loaded.flags.bossDefeated, true);
+});
+
 test("une sauvegarde corrompue ne casse pas et n'écrase pas l'original", () => {
   resetSave();
   localStorage.setItem(SAVE_KEY, "{ ceci n'est pas du JSON valide");

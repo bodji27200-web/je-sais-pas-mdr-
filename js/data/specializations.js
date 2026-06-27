@@ -76,7 +76,7 @@ export const SPECIALIZATIONS = {
     mastery: { wtype: "longbow", atkPct: 0.12 },
   },
   archer_ranger: {
-    id: "archer_ranger", classId: "archer", name: "Rôdeur", tagline: "Vitesse et déluge de flèches.",
+    id: "archer_ranger", classId: "archer", name: "Rôdeur", tagline: "Clairvoyance et déluge de flèches.",
     desc: "Tire vite et souvent, en multipliant les frappes.",
     statMods: { spdPct: 0.08, atkPct: 0.05 },
     passive: { skillPowerPct: 0.06 },
@@ -137,7 +137,7 @@ export const SPECIALIZATIONS = {
   },
   assassin_duelist: {
     id: "assassin_duelist", classId: "assassin", name: "Duelliste", tagline: "Danse de lames.",
-    desc: "Vitesse extrême, frappes multiples et vol de vie.",
+    desc: "Clairvoyance extrême, frappes multiples et vol de vie.",
     statMods: { spdPct: 0.12, critFlat: 3 },
     passive: { lifestealPct: 0.12 },
     grants: ["flurry"],

@@ -22,7 +22,7 @@ export const SAVE_KEY = "idle_rpg_save_v1";
 // Copie de sécurité écrite AVANT toute migration : si une migration tournait mal
 // dans une future version, on garde une trace de la sauvegarde d'origine.
 export const BACKUP_KEY = "idle_rpg_save_backup";
-export const SAVE_VERSION = 11;
+export const SAVE_VERSION = 12;
 
 let state = null;
 
@@ -240,6 +240,18 @@ function migrate(parsed) {
       }
     }
     parsed.version = 11;
+  }
+  // v11 -> v12 : modèle de statistiques de combat enrichi (Magie, Résistance,
+  // Dextérité, Précision, Clairvoyance, Dégâts critiques) + plafond d'esquive 60 %.
+  // Les nouvelles stats sont DÉRIVÉES (classe + équipement), donc NON stockées :
+  // une ancienne sauvegarde reste valable telle quelle. On versionne malgré tout
+  // (discipline de migration, instr. 313) et on borne hpCurrent au PV max courant
+  // par sécurité. La « Vitesse » devient « Clairvoyance » À L'AFFICHAGE ; la clé
+  // moteur `spd` est inchangée, donc aucune donnée d'équipement n'est touchée.
+  if (parsed.version === 11) {
+    const ch = parsed.character;
+    if (ch && typeof ch.hpCurrent === "number" && !Number.isFinite(ch.hpCurrent)) ch.hpCurrent = 1;
+    parsed.version = 12;
   }
   return parsed.version === SAVE_VERSION ? parsed : null;
 }

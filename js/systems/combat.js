@@ -39,6 +39,56 @@ export function cdFactor(spd) {
   return Math.max(CD_MIN_FACTOR, 1 - Math.max(0, spd - CD_SPEED_REF) / 100);
 }
 
+// --- Esquive : Dextérité (défenseur) contre Précision (attaquant) ------------
+// Rendement décroissant, PLAFOND DUR à 60 % (instr. 51-52) : atteindre le plafond
+// exige un build de très haut niveau entièrement tourné vers l'esquive (instr. 53),
+// et la Précision adverse fait baisser l'esquive (aucun build n'est invincible).
+export const DODGE_CAP = 0.6;
+export const DODGE_K = 200; // échelle des rendements décroissants
+export const ACC_FACTOR = 0.85; // poids de la Précision adverse contre la Dextérité
+export function dodgeChance(dex, acc) {
+  const net = Math.max(0, (dex || 0) - (acc || 0) * ACC_FACTOR);
+  const raw = net / (net + DODGE_K);
+  // Garde-fou : une valeur non finie (Dextérité infinie) sature au plafond.
+  return Math.min(DODGE_CAP, Number.isFinite(raw) ? raw : DODGE_CAP);
+}
+
+// --- Critique : plafonds (instr. 92-95) --------------------------------------
+// La part venant de la STAT est plafonnée à 50 %. Les bonus de compétence et
+// buffs peuvent pousser plus haut (passifs spécialisés) sans jamais garantir le
+// critique (plafond dur < 100 %).
+export const BASE_CRIT_CAP = 50;
+export const HARD_CRIT_CAP = 85;
+// Dégâts critiques : multiplicateur = 1 + critDmg%/100, plafonné globalement.
+export const CRIT_DMG_DEFAULT = 60; // ×1,6 (rétro-compatible avec l'ancien CRIT_MULT)
+export const CRIT_DMG_CAP = 150; // au plus ×2,5
+export function critMultOf(c) {
+  const cd = Math.min(CRIT_DMG_CAP, c && Number.isFinite(c.critDmg) ? c.critDmg : CRIT_DMG_DEFAULT);
+  return 1 + Math.max(0, cd) / 100;
+}
+// Chance de critique effective : la part venant de la STAT est plafonnée à 50 %,
+// les bonus de compétence/buffs peuvent dépasser, plafond dur < 100 %.
+export function critChanceOf(attacker, critBonus = 0, buffCrit = 0) {
+  const cc = Math.min(BASE_CRIT_CAP, attacker.crit || 0) + (critBonus || 0) + (buffCrit || 0);
+  return Math.min(HARD_CRIT_CAP, cc);
+}
+
+// --- Résistance / Magie : axe MAGIQUE (compétences à élément) -----------------
+// Résistance = parallèle à la Défense, mais pour les dégâts élémentaires (instr.
+// 38, 88). Magie = amplifie les compétences à élément, rendement décroissant et
+// plafonné (instr. 37, 87). Les compétences SANS élément restent purement
+// physiques (atk/def) : l'axe magique ne perturbe pas leur calcul.
+export const RES_K = 220;
+export const RES_CAP = 0.6;
+export function resReduction(res) {
+  return Math.min(RES_CAP, Math.max(0, res || 0) / ((res || 0) + RES_K));
+}
+export const MAG_K = 500;
+export const MAG_CAP = 0.4;
+export function magBonus(mag) {
+  return Math.min(MAG_CAP, Math.max(0, mag || 0) / MAG_K);
+}
+
 function makeCombatant(name, stats, skillIds, passiveId) {
   const passive = passiveId ? getSkill(passiveId) : null;
   return {
@@ -47,8 +97,13 @@ function makeCombatant(name, stats, skillIds, passiveId) {
     hp: stats.hp != null ? stats.hp : stats.maxHp,
     atk: stats.atk,
     def: stats.def,
-    spd: stats.spd,
+    spd: stats.spd, // spd = Clairvoyance (clé moteur historique)
     crit: stats.crit,
+    mag: stats.mag != null ? stats.mag : 0,
+    res: stats.res != null ? stats.res : 0,
+    dex: stats.dex != null ? stats.dex : 0,
+    acc: stats.acc != null ? stats.acc : 0,
+    critDmg: stats.critDmg != null ? stats.critDmg : CRIT_DMG_DEFAULT,
     skills: skillIds || [],
     passive: passiveId || null,
     pp: (passive && passive.passive) || {}, // bonus de passive utiles EN combat
@@ -161,7 +216,7 @@ export function buildPlayerCombatant(state) {
   const spec = getActiveSpec(state);
   const player = makeCombatant(
     state.character.name,
-    { maxHp: ds.maxHp, hp: Math.max(1, Math.round(state.character.hpCurrent)), atk: ds.atk, def: ds.def, spd: ds.spd, crit: ds.crit },
+    { maxHp: ds.maxHp, hp: Math.max(1, Math.round(state.character.hpCurrent)), atk: ds.atk, def: ds.def, spd: ds.spd, crit: ds.crit, mag: ds.mag, res: ds.res, dex: ds.dex, acc: ds.acc, critDmg: ds.critDmg },
     ["basic_attack", ...cls.skills, ...((spec && spec.grants) || [])],
     cls.passive
   );
@@ -242,9 +297,20 @@ export function startCombat(state, enemyId, opts = {}) {
 
   const player = buildPlayerCombatant(state);
 
+  // Les ennemis ne déclarent que hp/atk/def/spd/crit : on DÉRIVE les nouvelles
+  // stats (mag/res/dex/acc/critDmg) à partir de leur fiche, avec possibilité de
+  // surcharge explicite par ennemi (forward-compatible, instr. 26-27).
+  const es = enemy.stats;
   const e = makeCombatant(
     enemy.name,
-    { maxHp: enemy.stats.hp, atk: enemy.stats.atk, def: enemy.stats.def, spd: enemy.stats.spd, crit: enemy.stats.crit },
+    {
+      maxHp: es.hp, atk: es.atk, def: es.def, spd: es.spd, crit: es.crit,
+      mag: es.mag != null ? es.mag : Math.round(es.atk * 0.3),
+      res: es.res != null ? es.res : Math.round(es.def * 0.6),
+      dex: es.dex != null ? es.dex : Math.round(es.spd * 0.55),
+      acc: es.acc != null ? es.acc : Math.round(es.spd * 0.4 + es.crit * 0.4),
+      critDmg: es.critDmg != null ? es.critDmg : CRIT_DMG_DEFAULT,
+    },
     ["basic_attack", ...(enemy.skills || [])],
     enemy.passive || null
   );
@@ -271,9 +337,11 @@ export function startCombat(state, enemyId, opts = {}) {
   e.phaseName = null;
   e.planned = null; // action télégraphiée (intention)
 
-  // Enragé : +50 % à toutes les stats. Forçable pour les tests (opts.forceEnrage).
+  // Enragé : +50 % à toutes les stats. Forçable pour les tests :
+  // `forceEnrage: true` force l'enrage, `forceEnrage: false` le désactive.
   e.enraged = false;
-  if (opts.forceEnrage || Math.random() < ENRAGE_CHANCE) {
+  const wantEnrage = opts.forceEnrage === true || (opts.forceEnrage !== false && Math.random() < ENRAGE_CHANCE);
+  if (wantEnrage) {
     e.enraged = true;
     e.maxHp = Math.round(e.maxHp * ENRAGE_MULT);
     e.hp = e.maxHp;
@@ -281,6 +349,10 @@ export function startCombat(state, enemyId, opts = {}) {
     e.def = Math.round(e.def * ENRAGE_MULT);
     e.spd = Math.max(1, Math.round(e.spd * ENRAGE_MULT));
     e.crit = Math.round(e.crit * ENRAGE_MULT);
+    e.mag = Math.round(e.mag * ENRAGE_MULT);
+    e.res = Math.round(e.res * ENRAGE_MULT);
+    e.dex = Math.round(e.dex * ENRAGE_MULT);
+    e.acc = Math.round(e.acc * ENRAGE_MULT);
   }
 
   // Bestiaire : on note la rencontre (les résistances se révèlent après le combat).
@@ -376,14 +448,24 @@ function applyEffect(target, eff, sourceAtk, combat, who) {
 
 // Calcule et applique les dégâts. opts: { skillId, critBonus, concBonus }.
 function dealDamage(combat, attacker, defender, power, opts = {}) {
-  // Souplesse (Cuir, 4 pièces) : chance d'esquiver complètement l'attaque, puis
-  // gain temporaire de critique. Seul le porteur du matériau peut esquiver.
-  if (defender.mat && defender.mat.evasionPct > 0 && Math.random() * 100 < defender.mat.evasionPct) {
-    const cfg = MATERIAL_BEHAVIOR.souplesse;
-    defender.buffs.push({ type: "crit_buff", amount: cfg.critBuff, turns: cfg.critTurns });
-    log(combat, `${defender.name} esquive l'attaque (Souplesse) et gagne en précision.`, defender === combat.player ? "player" : "enemy");
-    combat.lastFx.push({ target: defender === combat.enemy ? "enemy" : "player", dmg: 0, crit: false, evaded: true });
-    return { dmg: 0, isCrit: false, evaded: true };
+  // ESQUIVE (instr. 39-60) : Dextérité du défenseur contre Précision de
+  // l'attaquant, + éventuelle Souplesse (Cuir 4 pièces), le tout PLAFONNÉ à 60 %.
+  // Une esquive annule les dégâts directs (le coût/effet déjà payé reste payé).
+  // `opts.unavoidable` : attaque rare explicitement marquée inévitable (instr. 58).
+  if (!opts.unavoidable) {
+    let pDodge = dodgeChance(defender.dex, attacker.acc);
+    if (defender.mat && defender.mat.evasionPct > 0) pDodge += defender.mat.evasionPct / 100;
+    pDodge = Math.min(DODGE_CAP, pDodge);
+    if (pDodge > 0 && Math.random() < pDodge) {
+      // Souplesse : esquiver accorde un petit bonus de critique (identité Cuir).
+      if (defender.mat && defender.mat.evasionPct > 0) {
+        const cfg = MATERIAL_BEHAVIOR.souplesse;
+        defender.buffs.push({ type: "crit_buff", amount: cfg.critBuff, turns: cfg.critTurns });
+      }
+      log(combat, `${defender.name} esquive l'attaque.`, defender === combat.player ? "player" : "enemy");
+      combat.lastFx.push({ target: defender === combat.enemy ? "enemy" : "player", dmg: 0, crit: false, evaded: true });
+      return { dmg: 0, isCrit: false, evaded: true };
+    }
   }
 
   let base = effectiveAtk(attacker) * power;
@@ -410,10 +492,19 @@ function dealDamage(combat, attacker, defender, power, opts = {}) {
   if (attacker.elementDmg && opts.element && attacker.elementDmg[opts.element])
     base *= 1 + attacker.elementDmg[opts.element];
 
+  // Axe MAGIQUE (instr. 37-38, 87-88) : une attaque À ÉLÉMENT est amplifiée par
+  // la Magie de l'attaquant et atténuée par la Résistance du défenseur (rendements
+  // décroissants, plafonnés). Les attaques SANS élément restent purement physiques.
+  if (opts.element) {
+    base *= 1 + magBonus(attacker.mag);
+    base *= 1 - resReduction(defender.res);
+  }
+
   base *= 0.9 + Math.random() * 0.2; // variance ±10 %
-  const critChance = attacker.crit + (opts.critBonus || 0) + sumBuff(attacker, "crit_buff");
+  // Chance critique plafonnée (voir critChanceOf) ; Dégâts critiques = critMultOf.
+  const critChance = critChanceOf(attacker, opts.critBonus || 0, sumBuff(attacker, "crit_buff"));
   const isCrit = Math.random() * 100 < critChance;
-  if (isCrit) base *= CRIT_MULT;
+  if (isCrit) base *= critMultOf(attacker);
 
   let dmg = Math.max(1, Math.round(base));
 
@@ -479,15 +570,22 @@ function useSkill(combat, actor, other, skillId) {
     const hits = skill.hits || 1;
     let total = 0;
     let anyCrit = false;
+    // Multi-frappes : la puissance est déjà répartie par frappe dans les données
+    // (instr. 96). Chaque frappe vérifie SÉPARÉMENT l'esquive et le critique.
     for (let i = 0; i < hits && other.hp > 0; i++) {
-      const r = dealDamage(combat, actor, other, skill.power, { skillId, critBonus: skill.critBonus || 0, concBonus, element: skill.element || actor.weaponElement || actor.element || null });
+      const r = dealDamage(combat, actor, other, skill.power, { skillId, critBonus: skill.critBonus || 0, concBonus, element: skill.element || actor.weaponElement || actor.element || null, unavoidable: skill.unavoidable });
       total += r.dmg;
       anyCrit = anyCrit || r.isCrit;
-      landed = true;
+      if (!r.evaded) landed = true;
     }
     const label = skill.id === "basic_attack" ? "attaque" : skill.name;
     const hitTxt = hits > 1 ? ` (${hits} frappes)` : "";
-    log(combat, `${actor.name} utilise ${label}${hitTxt} et inflige ${total} dégâts${anyCrit ? " (CRITIQUE !)" : ""}.`, anyCrit ? "crit" : kind);
+    if (landed) {
+      log(combat, `${actor.name} utilise ${label}${hitTxt} et inflige ${total} dégâts${anyCrit ? " (CRITIQUE !)" : ""}.`, anyCrit ? "crit" : kind);
+    } else {
+      // Toutes les frappes esquivées : afficher « esquivé », jamais « 0 dégât ».
+      log(combat, `${actor.name} utilise ${label} — esquivé !`, kind);
+    }
   } else if (!skill.self) {
     log(combat, `${actor.name} utilise ${skill.name}.`, kind);
   } else {
