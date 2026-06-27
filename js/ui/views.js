@@ -33,6 +33,10 @@ import { getGuide } from "../data/guides.js";
 import { evaluateAchievements, unlockedCount } from "../systems/achievements.js";
 import { ACHIEVEMENTS } from "../data/achievements.js";
 
+// Icône pièce d'or (image fournie). Utilisée dans les contextes HTML (pas les
+// attributs title ni les toasts, qui restent en texte).
+const COIN = '<img class="coin-ico" src="assets/ui/gold.png" alt="or" />';
+
 const STAT_LABELS = { maxHp: "PV max", atk: "Attaque", def: "Défense", spd: "Vitesse", crit: "Critique" };
 const STAT_ICONS = { maxHp: "❤️", atk: "⚔️", def: "🛡️", spd: "💨", crit: "🎯" };
 const STAT_TIP = {
@@ -151,7 +155,7 @@ export function renderTopbar(state) {
         <button class="gear-btn help-btn" data-act="open-guide" title="Aide / Guide" aria-label="Aide">?</button>
         <button class="gear-btn" data-act="open-options" title="Options" aria-label="Options">⚙</button>
       </div>
-      <div class="gold" id="tb-gold">🪙 ${fmt(state.gold)}</div>
+      <div class="gold" id="tb-gold">${COIN} <span id="tb-gold-num">${fmt(state.gold)}</span></div>
       <div class="top-activity" id="tb-activity">${topbarActivityInner(state)}</div>
     </div>`;
 }
@@ -280,7 +284,7 @@ function renderSpecCard(state, spec, active, cost) {
   const mLbl = spec.mastery ? `Maîtrise ${esc(spec.mastery.wtype)} : ${specBonusLines({ statMods: spec.mastery }).join(" · ") || "bonus"}` : "";
   let btn;
   if (active) btn = `<span class="tag spec-current">Voie actuelle</span>`;
-  else if (cost > 0) btn = `<button class="btn tiny" data-act="choose-spec" data-spec="${spec.id}">Changer · ${fmt(cost)} 🪙</button>`;
+  else if (cost > 0) btn = `<button class="btn tiny" data-act="choose-spec" data-spec="${spec.id}">Changer · ${fmt(cost)} ${COIN}</button>`;
   else btn = `<button class="btn tiny primary" data-act="choose-spec" data-spec="${spec.id}">Choisir</button>`;
   return `
     <div class="spec-card ${active ? "active" : ""}">
@@ -427,7 +431,7 @@ function costLine(state, cost) {
   const part = (have, need, label) =>
     `<span class="${have >= need ? "" : "lack"}">${label} ${need}</span>`;
   return [
-    part(state.gold, cost.gold, "🪙"),
+    part(state.gold, cost.gold, COIN),
     part(rc(state, "equip_essence"), cost.essence, "✨"),
     part(rc(state, cost.material.id), cost.material.qty, `${mat ? mat.icon : "❔"}`),
   ].join(" · ");
@@ -1144,7 +1148,7 @@ export function renderBattleControls(state, combat) {
       .join("");
     rewardHtml = `
       <div class="reward-box">
-        <p>+${combat.rewards.xp} XP · +${combat.rewards.gold} 🪙</p>
+        <p>+${combat.rewards.xp} XP · +${combat.rewards.gold} ${COIN}</p>
         ${drops ? `<ul class="drop-list">${drops}</ul>` : '<p class="muted small">Aucun butin cette fois.</p>'}
         ${combat.rewards.levels > 0 ? `<p class="lvlup">Niveau ${state.character.level} atteint !</p>` : ""}
       </div>`;

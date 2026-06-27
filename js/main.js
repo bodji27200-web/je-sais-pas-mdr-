@@ -281,7 +281,7 @@ function updateTick() {
   const xpNext = charXpToNext(state.character.level);
   setWidth("tb-xp-fill", state.character.xp, xpNext);
   setText("tb-xp-num", fmt(state.character.xp) + "/" + fmt(xpNext));
-  setText("tb-gold", "🪙 " + fmt(state.gold));
+  setText("tb-gold-num", fmt(state.gold)); // l'icône (img) reste, on met à jour le nombre
   const az = document.getElementById("tb-activity");
   if (az) az.innerHTML = topbarActivityInner(state); // sans <img> -> pas de clignotement
 
