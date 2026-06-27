@@ -263,6 +263,41 @@ export function save() {
   }
 }
 
+// --- Export / Import de sauvegarde ---
+// Le localStorage peut être effacé par le navigateur (Xbox, iPhone…). Ces deux
+// fonctions permettent au joueur de garder une copie hors ligne de sa partie et
+// de la restaurer (avant le multijoueur).
+
+// Renvoie l'état courant sérialisé (JSON joliment formaté), prêt à être
+// téléchargé. Renvoie null s'il n'y a pas de partie en cours.
+export function exportSave() {
+  if (!state) return null;
+  state.lastSeen = Date.now();
+  return JSON.stringify(state, null, 2);
+}
+
+// Importe une sauvegarde depuis une chaîne JSON. Valide et migre la sauvegarde
+// vers la version courante avant de l'adopter. Renvoie { ok, error }.
+// N'écrase la partie en cours que si l'import a réellement abouti.
+export function importSave(json) {
+  let parsed;
+  try {
+    parsed = JSON.parse(json);
+  } catch (e) {
+    return { ok: false, error: "Fichier illisible (JSON invalide)." };
+  }
+  if (!parsed || typeof parsed !== "object" || !parsed.character || !parsed.version) {
+    return { ok: false, error: "Ce fichier n'est pas une sauvegarde valide." };
+  }
+  const migrated = migrate(parsed);
+  if (!migrated) {
+    return { ok: false, error: "Sauvegarde incompatible avec cette version." };
+  }
+  state = migrated;
+  save();
+  return { ok: true };
+}
+
 export function resetSave() {
   if (storageAvailable()) {
     try {

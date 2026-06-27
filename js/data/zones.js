@@ -60,7 +60,7 @@ export const ZONES = {
     icon: "🌋",
     image: "assets/zones/pyrelake_ashes.png",
     arena: "assets/backgrounds/zone3.png",
-    recommendedLevel: 10,
+    recommendedLevel: 11,
     elements: ["fire", "lightning"],
     desc:
       "Un lac de lave figé sous une pluie de cendres. La chaleur brûle, la " +
@@ -69,7 +69,7 @@ export const ZONES = {
     boss: "ignar_emberheart",
     unlock: { prevBoss: "vorrak_collapse" },
     progression: [
-      { enemy: "magma_larva", level: 10, prevKills: 0, clearKills: 3 },
+      { enemy: "magma_larva", level: 11, prevKills: 0, clearKills: 3 },
       { enemy: "spark_elemental", level: 11, prevKills: 3, clearKills: 3 },
       { enemy: "ash_carapace", level: 12, prevKills: 3, clearKills: 3 },
       { enemy: "sulfur_prowler", level: 13, prevKills: 3, clearKills: 3 },

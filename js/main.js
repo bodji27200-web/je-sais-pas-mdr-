@@ -7,6 +7,8 @@ import {
   resetSave,
   hasSave,
   getState,
+  exportSave,
+  importSave,
 } from "./core/state.js";
 import {
   getDerivedStats,
@@ -24,7 +26,7 @@ import {
   activityProgress,
   activityRemainingMs,
 } from "./systems/jobs.js";
-import { charXpToNext } from "./core/progression.js";
+import { charXpToNext, jobXpToNext } from "./core/progression.js";
 import { craft } from "./systems/crafting.js";
 import { upgradeItem, dismantleItem, dismantleReward, needsDismantleConfirm } from "./systems/gear.js";
 import { findEquipmentInstance } from "./core/state.js";
@@ -268,6 +270,44 @@ function renderScreenOnly() {
   $("#screen").innerHTML = renderScreen();
 }
 
+// Mise à jour CIBLÉE de l'écran Métiers à la fin d'un cycle de récolte : on ne
+// réécrit que l'XP/le niveau, sans recréer les illustrations des métiers (sinon
+// elles clignotent toutes les 5–20 s). Renvoie false si un rendu complet est
+// nécessaire (montée de niveau -> les paliers/sélecteurs changent).
+function updateJobsScreen(state) {
+  const blocks = document.querySelectorAll(".job-block[data-job]");
+  if (!blocks.length) return false;
+  for (const block of blocks) {
+    const jp = state.jobs[block.dataset.job];
+    if (!jp) return false;
+    if (String(jp.level) !== block.dataset.level) return false; // level-up -> full render
+    const xpNext = jobXpToNext(jp.level);
+    const fill = block.querySelector(".job-xp-fill");
+    if (fill) fill.style.width = (xpNext > 0 ? Math.max(0, Math.min(100, (jp.xp / xpNext) * 100)) : 0) + "%";
+    const num = block.querySelector(".job-xp-num");
+    if (num) num.textContent = fmt(jp.xp) + "/" + fmt(xpNext);
+  }
+  return true;
+}
+
+// Mise à jour CIBLÉE des quantités de l'inventaire (ressources) sans recréer
+// les illustrations. Renvoie false si l'ensemble des ressources a changé
+// (nouvelle ressource ou ressource épuisée) -> rendu complet pour réordonner.
+function updateInventoryResources(state) {
+  const grid = document.querySelector(".inv-grid");
+  if (!grid) return false;
+  const ids = Object.keys(state.inventory.resources).filter((id) => state.inventory.resources[id] > 0);
+  const nodes = grid.querySelectorAll(".inv-item[data-res]");
+  if (nodes.length !== ids.length) return false; // composition changée
+  for (const node of nodes) {
+    const qty = state.inventory.resources[node.dataset.res];
+    if (!qty || qty <= 0) return false; // une ressource a disparu
+    const q = node.querySelector(".inv-qty");
+    if (q) q.textContent = "×" + fmt(qty);
+  }
+  return true;
+}
+
 // Mise à jour CIBLÉE des valeurs qui changent dans le temps, SANS recréer
 // le moindre <img> (sinon les illustrations clignotent à chaque tick).
 function updateTick() {
@@ -347,11 +387,17 @@ function tick() {
   // Mise à jour ciblée (pas de re-render complet -> aucune image recréée).
   updateTick();
 
-  // Quand un cycle de récolte s'achève, on rafraîchit l'écran (jobs/inventaire,
-  // qui n'ont que des emojis -> pas de clignotement) SANS reconstruire le topbar
-  // (qui contient l'emblème SVG). Les autres onglets se mettent à jour au clic.
-  if (cycle && !currentCombat && (currentTab === "inventory" || currentTab === "jobs")) {
-    renderScreenOnly();
+  // Quand un cycle de récolte s'achève, on met à jour l'écran Métiers/Sac de
+  // façon CIBLÉE (quantités, XP, palier) sans recréer les illustrations -> plus
+  // de clignotement. On ne retombe sur un rendu complet que si la structure
+  // change (montée de niveau, nouvelle ressource). Les autres onglets se mettent
+  // à jour au clic.
+  if (cycle && !currentCombat) {
+    if (currentTab === "jobs") {
+      if (!updateJobsScreen(state)) renderScreenOnly();
+    } else if (currentTab === "inventory") {
+      if (!updateInventoryResources(state)) renderScreenOnly();
+    }
   }
 
   tickCount += 1;
@@ -586,10 +632,53 @@ const handlers = {
         <button class="btn" data-act="open-achievements">★ Succès</button>
         <button class="btn" data-act="toggle-sound">${isMuted() ? "🔇 Son : coupé" : "🔊 Son : activé"}</button>
         <button class="btn" data-act="toggle-tutorials">${tuto ? "Guides : activés" : "Guides : désactivés"}</button>
+        <button class="btn" data-act="export-save">⬇ Exporter la sauvegarde</button>
+        <button class="btn" data-act="import-save">⬆ Importer une sauvegarde</button>
         <button class="btn danger" data-act="reset-save">Nouvelle partie</button>
         <button class="btn" data-act="close-modal">Fermer</button>
       </div>
+      <p class="muted small">Ta progression est stockée dans ce navigateur. Exporte un fichier de secours au cas où les données seraient effacées.</p>
     `);
+  },
+  "export-save": () => {
+    const data = exportSave();
+    if (!data) return toast("Aucune partie à exporter.", "warn");
+    const state = getState();
+    const stamp = new Date().toISOString().slice(0, 10);
+    const safeName = (state.character?.name || "heros").replace(/[^a-z0-9_-]+/gi, "_").toLowerCase();
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `idle-rpg-${safeName}-${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast("Sauvegarde exportée.", "good");
+  },
+  "import-save": () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "application/json,.json";
+    input.addEventListener("change", () => {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const r = importSave(String(reader.result));
+        if (!r.ok) return toast(r.error, "warn");
+        closeModal();
+        currentCombat = null;
+        currentTab = "character";
+        renderAll();
+        toast("Sauvegarde importée !", "good");
+        playDing();
+      };
+      reader.onerror = () => toast("Lecture du fichier impossible.", "warn");
+      reader.readAsText(file);
+    });
+    input.click();
   },
   "open-achievements": () => {
     showModal(renderAchievements(getState()));

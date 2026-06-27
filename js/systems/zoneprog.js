@@ -4,7 +4,7 @@
 import { allZones, getZone } from "../data/zones.js";
 import { getEnemy } from "../data/enemies.js";
 
-function defeatedCount(state, id) {
+export function defeatedCount(state, id) {
   return (state.counters && state.counters.defeated && state.counters.defeated[id]) || 0;
 }
 

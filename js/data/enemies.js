@@ -70,7 +70,7 @@ export const ENEMIES = {
     id: "forest_bandit",
     name: "Bandit des bois",
     isBoss: false,
-    level: 4,
+    level: 5,
     role: "skirmisher",
     icon: "🗡️",
     image: "assets/enemies/forest_bandit.png",
@@ -198,7 +198,7 @@ export const ENEMIES = {
 
   // ===================== ZONE 3 : Cendres de Pyrelac =====================
   magma_larva: {
-    id: "magma_larva", name: "Larve de magma", isBoss: false, level: 10, role: "skirmisher",
+    id: "magma_larva", name: "Larve de magma", isBoss: false, level: 11, role: "skirmisher",
     icon: "🐛", image: "assets/enemies/magma_larva.png", sprite: "assets/sprites/magma_larva.png",
     stats: { hp: 210, atk: 31, def: 9, spd: 11, crit: 6 },
     skills: ["ember_spit"], passive: null,

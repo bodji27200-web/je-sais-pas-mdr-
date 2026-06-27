@@ -18,7 +18,7 @@ import { upgradeCost, canUpgrade, dismantleReward } from "../systems/gear.js";
 import { RECIPES, STATIONS } from "../data/recipes.js";
 import { ENEMIES, getEnemy } from "../data/enemies.js";
 import { ZONES, allZones } from "../data/zones.js";
-import { enemyUnlock, zoneProgress, zoneUnlocked } from "../systems/zoneprog.js";
+import { enemyUnlock, zoneProgress, zoneUnlocked, defeatedCount } from "../systems/zoneprog.js";
 import { getDerivedStats, getStatDetails, canWieldWeapon, getActiveSpec, specUnlocked, nextRespecCost, familyCounts, activeMaterialBonuses, accessory2Unlocked } from "../core/character.js";
 import { MATERIALS } from "../data/materials.js";
 import { forecastTurns, whyCannotUse, enemyIntentInfo, DEF_K, DEF_CAP } from "../systems/combat.js";
@@ -517,14 +517,17 @@ function renderJobBlock(state, job) {
       ${nxt ? `<p class="muted small next-tier">🔒 Prochain palier : <strong>${esc(nxt.name)}</strong> au niveau ${nxt.minLevel}</p>` : `<p class="muted small">Palier maximal atteint.</p>`}`;
   }
 
+  // data-level permet une mise à jour CIBLÉE (cf. main.js) : tant que le niveau
+  // ne change pas, on ne réécrit que l'XP (le bloc et ses images restent).
+  const xpPct = xpNext > 0 ? Math.max(0, Math.min(100, (jp.xp / xpNext) * 100)) : 0;
   return `
-    <div class="job-block">
+    <div class="job-block" data-job="${job.id}" data-level="${jp.level}">
       <div class="job-head">
         ${sigil(job.image, job.icon)}
         <div class="job-id">
-          <strong>${esc(job.name)}</strong> <span class="muted">Niv. ${jp.level}</span>
-          ${bar(jp.xp, xpNext, "xp")}
-          <span class="muted small">${fmt(jp.xp)}/${fmt(xpNext)} XP</span>
+          <strong>${esc(job.name)}</strong> <span class="muted">Niv. <span class="job-lvl">${jp.level}</span></span>
+          <div class="bar xp"><div class="bar-fill job-xp-fill" style="width:${xpPct}%"></div></div>
+          <span class="muted small"><span class="job-xp-num">${fmt(jp.xp)}/${fmt(xpNext)}</span> XP</span>
         </div>
       </div>
       ${body}
@@ -554,7 +557,7 @@ function recipeCategory(recipe) {
   const tpl = getEquipment(out.id);
   if (!tpl) return "other";
   if (tpl.slot === "weapon") return "weapon";
-  if (tpl.slot === "head" || tpl.slot === "chest" || tpl.slot === "legs") return "armor";
+  if (["head", "chest", "hands", "legs", "feet"].includes(tpl.slot)) return "armor";
   if (tpl.slot === "accessory") return "accessory";
   return "other";
 }
@@ -685,9 +688,7 @@ function renderRecipe(state, recipe) {
 
   // Méta : type + métier requis + classes compatibles (armes) + XP de métier.
   const typeLabel =
-    out.type === "resource"
-      ? "Matériau"
-      : { weapon: "Arme", head: "Tête", chest: "Torse", legs: "Jambes", accessory: "Accessoire" }[outDef.slot] || "Objet";
+    out.type === "resource" ? "Matériau" : SLOTS[outDef.slot] || "Objet";
   const profReq = recipe.profReq || 1;
   const metaParts = [typeLabel, `${station ? esc(station.name) : ""} niv. ${profReq}`];
   if (recipe.levelReq) metaParts.push("Niv. " + recipe.levelReq);
@@ -725,7 +726,7 @@ export function renderInventory(state) {
     ? res
         .map((id) => {
           const r = getResource(id);
-          return `<div class="inv-item" title="${esc(r.desc)}">${sigil(r.image, r.icon)}<span class="inv-name">${esc(r.name)}</span><span class="inv-qty">×${fmt(state.inventory.resources[id])}</span></div>`;
+          return `<div class="inv-item" data-res="${id}" title="${esc(r.desc)}">${sigil(r.image, r.icon)}<span class="inv-name">${esc(r.name)}</span><span class="inv-qty">×${fmt(state.inventory.resources[id])}</span></div>`;
         })
         .join("")
     : '<p class="muted">Aucune ressource. Lance un métier !</p>';
@@ -1010,8 +1011,11 @@ export function renderZones(state, selectedZoneId) {
 
   const boss = getEnemy(zone.boss);
   const bu = enemyUnlock(state, zone.boss);
+  // « Réaffronter » dépend du boss DE CETTE zone (compteur dédié), pas d'un
+  // drapeau global : un boss jamais battu reste « Affronter ».
+  const bossBeaten = defeatedCount(state, zone.boss) > 0;
   const bossBtn = bu.unlocked
-    ? `<button class="btn ${state.flags.bossDefeated ? "" : "primary"}" data-act="fight" data-id="${boss.id}">${state.flags.bossDefeated ? "Réaffronter" : "Affronter"}</button>`
+    ? `<button class="btn ${bossBeaten ? "" : "primary"}" data-act="fight" data-id="${boss.id}">${bossBeaten ? "Réaffronter" : "Affronter"}</button>`
     : `<button class="btn" disabled>Verrouillé</button>`;
   const bossSub = bu.unlocked
     ? `Niv. ${boss.level} · PV ${boss.stats.hp}`
