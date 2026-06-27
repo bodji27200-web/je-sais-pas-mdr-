@@ -31,8 +31,8 @@ export const CRIT_MULT = 1.6; // multiplicateur de dégâts critiques
 export const SPEED_UNIT = 100; // unité d'initiative ; nextAt += UNIT/vitesse
 export const MAX_CONSEC = 2; // actions consécutives maximum
 
-// Réduction de recharge liée à la Vitesse : faible et PLAFONNÉE (20 % max).
-// Réf. 10 (vitesse de base) -> aucune réduction ; au-delà, réduction progressive.
+// Réduction de recharge liée à la Clairvoyance (clé moteur `spd`) : faible et
+// PLAFONNÉE (20 % max). Réf. 10 -> aucune réduction ; au-delà, réduction progressive.
 export const CD_SPEED_REF = 10;
 export const CD_MIN_FACTOR = 0.8; // au plus -20 % de recharge
 export function cdFactor(spd) {
