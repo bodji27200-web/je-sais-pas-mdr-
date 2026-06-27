@@ -569,7 +569,8 @@ const handlers = {
     renderAll();
   },
   equip: (el) => {
-    const r = equip(getState(), el.dataset.uid);
+    // data-slot (optionnel) = main choisie pour une arme à une main.
+    const r = equip(getState(), el.dataset.uid, el.dataset.slot || null);
     if (!r.ok) return toast(r.error, "warn");
     toast("Équipé : " + (r.name || "objet"), "good");
     save();

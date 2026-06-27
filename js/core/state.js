@@ -22,7 +22,7 @@ export const SAVE_KEY = "idle_rpg_save_v1";
 // Copie de sécurité écrite AVANT toute migration : si une migration tournait mal
 // dans une future version, on garde une trace de la sauvegarde d'origine.
 export const BACKUP_KEY = "idle_rpg_save_backup";
-export const SAVE_VERSION = 10;
+export const SAVE_VERSION = 11;
 
 let state = null;
 
@@ -59,7 +59,7 @@ export function newGame(name, classId) {
       level: 1,
       xp: 0,
       hpCurrent: cls.baseStats.hp, // ajusté ensuite par les stats dérivées
-      equipment: { weapon: null, head: null, chest: null, hands: null, legs: null, feet: null, accessory: null, accessory2: null },
+      equipment: { weapon: null, offhand: null, head: null, chest: null, hands: null, legs: null, feet: null, accessory: null, accessory2: null },
       specId: null, // voie de spécialisation (choisie au niveau 10)
       specChanges: 0, // nombre de changements de voie payés (coût croissant)
     },
@@ -218,6 +218,28 @@ function migrate(parsed) {
     if (eq) for (const k of Object.keys(eq)) assignEl(eq[k]);
     if (parsed.inventory && Array.isArray(parsed.inventory.equipment)) parsed.inventory.equipment.forEach(assignEl);
     parsed.version = 10;
+  }
+  // v10 -> v11 : main secondaire (Lot 14). On ajoute l'emplacement `offhand` et
+  // on déplace un éventuel bouclier coincé dans la main principale (les boucliers
+  // étaient rangés comme armes) vers la main secondaire.
+  if (parsed.version === 10) {
+    const eq = parsed.character && parsed.character.equipment;
+    if (eq) {
+      if (eq.offhand === undefined) eq.offhand = null;
+      const w = eq.weapon;
+      const wtpl = w && w.baseId ? getEquipment(w.baseId) : null;
+      if (wtpl && wtpl.wtype === "shield") {
+        // Le bouclier passe en main gauche (ou retourne au sac si elle est prise).
+        if (!eq.offhand) eq.offhand = w;
+        else {
+          if (!parsed.inventory) parsed.inventory = { resources: {}, equipment: [] };
+          if (!Array.isArray(parsed.inventory.equipment)) parsed.inventory.equipment = [];
+          parsed.inventory.equipment.push(w);
+        }
+        eq.weapon = null;
+      }
+    }
+    parsed.version = 11;
   }
   return parsed.version === SAVE_VERSION ? parsed : null;
 }

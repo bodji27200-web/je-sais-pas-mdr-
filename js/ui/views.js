@@ -11,7 +11,7 @@ import { ensureFamiliars, familiarLevelCap } from "../systems/familiars.js";
 import { familiarXpAt } from "../data/curves.js";
 import { JOBS, unlockedTiers, bestTier, nextTier } from "../data/jobs.js";
 import { RESOURCES, getResource } from "../data/resources.js";
-import { EQUIPMENT, getEquipment, SLOTS, ARMOR_FAMILIES } from "../data/equipment.js";
+import { EQUIPMENT, getEquipment, SLOTS, ARMOR_FAMILIES, weaponHand } from "../data/equipment.js";
 import { effectiveStats, MAX_UPGRADE } from "../core/items.js";
 import { getRarity } from "../data/rarities.js";
 import { upgradeCost, canUpgrade, dismantleReward } from "../systems/gear.js";
@@ -193,6 +193,10 @@ export function renderCharacter(state) {
     .join("");
 
   const acc2Locked = !accessory2Unlocked(state);
+  // Main principale tenant une arme à deux mains -> la main gauche est « occupée ».
+  const mainW = ch.equipment.weapon;
+  const mainWtpl = mainW ? getEquipment(mainW.baseId) : null;
+  const twoHanded = !!mainWtpl && weaponHand(mainWtpl.wtype) === "two";
   const slots = Object.keys(SLOTS)
     .map((slot) => {
       const inst = ch.equipment[slot];
@@ -200,15 +204,19 @@ export function renderCharacter(state) {
         if (slot === "accessory2" && acc2Locked) {
           return `<div class="slot empty locked"><span class="slot-name">${SLOTS[slot]}</span><span class="muted small">🔒 Vaincre un boss pour débloquer</span></div>`;
         }
+        if (slot === "offhand" && twoHanded) {
+          return `<div class="slot empty"><span class="slot-name">${SLOTS[slot]}</span><span class="muted small">⚔️ occupée (arme à 2 mains)</span></div>`;
+        }
         return `<div class="slot empty"><span class="slot-name">${SLOTS[slot]}</span><span class="muted">— vide —</span></div>`;
       }
       const item = getEquipment(inst.baseId);
       const r = getRarity(inst.rarity);
+      const handTag = item.slot === "weapon" && weaponHand(item.wtype) === "two" ? ' <span class="muted small">· 2 mains</span>' : "";
       return `
         <div class="slot filled" style="border-left:3px solid ${r.color}">
           ${sigil(item.image, item.icon)}
           <div class="slot-info">
-            <span class="slot-name">${SLOTS[slot]}</span>
+            <span class="slot-name">${SLOTS[slot]}${handTag}</span>
             <div class="gear-title"><strong style="color:${r.color}">${esc(item.name)}</strong>${upgradeSuffix(inst)}${rarityTag(inst)}${familyTag(item)}${elementBadge(inst)}</div>
             <span class="muted small">${statLine(effectiveStats(inst))}</span>
             ${affixList(inst)}
@@ -762,6 +770,20 @@ export function renderInventory(state) {
             : `<span class="muted small">✦ Renforcement max (+${MAX_UPGRADE})</span>`;
 
           const dr = dismantleReward(inst);
+          // Boutons d'équipement : une arme à une main propose les DEUX mains
+          // (dual-wield) ; une arme à 2 mains ou un bouclier a un bouton dédié.
+          const hand = item.slot === "weapon" ? weaponHand(item.wtype) : null;
+          let equipControls;
+          if (!canEquip) {
+            equipControls = `<button class="btn tiny" data-act="equip" data-uid="${inst.uid}" disabled title="${esc(equipTitle)}">${equipLabel}</button>`;
+          } else if (hand === "one") {
+            equipControls =
+              `<button class="btn tiny primary" data-act="equip" data-uid="${inst.uid}" data-slot="weapon" title="Équiper en main droite">Main D.</button>` +
+              `<button class="btn tiny" data-act="equip" data-uid="${inst.uid}" data-slot="offhand" title="Équiper en main gauche">Main G.</button>`;
+          } else {
+            const lbl = hand === "two" ? "Équiper (2 mains)" : hand === "off" ? "Main gauche" : "Équiper";
+            equipControls = `<button class="btn tiny primary" data-act="equip" data-uid="${inst.uid}" title="${esc(equipTitle)}">${lbl}</button>`;
+          }
           return `
             <div class="inv-gear" style="border-left:3px solid ${r.color}">
               ${sigil(item.image, item.icon)}
@@ -773,7 +795,7 @@ export function renderInventory(state) {
                 ${upLine}
               </div>
               <div class="inv-gear-actions">
-                <button class="btn tiny ${canEquip ? "primary" : ""}" data-act="equip" data-uid="${inst.uid}" ${canEquip ? "" : "disabled"} title="${esc(equipTitle)}">${equipLabel}</button>
+                ${equipControls}
                 <button class="btn tiny" data-act="upgrade" data-uid="${inst.uid}" ${cost && up.ok ? "" : "disabled"} title="${cost ? esc(up.ok ? "Renforcer cette pièce" : up.reason) : "Niveau maximum"}">Améliorer</button>
                 <button class="btn tiny ghost" data-act="dismantle" data-uid="${inst.uid}" title="Démanteler : +🪙${dr.gold} +✨${dr.essence}">Démanteler</button>
               </div>

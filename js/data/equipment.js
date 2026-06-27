@@ -16,10 +16,11 @@ export const ARMOR_FAMILIES = {
 };
 
 export const SLOTS = {
-  weapon: "Arme",
+  weapon: "Main droite", // main principale (arme)
+  offhand: "Main gauche", // main secondaire (2e arme, bouclier, ou occupée par une arme à 2 mains)
   head: "Tête",
   chest: "Torse",
-  hands: "Mains",
+  hands: "Gants",
   legs: "Jambes",
   feet: "Bottes",
   accessory: "Accessoire",
@@ -29,6 +30,26 @@ export const SLOTS = {
 // Emplacements partageant un même type d'objet (un accessoire va dans l'un OU
 // l'autre des deux emplacements d'accessoire).
 export const SLOT_ALIASES = { accessory: ["accessory", "accessory2"] };
+
+// Maniement des armes par type (Lot 14 : main principale / secondaire). Une arme
+// occupe :
+//  - "two" : les DEUX mains (rien d'autre en main gauche) — greatsword, arcs, bâton ;
+//  - "off" : la main gauche UNIQUEMENT (boucliers) ;
+//  - "one" : une seule main → peut aller en main droite OU gauche (dual-wield),
+//            valeur par défaut pour tout type non listé.
+export const WEAPON_HANDS = {
+  greatsword: "two",
+  bow: "two",
+  longbow: "two",
+  crossbow: "two",
+  staff: "two",
+  shield: "off",
+};
+
+// Nombre/placement de mains pour un type d'arme (défaut : une main).
+export function weaponHand(wtype) {
+  return WEAPON_HANDS[wtype] || "one";
+}
 
 export const EQUIPMENT = {
   // --- Armes ---

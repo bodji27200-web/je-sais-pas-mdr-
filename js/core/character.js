@@ -1,7 +1,7 @@
 // Logique du personnage : stats dérivées, équipement, PV, XP.
 
 import { getClass } from "../data/classes.js";
-import { getEquipment } from "../data/equipment.js";
+import { getEquipment, weaponHand } from "../data/equipment.js";
 import { getSkill } from "../data/skills.js";
 import { getSpec, SPEC_UNLOCK_LEVEL, respecCost } from "../data/specializations.js";
 import { MATERIALS } from "../data/materials.js";
@@ -120,10 +120,13 @@ export function getDerivedStats(state) {
     if (m.spdPct) stats.spd *= 1 + m.spdPct;
     if (m.critFlat) stats.crit = (stats.crit || 0) + m.critFlat;
 
-    // Maîtrise : bonus si l'arme de prédilection de la voie est équipée.
-    const wInst = ch.equipment.weapon;
-    const wtpl = wInst ? getEquipment(wInst.baseId) : null;
-    if (spec.mastery && wtpl && wtpl.wtype === spec.mastery.wtype) {
+    // Maîtrise : bonus si l'arme de prédilection de la voie est équipée dans
+    // l'une OU l'autre main (dual-wield pris en compte).
+    const wieldsMastery = spec.mastery && ["weapon", "offhand"].some((s) => {
+      const t = ch.equipment[s] ? getEquipment(ch.equipment[s].baseId) : null;
+      return t && t.wtype === spec.mastery.wtype;
+    });
+    if (wieldsMastery) {
       const k = spec.mastery;
       if (k.atkPct) stats.atk *= 1 + k.atkPct;
       if (k.defPct) stats.def *= 1 + k.defPct;
@@ -249,10 +252,11 @@ export function gearCombatBonuses(state) {
   return { resist, elementDmg, pp };
 }
 
-// Élément de l'arme équipée (oriente les attaques sans élément propre).
+// Élément de l'arme équipée (oriente les attaques sans élément propre). La main
+// principale prime ; à défaut, l'arme de la main secondaire.
 export function equippedWeaponElement(state) {
-  const w = state.character.equipment.weapon;
-  return (w && w.element) || null;
+  const eq = state.character.equipment;
+  return (eq.weapon && eq.weapon.element) || (eq.offhand && eq.offhand.element) || null;
 }
 
 // Une arme est-elle maniable par la classe du personnage ?
@@ -265,8 +269,17 @@ export function canWieldWeapon(state, tpl) {
   return cls.weapons.includes(tpl.wtype);
 }
 
-// Équipe une instance (par uid) depuis l'inventaire. Renvoie { ok, error, name }.
-export function equip(state, uid) {
+// Une arme à deux mains occupe-t-elle actuellement la main principale ?
+function mainHandIsTwoHanded(state) {
+  const w = state.character.equipment.weapon;
+  const t = w ? getEquipment(w.baseId) : null;
+  return !!t && weaponHand(t.wtype) === "two";
+}
+
+// Équipe une instance (par uid) depuis l'inventaire. `preferredSlot` (optionnel)
+// permet de choisir la main pour une arme à une main : "weapon" (main droite) ou
+// "offhand" (main gauche). Renvoie { ok, error, name, slot }.
+export function equip(state, uid, preferredSlot = null) {
   const inst = findEquipmentInstance(uid);
   if (!inst) return { ok: false, error: "Objet introuvable." };
   const tpl = getEquipment(inst.baseId);
@@ -278,25 +291,47 @@ export function equip(state, uid) {
     return { ok: false, error: `${cls.name} ne peut pas manier cette arme.` };
   }
 
-  // Choix de l'emplacement. Les accessoires ont DEUX emplacements possibles ;
-  // le 2e n'est utilisable qu'après avoir vaincu un boss (Lot 13).
+  const eq = state.character.equipment;
+  const displaced = []; // pièces renvoyées à l'inventaire (slot libéré par incompatibilité)
   let slot = tpl.slot;
-  if (tpl.slot === "accessory") {
+
+  if (tpl.slot === "weapon") {
+    // Routage main principale / secondaire selon le maniement de l'arme.
+    const hand = weaponHand(tpl.wtype);
+    if (hand === "two") {
+      slot = "weapon"; // occupe les deux mains : on libère la main gauche
+      if (eq.offhand) { displaced.push(eq.offhand); eq.offhand = null; }
+    } else if (hand === "off") {
+      slot = "offhand"; // bouclier : main gauche uniquement
+      if (mainHandIsTwoHanded(state)) { displaced.push(eq.weapon); eq.weapon = null; }
+    } else {
+      // Arme à une main : main droite par défaut, main gauche si demandé/libre.
+      if (preferredSlot === "offhand") slot = "offhand";
+      else if (preferredSlot === "weapon") slot = "weapon";
+      else if (!eq.weapon) slot = "weapon";
+      else if (!eq.offhand && !mainHandIsTwoHanded(state)) slot = "offhand";
+      else slot = "weapon";
+      // Poser une arme en main gauche est incompatible avec une 2 mains en main droite.
+      if (slot === "offhand" && mainHandIsTwoHanded(state)) { displaced.push(eq.weapon); eq.weapon = null; }
+    }
+  } else if (tpl.slot === "accessory") {
+    // Les accessoires ont DEUX emplacements ; le 2e se débloque en battant un boss.
     const second = accessory2Unlocked(state);
-    if (!state.character.equipment.accessory) slot = "accessory";
-    else if (second && !state.character.equipment.accessory2) slot = "accessory2";
+    if (!eq.accessory) slot = "accessory";
+    else if (second && !eq.accessory2) slot = "accessory2";
     else slot = "accessory"; // les deux pleins (ou 2e verrouillé) -> remplace le 1er
   }
 
-  const previous = state.character.equipment[slot];
+  const previous = eq[slot];
 
-  // Retire de l'inventaire, place dans le slot, rend l'ancien à l'inventaire.
+  // Retire de l'inventaire, place dans le slot, rend l'ancien + les déplacés.
   removeEquipmentInstance(uid);
-  state.character.equipment[slot] = inst;
-  if (previous) addEquipmentInstance(previous);
+  eq[slot] = inst;
+  if (previous) displaced.push(previous);
+  for (const p of displaced) if (p) addEquipmentInstance(p);
 
   clampHp(state);
-  return { ok: true, name: tpl.name };
+  return { ok: true, name: tpl.name, slot };
 }
 
 // Le 2e emplacement d'accessoire est-il débloqué ? (un boss vaincu).
