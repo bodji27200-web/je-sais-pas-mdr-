@@ -25,8 +25,9 @@ export const FAMILIARS = {
   pebble_mite: {
     id: "pebble_mite", name: "Pétroglyphe", element: "nature", role: "protecteur", rarity: "common",
     image: "assets/familiars/pebble_mite.png", sprite: "assets/familiars/pebble_mite.png",
-    passive: { maxHpPct: 0.04 },
-    desc: "Une petite créature de pierre qui endurcit la peau de son maître (PV max +4 %).",
+    // Rôle IRREMPLAÇABLE (instr. 294) : seul familier qui renforce la Garde-réserve.
+    passive: { guardMaxPct: 0.18 },
+    desc: "Une petite créature de pierre qui consolide la Garde de son maître (réserve de Garde +18 %).",
   },
   spark_mote: {
     id: "spark_mote", name: "Grésille", element: "lightning", role: "rapide", rarity: "common",
@@ -126,3 +127,8 @@ export function getEgg(id) {
 // Coût en Essence de familier pour nourrir (un cran de lien).
 export const FEED_ESSENCE_COST = 3;
 export const LINK_MAX = 10;
+
+// Plafond DUR de régénération de PV apportée par un familier (instr. 100, 298) :
+// un familier passif ne doit jamais restaurer plus de quelques pourcents des PV
+// max par tour, sinon il neutralise seul un boss.
+export const FAMILIAR_REGEN_CAP = 0.03;

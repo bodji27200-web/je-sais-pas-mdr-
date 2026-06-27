@@ -919,6 +919,7 @@ function familiarPassiveLines(fam) {
   if (p.critFlat) out.push(`Crit +${p.critFlat} %`);
   if (p.spdPct) out.push(`Clairvoyance +${Math.round(p.spdPct * 100)} %`);
   if (p.maxHpPct) out.push(`PV max +${Math.round(p.maxHpPct * 100)} %`);
+  if (p.guardMaxPct) out.push(`Garde max +${Math.round(p.guardMaxPct * 100)} %`);
   if (p.elementDmgPct) for (const el of Object.keys(p.elementDmgPct)) {
     const e = getElement(el);
     out.push(`${e ? e.name : el} +${Math.round(p.elementDmgPct[el] * 100)} %`);

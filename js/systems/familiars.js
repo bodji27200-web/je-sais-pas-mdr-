@@ -5,7 +5,7 @@
 // (voir effectiveFamiliarPassive + intégration dans systems/combat.js). Il ne
 // joue pas à la place du joueur.
 
-import { getFamiliar, familiarsByRarity, getEgg, FEED_ESSENCE_COST, LINK_MAX } from "../data/familiars.js";
+import { getFamiliar, familiarsByRarity, getEgg, FEED_ESSENCE_COST, LINK_MAX, FAMILIAR_REGEN_CAP } from "../data/familiars.js";
 import { familiarXpAt } from "../data/curves.js";
 import { applyXp } from "../core/progression.js";
 
@@ -130,5 +130,8 @@ export function effectiveFamiliarPassive(state) {
       for (const el of Object.keys(v)) p[k][el] = v[el] * mult;
     }
   }
+  // Plafond DUR de régénération de PV (instr. 100, 298) : même renforcé par le
+  // lien, un familier ne restaure jamais plus de quelques % des PV max par tour.
+  if (p.hpRegenPct) p.hpRegenPct = Math.min(FAMILIAR_REGEN_CAP, p.hpRegenPct);
   return { id: fam.id, sprite: fam.sprite, image: fam.image, element: fam.element, role: fam.role, passive: p, level: o.level, link: o.link };
 }

@@ -121,10 +121,17 @@ test("le passif du familier équipé s'applique au héros en combat (soutien lé
   assert.ok(cYes.player.crit >= baseCrit + 2, "le crit du familier s'applique");
   assert.ok(cYes.player.familiar && cYes.player.familiar.id === "dawn_seraph", "familier attaché au combat");
 
-  // Un familier à PV max applique le bonus.
-  s.familiars.equipped = "pebble_mite"; // maxHpPct +4 %
+  // Un familier à PV max applique le bonus (Ronceau : maxHpPct +6 %).
+  s.familiars.owned["thorn_cub"] = { level: 1, xp: 0, link: 0 };
+  s.familiars.equipped = "thorn_cub";
   const cHp = startCombat(s, "feral_wolf");
   assert.ok(cHp.player.maxHp > baseMax, "le PV max du familier s'applique");
+
+  // Le Pétroglyphe renforce la Garde-réserve (rôle protecteur unique, instr. 294).
+  const guardBase = startCombat(fresh(), "feral_wolf").player.guardMax;
+  s.familiars.equipped = "pebble_mite";
+  const cGuard = startCombat(s, "feral_wolf");
+  assert.ok(cGuard.player.guardMax > guardBase, "le Pétroglyphe augmente la réserve de Garde");
 });
 
 test("migration v7 -> v8 : familiers initialisés sans rien casser", () => {
@@ -138,4 +145,38 @@ test("migration v7 -> v8 : familiers initialisés sans rien casser", () => {
   const f = ensureFamiliars(v7);
   assert.ok(f.owned && f.eggs && typeof f.essence === "number");
   assert.equal(SAVE_VERSION >= 8, true);
+});
+
+// --- Lot 7 : rôles irremplaçables, plafonds et combos interdits ---------------
+
+test("familier : la régénération de PV est plafonnée à quelques % (instr. 100, 298)", () => {
+  const s = fresh();
+  s.familiars.owned["dawn_seraph"] = { level: 5, xp: 0, link: LINK_MAX }; // lien max -> mult ×1.15
+  s.familiars.equipped = "dawn_seraph";
+  const eff = effectiveFamiliarPassive(s);
+  assert.ok(eff.passive.hpRegenPct <= 0.03 + 1e-9, `régén familier plafonnée (${eff.passive.hpRegenPct})`);
+});
+
+test("familiers : aucun passif identique (chaque familier a une fonction distincte, instr. 280)", () => {
+  const seen = new Map();
+  for (const f of Object.values(FAMILIARS)) {
+    const sig = JSON.stringify(f.passive, Object.keys(f.passive).sort());
+    assert.ok(!seen.has(sig), `${f.id} a le même passif que ${seen.get(sig)} (doit être distinct)`);
+    seen.set(sig, f.id);
+  }
+});
+
+test("familiers : aucun ne cumule soin fort + action bonus + résurrection (instr. 299)", () => {
+  for (const f of Object.values(FAMILIARS)) {
+    const p = f.passive || {};
+    // Le moteur ne définit ni action bonus ni résurrection pour les familiers :
+    // ces clés ne doivent jamais apparaître.
+    assert.ok(p.extraAction == null && p.revive == null && p.resurrect == null,
+      `${f.id} ne doit pas accorder d'action bonus ni de résurrection`);
+    // Et un familier ne doit pas empiler régén PV + vol de vie au-delà du raisonnable.
+    if (p.hpRegenPct && p.lifestealPct) {
+      assert.ok(p.hpRegenPct <= 0.03 && p.lifestealPct <= 0.06,
+        `${f.id} : sustain cumulé trop élevé`);
+    }
+  }
 });

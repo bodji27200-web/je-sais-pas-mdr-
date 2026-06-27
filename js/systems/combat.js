@@ -312,6 +312,11 @@ export function buildPlayerCombatant(state) {
     }
     if (p.critFlat) player.crit += p.critFlat;
     if (p.spdPct) player.spd = Math.max(1, player.spd * (1 + p.spdPct));
+    // Renfort de la Garde-réserve (rôle protecteur unique du Pétroglyphe, instr. 294).
+    if (p.guardMaxPct && player.guardMax > 0) {
+      player.guardMax = Math.round(player.guardMax * (1 + p.guardMaxPct));
+      player.guardPool = player.guardMax;
+    }
     const ppAdd = {};
     for (const k of ["skillPowerPct", "lifestealPct", "hpRegenPct"]) if (p[k]) ppAdd[k] = p[k];
     if (Object.keys(ppAdd).length) mergePp(player.pp, ppAdd);
