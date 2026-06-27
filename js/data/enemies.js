@@ -97,7 +97,10 @@ export const ENEMIES = {
     icon: "👹",
     image: "assets/enemies/goblin_chief_grok.png",
     sprite: "assets/sprites/goblin_chief_grok.png",
-    stats: { hp: 680, atk: 30, def: 16, spd: 12, crit: 12 },
+    // Équilibrage Lot 8 : un boss ne doit pas se faire encaisser sans subir de
+    // dégâts. Plus de pression offensive + Précision (acc) pour qu'il touche
+    // vraiment, sans gonfler aveuglément ses PV (instr. 22, 330, 333).
+    stats: { hp: 760, atk: 42, def: 18, spd: 15, crit: 14, acc: 48 },
     skills: ["boss_cleave", "boss_roar", "boss_quake", "boss_guard"],
     passive: "enrage",
     resist: { fire: 0.8, water: 1.25, lightning: 1.15 }, // Trempé puis foudroyé : combo gagnant

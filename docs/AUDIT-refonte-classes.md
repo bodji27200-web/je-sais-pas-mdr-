@@ -61,3 +61,23 @@
 9. Finitions UI/perf/QA + déploiement (instr. 334-350).
 
 > Chaque lot : commit isolé, tests verts, save chargeable, résumé en fin de lot.
+
+## 4. Constats du simulateur d'équilibrage (Lot 8) — à traiter
+
+Le simulateur PvE (`simulatePvE`, vrai moteur) révèle deux déséquilibres réels,
+mesurés à équipement comparable (rare) et niveau égal au boss :
+
+- **No-hit trop fréquent contre un boss unique.** Un joueur équipé de son niveau
+  bat souvent un boss **sans subir de dégâts** (out-DPS + Garde/bouclier). Petites
+  corrections appliquées (1er boss : +pression offensive et Précision ; Barrière
+  arcanique 50 %/3t → 38 %/2t). Insuffisant seul : réduire le no-hit demande un
+  passage d'équilibrage itératif (instr. 330), pas un gonflage de PV (instr. 23).
+- **Le Mage domine le boss de fin.** Ignar : Mage ~100 % de victoires (souvent
+  no-hit) tandis que les classes au corps-à-corps tournent à ~0 % (faible
+  résistance au Feu, pas d'out-DPS). Viole instr. 327/331. Pistes : Précision/
+  anti-bouclier ciblés sur le boss (instr. 274), résistance au Feu accessible aux
+  corps-à-corps via Tissu/Résistance, lissage des dégâts magiques bruts du Mage.
+
+Le harnais de simulation est désormais en place pour piloter ces corrections par
+**petits ajustements mesurés** (instr. 333). Ce passage d'équilibrage fin reste à
+mener (suivi : non terminé).
