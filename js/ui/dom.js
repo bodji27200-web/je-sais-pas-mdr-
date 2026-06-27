@@ -26,7 +26,10 @@ export function sigil(imagePath, emoji, extraClass = "") {
       svg !== imagePath
         ? `if(!this.dataset.alt){this.dataset.alt=1;this.src='${esc(svg)}';}else{this.remove();}`
         : "this.remove()";
-    img = `<img class="sigil-img" src="${esc(imagePath)}" alt="" loading="lazy" onerror="${onerr}" />`;
+    // onload : masque l'emoji de secours (sinon il transparaît DERRIÈRE les images
+    // à fond transparent — « truc » visible derrière les persos). Bug corrigé.
+    const onload = "this.closest('.sigil').classList.add('img-ok')";
+    img = `<img class="sigil-img" src="${esc(imagePath)}" alt="" loading="lazy" onload="${onload}" onerror="${onerr}" />`;
   }
   return `<span class="sigil ${extraClass}"><span class="sigil-emoji">${emoji || "❔"}</span>${img}</span>`;
 }

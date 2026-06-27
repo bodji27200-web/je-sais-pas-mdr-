@@ -181,6 +181,7 @@ a { color: var(--gold); }
 }
 .sigil.lg { width: 74px; height: 74px; border-radius: 14px; }
 .sigil-emoji { font-size: 1.4rem; z-index: 0; }
+.sigil.img-ok .sigil-emoji { display: none; } /* image chargée -> on cache l'emoji de secours */
 .sigil.lg .sigil-emoji { font-size: 2.2rem; }
 .sigil-img {
   position: absolute;
@@ -677,11 +678,11 @@ a { color: var(--gold); }
 .fighter.enemy .sprite-anim { animation-delay: -1.3s; }
 /* Persos relativement petits : ~15 % de la hauteur d'arène (boss ~24 %). */
 .sprite-img {
-  height: 22cqh; width: auto; max-width: 100%;
+  height: 27cqh; width: auto; max-width: 100%;
   object-fit: contain; z-index: 1;
   filter: drop-shadow(0 5px 4px rgba(0,0,0,0.4));
 }
-.fighter.boss .sprite-img { height: 30cqh; }
+.fighter.boss .sprite-img { height: 36cqh; }
 .fighter.enemy .sprite-img { transform: scaleX(-1); } /* l'ennemi fait face au héros */
 
 /* Barre de vie rattachée, au-dessus de chaque combattant. */
@@ -721,13 +722,14 @@ a { color: var(--gold); }
 .fighter-move.atk-heavy-right { animation: heavyRight 0.62s cubic-bezier(.45,-0.15,.3,1.35); }
 .fighter-move.atk-heavy-left  { animation: heavyLeft 0.62s cubic-bezier(.45,-0.15,.3,1.35); }
 
-/* Défenseur : recul net + flash (sur le sprite, pour ne pas gêner l'idle) */
-@keyframes hitRight { 0%{transform:translateX(0);filter:brightness(1);} 16%{transform:translateX(5cqw);filter:brightness(2.3);} 60%{transform:translateX(1.6cqw);filter:brightness(1.3);} 100%{transform:translateX(0);filter:brightness(1);} }
-@keyframes hitLeft  { 0%{transform:translateX(0);filter:brightness(1);} 16%{transform:translateX(-5cqw);filter:brightness(2.3);} 60%{transform:translateX(-1.6cqw);filter:brightness(1.3);} 100%{transform:translateX(0);filter:brightness(1);} }
+/* Défenseur : recul net + LÉGER éclat (pas de flash agressif — accessibilité,
+   risque épileptique). Luminosité plafonnée à ~1.25. */
+@keyframes hitRight { 0%{transform:translateX(0);filter:brightness(1);} 16%{transform:translateX(5cqw);filter:brightness(1.22);} 60%{transform:translateX(1.6cqw);filter:brightness(1.08);} 100%{transform:translateX(0);filter:brightness(1);} }
+@keyframes hitLeft  { 0%{transform:translateX(0);filter:brightness(1);} 16%{transform:translateX(-5cqw);filter:brightness(1.22);} 60%{transform:translateX(-1.6cqw);filter:brightness(1.08);} 100%{transform:translateX(0);filter:brightness(1);} }
 .fighter-sprite.hit-right { animation: hitRight 0.32s ease; }
 .fighter-sprite.hit-left  { animation: hitLeft 0.32s ease; }
-@keyframes critRight { 0%{transform:translateX(0) rotate(0);filter:brightness(1);} 12%{transform:translateX(8cqw) rotate(3deg);filter:brightness(3) saturate(1.5);} 42%{transform:translateX(3cqw) rotate(-2deg);} 72%{transform:translateX(1cqw);filter:brightness(1.5);} 100%{transform:translateX(0) rotate(0);filter:brightness(1);} }
-@keyframes critLeft  { 0%{transform:translateX(0) rotate(0);filter:brightness(1);} 12%{transform:translateX(-8cqw) rotate(-3deg);filter:brightness(3) saturate(1.5);} 42%{transform:translateX(-3cqw) rotate(2deg);} 72%{transform:translateX(-1cqw);filter:brightness(1.5);} 100%{transform:translateX(0) rotate(0);filter:brightness(1);} }
+@keyframes critRight { 0%{transform:translateX(0) rotate(0);filter:brightness(1);} 12%{transform:translateX(8cqw) rotate(3deg);filter:brightness(1.3) saturate(1.2);} 42%{transform:translateX(3cqw) rotate(-2deg);} 72%{transform:translateX(1cqw);filter:brightness(1.12);} 100%{transform:translateX(0) rotate(0);filter:brightness(1);} }
+@keyframes critLeft  { 0%{transform:translateX(0) rotate(0);filter:brightness(1);} 12%{transform:translateX(-8cqw) rotate(-3deg);filter:brightness(1.3) saturate(1.2);} 42%{transform:translateX(-3cqw) rotate(2deg);} 72%{transform:translateX(-1cqw);filter:brightness(1.12);} 100%{transform:translateX(0) rotate(0);filter:brightness(1);} }
 .fighter-sprite.crit-right { animation: critRight 0.5s ease; }
 .fighter-sprite.crit-left  { animation: critLeft 0.5s ease; }
 
@@ -902,16 +904,16 @@ a { color: var(--gold); }
 .sigil.fx-crit { animation: critShake 0.42s ease; }
 @keyframes hitShake {
   0% { transform: translateX(0); filter: brightness(1); }
-  20% { transform: translateX(-5px); filter: brightness(2.2); }
+  20% { transform: translateX(-5px); filter: brightness(1.18); }
   40% { transform: translateX(5px); }
-  60% { transform: translateX(-3px); filter: brightness(1.4); }
+  60% { transform: translateX(-3px); filter: brightness(1.08); }
   100% { transform: translateX(0); filter: brightness(1); }
 }
 @keyframes critShake {
   0% { transform: translate(0,0) rotate(0); filter: brightness(1); box-shadow: 0 0 0 rgba(224,178,87,0); }
-  15% { transform: translate(-7px,-2px) rotate(-3deg); filter: brightness(2.6); box-shadow: 0 0 22px rgba(224,178,87,0.8); }
+  15% { transform: translate(-7px,-2px) rotate(-3deg); filter: brightness(1.28); box-shadow: 0 0 18px rgba(224,178,87,0.55); }
   35% { transform: translate(7px,2px) rotate(3deg); }
-  55% { transform: translate(-4px,0) rotate(-2deg); filter: brightness(1.6); }
+  55% { transform: translate(-4px,0) rotate(-2deg); filter: brightness(1.12); }
   100% { transform: translate(0,0) rotate(0); filter: brightness(1); box-shadow: 0 0 0 rgba(224,178,87,0); }
 }
 @media (prefers-reduced-motion: reduce) {
