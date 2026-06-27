@@ -127,9 +127,9 @@ export const SKILLS = {
     desc: "Projectile magique infligeant 170 % des dégâts.",
   },
   arcane_barrier: {
-    id: "arcane_barrier", name: "Barrière arcanique", type: "active", power: 0, cooldown: 3, cost: 35,
-    target: "self", anim: "buff", self: [{ type: "shield", pctMaxHp: 0.5, turns: 3 }],
-    desc: "Crée un bouclier absorbant jusqu'à 50 % de tes PV max pendant 3 tours.",
+    id: "arcane_barrier", name: "Barrière arcanique", type: "active", power: 0, cooldown: 4, cost: 35,
+    target: "self", anim: "buff", self: [{ type: "shield", pctMaxHp: 0.38, turns: 2 }],
+    desc: "Crée un bouclier absorbant jusqu'à 38 % de tes PV max pendant 2 tours.",
   },
   arcane_influx: {
     id: "arcane_influx", name: "Afflux magique", type: "passive",

@@ -1193,6 +1193,34 @@ function simStartTurnUpkeep(combat, c) {
   if (c.hp > 0) gainResource(c, "regenPerTurn");
 }
 
+// Simulateur PvE (Lot 8, instr. 325-333) : joue un VRAI combat joueur-vs-ennemi
+// avec le moteur complet (startCombat + resolveRound), le joueur étant piloté par
+// une politique (défaut : pickSkillGeneric). Sert à mesurer des taux de victoire
+// et à détecter les valeurs absurdes (0 % / 100 %, no-hit trop fréquents).
+// `state.character.hpCurrent` doit être plein avant l'appel (combat réel).
+export function simulatePvE(state, enemyId, opts = {}) {
+  const combat = startCombat(state, enemyId, { forceEnrage: opts.forceEnrage === true ? true : false });
+  if (!combat) return null;
+  const policy = opts.policy || pickSkillGeneric;
+  const maxRounds = opts.maxRounds || 400;
+  let tookDamage = false;
+  let safety = 0;
+  while (combat.status === "active" && safety < maxRounds) {
+    safety++;
+    const hpBefore = combat.player.hp;
+    let id = policy(combat.player, combat.enemy);
+    if (!playerCanUse(combat, id)) id = "basic_attack";
+    resolveRound(state, combat, id);
+    if (combat.player.hp < hpBefore) tookDamage = true;
+  }
+  return {
+    win: combat.status === "won",
+    turns: combat.turn,
+    hpFrac: combat.player.hp / combat.player.maxHp,
+    noHitWin: combat.status === "won" && !tookDamage,
+  };
+}
+
 // Simule un duel entre deux builds (states A et B). Renvoie le vainqueur.
 //   opts : { maxTurns, policyA, policyB }
 // policy(actor, other) -> skillId (défaut : pickSkillGeneric).
