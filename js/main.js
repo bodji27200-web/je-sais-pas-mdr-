@@ -37,6 +37,7 @@ import { getClass } from "./data/classes.js";
 import { getEnemy } from "./data/enemies.js";
 import { ZONES } from "./data/zones.js";
 import { hatchEgg, equipFamiliar, feedFamiliar, setFamiliarPosture } from "./systems/familiars.js";
+import { unlockNode, equipClassNode, equipHeritage } from "./systems/classtree.js";
 import { checkNewAchievements } from "./systems/achievements.js";
 import { getGuide } from "./data/guides.js";
 import { updateObjectives, ensureObjectives, objectiveLabel } from "./systems/objectives.js";
@@ -57,6 +58,8 @@ import {
   defaultCraftFilters,
   renderInventory,
   renderFamiliars,
+  renderClassTree,
+  renderNodeDetail,
   renderZones,
   renderBattle,
   renderBattleLog,
@@ -76,12 +79,15 @@ const TABS = [
   { id: "jobs", label: "Métiers", icon: "🪓" },
   { id: "craft", label: "Atelier", icon: "🔥" },
   { id: "inventory", label: "Sac", icon: "🎒" },
+  { id: "tree", label: "Arbre", icon: "🌳" },
   { id: "familiars", label: "Familiers", icon: "🐾" },
   { id: "combat", label: "Combat", icon: "⚔️" },
 ];
 
 let currentTab = "jobs";
 let currentCombat = null;
+let currentTreeVoie = null; // voie affichée dans l'arbre (null = voie du héros)
+let currentTreeNode = null; // classe sélectionnée pour consultation (fiche)
 let selectedClassId = null;
 let currentZoneId = null; // zone sélectionnée dans le menu Combat (défaut : 1re)
 let familiarFilters = { element: "all", role: "all", rarity: "all" };
@@ -141,6 +147,8 @@ function renderScreen() {
       return renderCraft(state, craftFilters, craftSelectedId);
     case "inventory":
       return renderInventory(state);
+    case "tree":
+      return renderClassTree(state, currentTreeVoie, currentTreeNode);
     case "familiars":
       return renderFamiliars(state, familiarFilters);
     case "combat":
@@ -576,6 +584,45 @@ const handlers = {
   },
   "familiar-posture": (el) => {
     const r = setFamiliarPosture(getState(), el.dataset.id, el.dataset.posture);
+    if (!r.ok) return toast(r.error, "warn");
+    save();
+    renderAll();
+  },
+  // --- Arbre de classes ---
+  // Consultation : MISE À JOUR CIBLÉE de la fiche + surlignage (pas de rebuild complet).
+  "tree-select": (el) => {
+    currentTreeNode = el.dataset.id;
+    const detail = document.getElementById("tree-detail");
+    if (detail) detail.outerHTML = renderNodeDetail(getState(), currentTreeNode);
+    document.querySelectorAll(".tree-node.selected").forEach((n) => {
+      n.classList.remove("selected");
+      n.setAttribute("aria-pressed", "false");
+    });
+    if (el.classList) { el.classList.add("selected"); el.setAttribute("aria-pressed", "true"); }
+  },
+  "tree-voie": (el) => {
+    currentTreeVoie = el.dataset.voie;
+    currentTreeNode = null; // recadre la fiche sur la voie affichée
+    renderAll();
+  },
+  "unlock-node": (el) => {
+    const r = unlockNode(getState(), el.dataset.id);
+    if (!r.ok) return toast(r.error, "warn");
+    toast(`${r.name} débloquée !`, "good");
+    currentTreeNode = el.dataset.id;
+    save();
+    renderAll();
+  },
+  "equip-node": (el) => {
+    const r = equipClassNode(getState(), el.dataset.id, { inCombat: !!currentCombat });
+    if (!r.ok) return toast(r.error, "warn");
+    toast(`Classe équipée : ${r.name}.`, "good");
+    currentTreeNode = el.dataset.id;
+    save();
+    renderAll();
+  },
+  "equip-heritage": (el) => {
+    const r = equipHeritage(getState(), el.dataset.id || null);
     if (!r.ok) return toast(r.error, "warn");
     save();
     renderAll();

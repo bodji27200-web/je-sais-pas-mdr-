@@ -9,6 +9,9 @@ import { getClassResource } from "../data/classResources.js";
 import { FAMILIARS, allFamiliars, FAMILIAR_ROLES, EGGS, LINK_MAX, FEED_ESSENCE_COST } from "../data/familiars.js";
 import { ensureFamiliars, familiarLevelCap, familiarPosture, familiarSkills } from "../systems/familiars.js";
 import { FAM_SKILLS, FAM_POSTURES, FAM_POSTURE_LABELS } from "../data/famskills.js";
+import { nodeUnlocked, canUnlockNode, equippedNodeId, masteryProgress, ownedHeritageTraits } from "../systems/classtree.js";
+import { nodesForPath, RANKS, getNode, rankInfo, MASTERY_MAX_LEVEL, totalClassCount, getHeritageTrait } from "../data/classTree.js";
+import { getSummon } from "../data/summons.js";
 import { familiarXpAt } from "../data/curves.js";
 import { JOBS, unlockedTiers, bestTier, nextTier } from "../data/jobs.js";
 import { RESOURCES, getResource } from "../data/resources.js";
@@ -292,6 +295,177 @@ function specBonusLines(spec) {
   if (p.execute) out.push(`+${Math.round(p.execute.bonus * 100)} % dégâts sous ${Math.round(p.execute.threshold * 100)} % PV cible`);
   if (p.vsDebuff) out.push(`+${Math.round(p.vsDebuff.bonus * 100)} % dégâts sur cible affaiblie`);
   return out;
+}
+
+// ===========================================================================
+// INTERFACE VISUELLE DE L'ARBRE DE CLASSES (Lot 16)
+// ---------------------------------------------------------------------------
+// Affiche les 65 classes existantes (données inchangées) : 10 rangs, progression
+// verticale, connexions, embranchements, états verrouillé/débloqué/équipé, coûts,
+// Maîtrise et Trait d'héritage. Cliquer une classe ouvre sa FICHE (sans l'équiper).
+// Rendu sombre, tactile, mobile/Xbox ; les clics de consultation ne reconstruisent
+// PAS tout le DOM (mise à jour ciblée de la fiche, voir main.js).
+
+function nodeStatLines(node) {
+  const out = [];
+  const m = node.statMods || {};
+  const pctLbl = { atkPct: "Attaque", defPct: "Défense", hpPct: "PV", spdPct: "Clairvoyance", magPct: "Magie", dexPct: "Dextérité", resPct: "Résistance" };
+  for (const k of Object.keys(pctLbl)) if (m[k]) out.push(`${m[k] > 0 ? "+" : ""}${Math.round(m[k] * 100)} % ${pctLbl[k]}`);
+  const flatLbl = { critFlat: "% critique", accFlat: "Précision", resFlat: "Résistance", dexFlat: "Dextérité" };
+  for (const k of Object.keys(flatLbl)) if (m[k]) out.push(`${m[k] > 0 ? "+" : ""}${m[k]} ${flatLbl[k]}`);
+  const p = node.passive || {};
+  if (p.skillPowerPct) out.push(`Compétences +${Math.round(p.skillPowerPct * 100)} %`);
+  if (p.lifestealPct) out.push(`Vol de vie +${Math.round(p.lifestealPct * 100)} %`);
+  if (p.hpRegenPct) out.push(`Régén. ${Math.round(p.hpRegenPct * 100)} %/tour`);
+  if (p.execute) out.push(`Exécution sous ${Math.round(p.execute.threshold * 100)} % PV`);
+  return out;
+}
+
+function nodeStateOf(state, node) {
+  if (equippedNodeId(state) === node.id) return "equipped";
+  if (nodeUnlocked(state, node.id)) return "unlocked";
+  if (canUnlockNode(state, node.id).ok) return "available";
+  return "locked";
+}
+
+function masteryPips(level, max) {
+  let s = "";
+  for (let i = 1; i <= max; i++) s += `<span class="m-pip ${i <= level ? "on" : ""}"></span>`;
+  return `<span class="mastery-pips" title="Maîtrise ${level}/${max}">${s}</span>`;
+}
+
+function treeNodeTile(state, node, selectedId) {
+  const st = nodeStateOf(state, node);
+  const sel = node.id === selectedId ? " selected" : "";
+  const mp = masteryProgress(state, node.id);
+  const showMastery = st === "equipped" || st === "unlocked";
+  const icon = st === "equipped" ? "★" : st === "unlocked" ? "✓" : st === "available" ? "+" : "🔒";
+  return `
+    <button class="tree-node ${st}${sel}" data-act="tree-select" data-id="${node.id}" aria-pressed="${node.id === selectedId}">
+      <span class="tn-mark">${icon}</span>
+      <span class="tn-name">${esc(node.name)}</span>
+      <span class="tn-meta">R${node.rank} · Niv.${node.levelReq}${node.hybrid ? " · Hybride" : ""}</span>
+      ${showMastery ? masteryPips(mp.level, MASTERY_MAX_LEVEL) : ""}
+    </button>`;
+}
+
+function treeColumn(state, voie, selectedId) {
+  const nodes = nodesForPath(voie);
+  const byRank = new Map();
+  for (const n of nodes) {
+    if (!byRank.has(n.rank)) byRank.set(n.rank, []);
+    byRank.get(n.rank).push(n);
+  }
+  const rows = RANKS.map((r) => {
+    const at = byRank.get(r.rank) || [];
+    if (!at.length) return "";
+    const tiles = at.map((n) => treeNodeTile(state, n, selectedId)).join("");
+    return `
+      <div class="tree-rank">
+        <div class="tree-rank-label"><span class="rank-stars">${"★".repeat(Math.min(5, r.rank))}${r.rank > 5 ? "+" : ""}</span><span class="muted small">Rang ${r.rank}</span></div>
+        <div class="tree-rank-nodes">${tiles}</div>
+      </div>
+      <div class="tree-link" aria-hidden="true"></div>`;
+  }).join("");
+  return `<div class="tree-column">${rows}</div>`;
+}
+
+export function renderNodeDetail(state, nodeId) {
+  const node = getNode(nodeId);
+  if (!node) return `<div class="tree-detail empty" id="tree-detail"><p class="muted">Sélectionne une classe pour voir sa fiche.</p></div>`;
+  const st = nodeStateOf(state, node);
+  const chk = canUnlockNode(state, node.id);
+  const ri = rankInfo(node.rank);
+  const stats = nodeStatLines(node).map((x) => `<span class="spec-bonus">${esc(x)}</span>`).join("") || `<span class="muted small">Profil de base</span>`;
+  const skills = (node.grants || []).map((id) => getSkill(id)).filter(Boolean)
+    .map((s) => `<li><strong>${esc(s.name)}</strong> — <span class="muted small">${esc(s.desc || "")}</span></li>`).join("");
+  const forces = (node.forces || []).map((x) => `<li>${esc(x)}</li>`).join("");
+  const faibl = (node.faiblesses || []).map((x) => `<li>${esc(x)}</li>`).join("");
+  const weapons = (node.weapons || []).concat(Object.keys(node.addWeapons || {})).join(", ");
+  const armors = (node.armors || []).join(", ");
+  const mp = masteryProgress(state, node.id);
+  const heritage = node.heritage ? getHeritageTrait(node.heritage) : null;
+  const reqs = (node.requires || []).map((r) => getNode(r)?.name || r).join(" ou ");
+  const masteryReq = Object.keys(node.masteryReq || {}).map((k) => `Maîtrise ${node.masteryReq[k]} de ${getNode(k)?.name || k}`).join(", ");
+  const summon = node.summoner
+    ? `<p class="muted small">✶ Invocateur : ${node.summoner.max} emplacement(s)${node.summoner.permanent ? " · invocations permanentes" : ""}.</p>`
+    : "";
+
+  let actions = "";
+  if (st === "equipped") actions = `<span class="tag spec-current">Classe équipée</span>`;
+  else if (st === "unlocked") actions = `<button class="btn primary" data-act="equip-node" data-id="${node.id}">Équiper</button>`;
+  else if (st === "available") actions = `<button class="btn" data-act="unlock-node" data-id="${node.id}">Débloquer · ${node.cost ? fmt(node.cost) + " " + COIN : "gratuit"}</button>`;
+  else actions = `<span class="tag locked">Verrouillée</span>`;
+
+  const reasons = (st === "locked" && chk.reasons.length)
+    ? `<ul class="tree-reqs">${chk.reasons.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>` : "";
+
+  return `
+    <div class="tree-detail" id="tree-detail">
+      <div class="td-head">
+        <div>
+          <strong class="td-name">${esc(node.name)}</strong>
+          <span class="muted small">${esc(node.role || "")} · Rang ${node.rank} (${esc(ri.name)})</span>
+        </div>
+        <span class="tn-mark big ${st}">${st === "equipped" ? "★" : st === "unlocked" ? "✓" : st === "available" ? "+" : "🔒"}</span>
+      </div>
+      ${node.tagline ? `<p class="td-tag">« ${esc(node.tagline)} »</p>` : ""}
+      <p class="muted small">${esc(node.desc || "")}</p>
+      ${summon}
+      <div class="td-grid">
+        <div><h4>Statistiques</h4><div class="spec-bonuses">${stats}</div></div>
+        ${forces ? `<div><h4>Forces</h4><ul class="td-list good">${forces}</ul></div>` : ""}
+        ${faibl ? `<div><h4>Faiblesses</h4><ul class="td-list bad">${faibl}</ul></div>` : ""}
+        ${skills ? `<div><h4>Compétences</h4><ul class="td-list">${skills}</ul></div>` : ""}
+        ${(weapons || armors) ? `<div><h4>Équipement</h4><p class="muted small">${weapons ? "Armes : " + esc(weapons) : ""}${weapons && armors ? "<br>" : ""}${armors ? "Armures : " + esc(armors) : ""}</p></div>` : ""}
+        <div><h4>Maîtrise</h4>${masteryPips(mp.level, MASTERY_MAX_LEVEL)} <span class="muted small">${mp.maxed ? "max" : `${mp.into}/${mp.need} vers palier ${mp.nextLevel}`}</span>
+          ${node.mastery ? `<p class="muted small">Bonus d'arme : ${esc(node.mastery.wtype)}</p>` : ""}
+          ${heritage ? `<p class="muted small">🏅 Héritage : <strong>${esc(heritage.name)}</strong> — ${esc(heritage.desc)} ${mp.maxed ? "(débloqué)" : "(à Maîtrise max)"}</p>` : ""}
+        </div>
+        ${(reqs || masteryReq) ? `<div><h4>Prérequis</h4><p class="muted small">${reqs ? "Classe : " + esc(reqs) : ""}${reqs && masteryReq ? "<br>" : ""}${masteryReq ? esc(masteryReq) : ""}${node.levelReq ? `<br>Niveau ${node.levelReq}` : ""}</p></div>` : ""}
+      </div>
+      ${reasons}
+      <div class="td-actions">${actions}</div>
+    </div>`;
+}
+
+function renderHeritageStrip(state) {
+  const owned = ownedHeritageTraits(state);
+  const cur = state.character.heritageTrait;
+  if (!owned.length) {
+    return `<p class="muted small">🏅 Aucun Trait d'héritage débloqué. Porte une classe à Maîtrise maximale pour gagner son trait.</p>`;
+  }
+  const chips = owned.map((t) =>
+    `<button class="zone-chip ${cur === t.id ? "active" : ""}" data-act="equip-heritage" data-id="${t.id}" title="${esc(t.desc)}">${esc(t.name)}</button>`
+  ).join("");
+  return `
+    <p class="muted small">🏅 Trait d'héritage (un seul actif) :</p>
+    <div class="fam-postures">${chips}<button class="zone-chip ${!cur ? "active" : ""}" data-act="equip-heritage" data-id="">Aucun</button></div>`;
+}
+
+export function renderClassTree(state, voie, selectedId) {
+  const ch = state.character;
+  const voieId = voie || ch.classId;
+  const sel = selectedId || equippedNodeId(state);
+  const unlockedCount = (ch.unlockedNodes || []).length + Object.keys(CLASSES).length;
+  const total = totalClassCount();
+  const voieChips = Object.values(CLASSES).map((c) =>
+    `<button class="zone-chip ${c.id === voieId ? "active" : ""}" data-act="tree-voie" data-voie="${c.id}">${classEmoji(c.id)} ${esc(c.name)}</button>`
+  ).join("");
+  return `
+    <section class="panel class-tree">
+      <div class="tree-top">
+        <h3 class="section-title">Arbre de classes</h3>
+        <span class="muted small">${Math.min(total, unlockedCount)}/${total} classes · 10 rangs · 5 voies</span>
+      </div>
+      <p class="muted small">Touche une classe pour consulter sa fiche. Le déblocage et l'équipement sont des actions explicites (jamais au simple survol).</p>
+      <div class="tree-voies">${voieChips}</div>
+      ${renderHeritageStrip(state)}
+      <div class="tree-layout">
+        <div class="tree-scroll" id="tree-scroll">${treeColumn(state, voieId, sel)}</div>
+        ${renderNodeDetail(state, sel)}
+      </div>
+    </section>`;
 }
 
 function renderSpecCard(state, spec, active, cost) {
