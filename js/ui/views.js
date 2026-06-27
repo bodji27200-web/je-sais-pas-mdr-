@@ -1153,18 +1153,11 @@ export function renderForecast(combat) {
   return `<span class="muted small">Ordre probable :</span> ${chips}`;
 }
 
-// Intention télégraphiée du boss (prochaine action annoncée). Permet au joueur
-// de se préparer (défendre, affaiblir, interrompre). Vide pour les non-boss.
-export function renderIntent(combat) {
-  const info = enemyIntentInfo(combat);
-  if (!info) return "";
-  const el = info.element ? getElement(info.element) : null;
-  const dot = el ? `<span class="el-dot" style="background:${el.color}"></span>` : "";
-  const phase = info.phase ? `<span class="intent-phase">${esc(info.phase)}</span>` : "";
-  return `<div class="intent ${info.danger ? "danger" : ""}">
-      <span class="intent-ico">${info.danger ? "⚠" : "◔"}</span>
-      <span class="intent-txt">${combat.enemy.name} prépare : ${dot}<strong>${esc(info.name)}</strong></span>${phase}
-    </div>`;
+// La prochaine action ennemie n'est JAMAIS annoncée à l'avance (instr. 29-30, 272) :
+// le journal de combat ne la révèle qu'au moment de son exécution. La file
+// d'initiative (renderForecast) montre l'ORDRE des tours, sans les compétences.
+export function renderIntent() {
+  return "";
 }
 
 // Log de combat (texte seulement, mis à jour de façon ciblée).

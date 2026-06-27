@@ -381,7 +381,6 @@ export function startCombat(state, enemyId, opts = {}) {
   e.phaseDefShred = 0;
   e.element = null; // élément des attaques sans élément propre (posé par les phases)
   e.phaseName = null;
-  e.planned = null; // action télégraphiée (intention)
 
   // Enragé : +50 % à toutes les stats. Forçable pour les tests :
   // `forceEnrage: true` force l'enrage, `forceEnrage: false` le désactive.
@@ -429,7 +428,6 @@ export function startCombat(state, enemyId, opts = {}) {
     lastFx: [],
     lastActions: [],
   };
-  if (e.isBoss) planIntent(combat); // première intention télégraphiée
   return combat;
 }
 
@@ -751,6 +749,34 @@ function expectedDamage(actor, target, skill) {
   return perHit * hits;
 }
 
+// --- Mémoire légère de l'IA (instr. 277-278) ---------------------------------
+// L'IA NE LIT PAS les futurs choix du joueur : elle observe seulement l'historique
+// récent. Si le joueur répète une stratégie, l'IA ajuste ses PRIORITÉS (pas de
+// bonus de stats caché). Fenêtre glissante de 6 actions.
+function recordPlayerMove(combat, skillId) {
+  if (!combat.playerHistory) combat.playerHistory = [];
+  combat.playerHistory.push(skillId);
+  if (combat.playerHistory.length > 6) combat.playerHistory.shift();
+}
+// Schéma dominant récent du joueur, ou null si pas de répétition marquée (< 60 %).
+function playerPattern(combat) {
+  const h = combat.playerHistory || [];
+  if (h.length < 3) return null;
+  const counts = {};
+  for (const id of h) counts[id] = (counts[id] || 0) + 1;
+  let top = null, n = 0;
+  for (const id of Object.keys(counts)) if (counts[id] > n) { n = counts[id]; top = id; }
+  const frac = n / h.length;
+  if (frac < 0.6) return null;
+  const sk = getSkill(top);
+  return { id: top, frac, aggressive: !!(sk && (sk.power || 0) > 0) };
+}
+// Une compétence est-elle « défensive » (soutien sur soi) ?
+function isDefensiveSkill(s) {
+  return !!(s.self && (!s.power || s.power === 0) &&
+    s.self.some((e) => ["guard", "def_buff", "shield", "guard_active", "guard_restore", "heal"].includes(e.type)));
+}
+
 function scoreEnemySkill(combat, id) {
   const enemy = combat.enemy;
   const player = combat.player;
@@ -777,7 +803,7 @@ function scoreEnemySkill(combat, id) {
         score += hasBuffType(enemy, "spd_buff") ? -100 : 40;
       }
     }
-    return score;
+    return score + memoryNudge(combat, s);
   }
 
   // --- Compétences offensives ---
@@ -799,7 +825,18 @@ function scoreEnemySkill(combat, id) {
   // Légère préférence pour ne pas « gaspiller » un gros cooldown hors fenêtre.
   if ((s.cooldown || 0) >= 3 && !lethal && !playerLow) score -= 25;
 
-  return score;
+  return score + memoryNudge(combat, s);
+}
+
+// Ajustement de PRIORITÉ issu de la mémoire (jamais un bonus de stats). Joueur
+// répétitivement agressif -> l'IA valorise un peu plus la défense ; joueur
+// répétitivement passif -> l'IA valorise un peu plus l'offensive.
+function memoryNudge(combat, s) {
+  const pat = playerPattern(combat);
+  if (!pat) return 0;
+  if (pat.aggressive && isDefensiveSkill(s)) return 30 * pat.frac;
+  if (!pat.aggressive && (s.power || 0) > 0) return 25 * pat.frac;
+  return 0;
 }
 
 function chooseEnemySkill(combat) {
@@ -844,36 +881,17 @@ function checkPhase(combat) {
   }
 }
 
-// --- Intentions télégraphiées (boss) ----------------------------------------
-// Le boss ANNONCE sa prochaine action ; il s'y engage (le joueur peut réagir :
-// se défendre, baisser ses PV, l'affaiblir). planIntent fixe l'action prévue.
-function planIntent(combat) {
-  const e = combat.enemy;
-  if (!e.isBoss || combat.status !== "active") { e.planned = null; return; }
-  e.planned = chooseEnemySkill(combat);
-}
-
-// Compétence que l'ennemi joue : l'intention engagée si elle est prête, sinon un
-// choix frais. Consomme l'intention.
+// Compétence que l'ennemi joue : choisie FRAÎCHEMENT à chaque tour (jamais
+// pré-annoncée). Le journal ne révèle l'action qu'au moment où elle est exécutée
+// (instr. 28-30, 272). Plus de séquence scriptée ni de télégraphie.
 function nextEnemySkill(combat) {
-  const e = combat.enemy;
-  const ready = (id) => !e.cooldowns[id] || e.cooldowns[id] <= 0;
-  if (e.planned && ready(e.planned)) {
-    const s = e.planned;
-    e.planned = null;
-    return s;
-  }
   return chooseEnemySkill(combat);
 }
 
-// Info d'intention pour l'UI (nom, élément, danger). Danger = gros coup signature.
-export function enemyIntentInfo(combat) {
-  const e = combat.enemy;
-  if (!e || !e.isBoss || combat.status !== "active" || !e.planned) return null;
-  const s = getSkill(e.planned);
-  if (!s) return null;
-  const danger = (s.power || 0) >= 1.8;
-  return { name: s.name, element: s.element || e.element || null, danger, phase: e.phaseName || null };
+// L'intention n'est JAMAIS révélée à l'avance (instr. 29-30, 272). Conservé en
+// no-op pour compat ; renvoie toujours null -> l'UI n'affiche aucune annonce.
+export function enemyIntentInfo() {
+  return null;
 }
 
 // Entretien après chaque action du joueur : DoT, cooldowns, buffs, régén.
@@ -974,12 +992,13 @@ export function resolveRound(state, combat, playerSkillId) {
 
   // Action du joueur.
   useSkill(combat, combat.player, combat.enemy, playerSkillId);
+  recordPlayerMove(combat, playerSkillId); // mémoire légère de l'IA (instr. 277)
   combat.player.nextAt += SPEED_UNIT / effectiveSpd(combat.player);
   checkPhase(combat); // un burst peut faire franchir un seuil de phase tout de suite
   checkDeaths(state, combat);
 
-  // Tours de l'ennemi tant que c'est son tour (≤ MAX_CONSEC). Le boss joue
-  // l'action télégraphiée si elle est prête (le joueur a pu s'y préparer).
+  // Tours de l'ennemi tant que c'est son tour (≤ MAX_CONSEC). L'action est choisie
+  // fraîchement et n'est révélée qu'au moment de son exécution (instr. 29-30).
   let eActed = 0;
   while (combat.status === "active" && combat.enemy.nextAt <= combat.player.nextAt + 1e-6 && eActed < MAX_CONSEC) {
     useSkill(combat, combat.enemy, combat.player, nextEnemySkill(combat));
@@ -1007,7 +1026,6 @@ export function resolveRound(state, combat, playerSkillId) {
     upkeep(combat);
     checkPhase(combat); // un DoT peut aussi faire franchir un seuil
     checkDeaths(state, combat); // un DoT peut achever un combattant
-    planIntent(combat); // télégraphie la prochaine action du boss
   }
   return combat;
 }
