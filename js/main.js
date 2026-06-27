@@ -32,7 +32,10 @@ import { upgradeItem, dismantleItem, dismantleReward, needsDismantleConfirm } fr
 import { findEquipmentInstance } from "./core/state.js";
 import { getRarity } from "./data/rarities.js";
 import { startCombat, resolveRound } from "./systems/combat.js";
-import { enemyUnlock } from "./systems/zoneprog.js";
+import { enemyUnlock, zoneUnlocked } from "./systems/zoneprog.js";
+import { getClass } from "./data/classes.js";
+import { getEnemy } from "./data/enemies.js";
+import { ZONES } from "./data/zones.js";
 import { hatchEgg, equipFamiliar, feedFamiliar } from "./systems/familiars.js";
 import { checkNewAchievements } from "./systems/achievements.js";
 import { getGuide } from "./data/guides.js";
@@ -87,6 +90,37 @@ let tickCount = 0;
 // superposer / casser les dash ; chaque perso revient pile à sa place).
 let combatBusy = false;
 let combatBusyTimer = null;
+
+// --- Préchargement des images de combat -------------------------------------
+// Les images de combat (décor d'arène, sprites) sont en loading="lazy" : sans
+// préchargement, elles n'arrivent qu'au moment où l'écran de combat s'affiche,
+// d'où un « pop-in » visible et des animations qui jouent sur l'emoji de secours
+// au tout premier combat (surtout mobile/Xbox, cache froid). On les met donc en
+// cache À L'AVANCE, dès que le joueur consulte une zone -> écran de combat peint
+// d'emblée. Idempotent : chaque image n'est préchargée qu'une fois.
+const preloaded = new Set();
+function preloadImage(path) {
+  if (!path || preloaded.has(path)) return;
+  preloaded.add(path);
+  const img = new Image();
+  img.src = path; // suffit à déclencher la mise en cache du navigateur
+}
+
+// Précharge le décor + le sprite du héros + les sprites des ennemis/boss d'une
+// zone (l'un d'eux sera l'adversaire du prochain combat). Résout la zone comme
+// la vue (zone par défaut si l'id est absent/verrouillé).
+function preloadZoneCombatAssets(zoneId) {
+  const state = getState();
+  if (!state) return;
+  const zones = Object.values(ZONES);
+  let zone = zones.find((z) => z.id === zoneId) || zones[0];
+  if (!zoneUnlocked(state, zone.id).unlocked) zone = zones[0];
+  preloadImage(zone.arena || zone.image); // décor d'arène (grande image)
+  const heroClass = getClass(state.character.classId);
+  if (heroClass) preloadImage(heroClass.sprite); // sprite du héros
+  for (const id of zone.enemies || []) preloadImage(getEnemy(id)?.sprite);
+  preloadImage(getEnemy(zone.boss)?.sprite);
+}
 
 // --- Rendu ------------------------------------------------------------------
 
@@ -469,11 +503,15 @@ const handlers = {
     currentCombat = null;
     currentTab = el.dataset.tab;
     renderAll();
+    // Onglet Combat ouvert : on précharge le décor + les sprites pour que le
+    // premier combat s'affiche complet, sans pop-in.
+    if (currentTab === "combat") preloadZoneCombatAssets(currentZoneId);
     maybeShowGuide(currentTab); // guide contextuel à la première ouverture
   },
   "select-zone": (el) => {
     currentZoneId = el.dataset.zone;
     renderAll();
+    preloadZoneCombatAssets(currentZoneId); // précharge les images de la zone choisie
   },
   "familiar-filter": (el) => {
     familiarFilters = { ...familiarFilters, [el.dataset.key]: el.dataset.val };
