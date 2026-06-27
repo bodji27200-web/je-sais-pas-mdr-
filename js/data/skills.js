@@ -122,9 +122,9 @@ export const SKILLS = {
 
   // ===================== MAGE (Mana) =====================
   arcane_bolt: {
-    id: "arcane_bolt", name: "Projectile arcanique", type: "active", power: 1.7, cooldown: 0, cost: 25,
-    target: "enemy", anim: "magic",
-    desc: "Projectile magique infligeant 170 % des dégâts.",
+    id: "arcane_bolt", name: "Projectile arcanique", type: "active", power: 1.55, cooldown: 0, cost: 25,
+    target: "enemy", anim: "magic", element: "chaos",
+    desc: "Projectile de pure magie (155 %, arcanique) — soumis à la Résistance de la cible.",
   },
   arcane_barrier: {
     id: "arcane_barrier", name: "Barrière arcanique", type: "active", power: 0, cooldown: 4, cost: 35,
@@ -212,7 +212,7 @@ export const SKILLS = {
 
   // -- Mage --
   fireball: {
-    id: "fireball", name: "Boule de feu", type: "active", power: 1.9, cooldown: 1, cost: 40,
+    id: "fireball", name: "Boule de feu", type: "active", power: 1.85, cooldown: 2, cost: 44,
     target: "enemy", anim: "magic", element: "fire", inflicts: "burn",
     desc: "Explosion ardente de Feu (190 %) qui embrase la cible (Brûlure : dégâts sur la durée, soins réduits).",
   },
@@ -331,8 +331,8 @@ export const SKILLS = {
   // imbattable). Voir équilibrage Lot 10.
   boss_resilience: {
     id: "boss_resilience", name: "Résilience", type: "passive",
-    passive: { hpRegenPct: 0.018 },
-    desc: "Régénère lentement (~2 % des PV max par tour).",
+    passive: { hpRegenPct: 0.012 },
+    desc: "Régénère lentement (~1 % des PV max par tour).",
   },
   soul_siphon: {
     id: "soul_siphon", name: "Siphon d'âme", type: "passive",
@@ -469,8 +469,8 @@ export const SKILLS = {
   ember_shield: {
     id: "ember_shield", name: "Aegis de braise", type: "active", power: 0, cooldown: 4,
     target: "self", anim: "buff",
-    self: [{ type: "def_buff", amount: 0.45, turns: 2 }, { type: "shield", pctMaxHp: 0.22, turns: 3 }],
-    desc: "Bouclier de braise : défense +45 % et absorption sur 3 tours.",
+    self: [{ type: "def_buff", amount: 0.15, turns: 2 }, { type: "shield", pctMaxHp: 0.16, turns: 3 }],
+    desc: "Bouclier de braise : défense +15 % et absorption sur 3 tours.",
   },
 
   // ===========================================================================

@@ -264,7 +264,18 @@ export const ENEMIES = {
   ignar_emberheart: {
     id: "ignar_emberheart", name: "Ignar, Cœur de Braise", isBoss: true, level: 15, role: "boss",
     icon: "🌋", image: "assets/enemies/ignar_emberheart.png", sprite: "assets/sprites/ignar_emberheart.png",
-    stats: { hp: 1000, atk: 34, def: 18, spd: 12, crit: 12 },
+    // Boss de fin : vraie RÉSISTANCE magique (instr. équilibrage — on tempère les
+    // nukes par la Résistance, PAS par une inflation de PV) et un peu de Précision
+    // pour percer l'esquive. PV inchangés (1000).
+    stats: { hp: 780, atk: 34, def: 18, spd: 12, crit: 12, res: 130, acc: 24 },
+    // Fournaise : chaleur ambiante INÉVITABLE qui ronge le héros chaque manche
+    // (~2 % de ses PV max). Sert à rendre les no-hit EXCEPTIONNELS sans gonfler les
+    // PV ni le burst d'Ignar : il faut tuer avant que la chaleur ne morde.
+    aura: { pctMaxHp: 0.02, element: "fire", name: "Fournaise d'Ignar" },
+    // Plafond d'encaissement : aucune frappe ne lui retire plus de 18 % de ses PV
+    // max d'un coup. Empêche les one-shots (mage burst) : le boss agit forcément et
+    // la Fournaise mord -> no-hit exceptionnels, SANS inflation de PV/dégâts.
+    hitCap: 0.32,
     skills: ["ignar_slam", "flame_wave", "thunder_call", "ember_shield"], passive: "enrage",
     secondPassive: "boss_resilience",
     resist: { fire: 0.5, water: 1.4, umbral: 1.1 },

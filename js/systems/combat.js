@@ -407,6 +407,8 @@ export function startCombat(state, enemyId, opts = {}) {
   e.isBoss = enemy.isBoss;
   e.role = enemy.role || null;
   e.resist = enemy.resist || {}; // résistances/vulnérabilités élémentaires
+  e.aura = enemy.aura || null; // chaleur/poison ambiant inévitable (boss)
+  e.hitCap = enemy.hitCap || 0; // plafond d'encaissement par coup (anti one-shot)
 
   // Seconde passive éventuelle (boss : 2 passives) — fusionnée dans pp.
   if (enemy.secondPassive) {
@@ -674,6 +676,11 @@ function dealDamage(combat, attacker, defender, power, opts = {}) {
     const absorbed = Math.min(defender.shield, dmg);
     defender.shield -= absorbed;
     dmg -= absorbed;
+  }
+  // Plafond d'encaissement (boss) : aucune frappe ne retire plus de hitCap × PV max
+  // d'un coup. Anti one-shot — le boss survit toujours à un burst isolé (instr.).
+  if (defender.hitCap > 0 && dmg > 0) {
+    dmg = Math.min(dmg, Math.max(1, Math.round(defender.maxHp * defender.hitCap)));
   }
   defender.hp = Math.max(0, defender.hp - dmg);
 
@@ -1017,6 +1024,18 @@ function upkeep(combat) {
       }
       // Régénération de ressource de classe (Mana surtout).
       if (c.hp > 0) gainResource(c, "regenPerTurn");
+    }
+
+    // Aura ambiante d'un boss (ex. Fournaise d'Ignar) : petite morsure INÉVITABLE
+    // sur le héros chaque manche (instr. : rendre les no-hit exceptionnels sans
+    // gonfler les PV/dégâts). Touche les PV directement (ni esquive, ni Garde,
+    // ni bouclier) ; ne peut pas achever (laisse toujours ≥1 PV).
+    const aura = combat.enemy.aura;
+    if (aura && combat.player.hp > 1) {
+      const bite = Math.max(1, Math.round(combat.player.maxHp * (aura.pctMaxHp || 0)));
+      combat.player.hp = Math.max(1, combat.player.hp - bite);
+      combat.lastFx.push({ target: "player", dmg: bite, crit: false, dot: true });
+      log(combat, `${aura.name || "Aura"} : ${combat.player.name} subit ${bite} dégâts inévitables.`, "enemy");
     }
   }
 
