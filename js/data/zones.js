@@ -34,7 +34,7 @@ export const ZONES = {
     name: "Carrière d'Ombrepierre",
     icon: "⛰️",
     image: "assets/zones/shadowstone_quarry.png",
-    arena: "assets/zones/shadowstone_quarry.png",
+    arena: "assets/backgrounds/zone2.png",
     recommendedLevel: 6,
     elements: ["umbral", "nature"], // éléments dominants de la zone
     desc:
