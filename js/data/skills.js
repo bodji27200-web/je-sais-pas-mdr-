@@ -477,3 +477,34 @@ export const SKILLS = {
 export function getSkill(id) {
   return SKILLS[id] || null;
 }
+
+// --- Tags d'IA (instr. 236-239) ----------------------------------------------
+// Le moteur ne doit PAS dépendre du texte français pour comprendre une compétence.
+// Les tags décrivent la fonction d'une compétence dans un vocabulaire stable :
+//   damage · heal · guard · cleanse · buff · debuff · execute · summon · control · resource
+// Une compétence peut fournir `tags` explicitement ; sinon ils sont DÉRIVÉS de ses
+// mécaniques (source de vérité unique : les données de la compétence, pas la desc).
+export const SKILL_TAGS = ["damage", "heal", "guard", "cleanse", "buff", "debuff", "execute", "summon", "control", "resource"];
+
+export function deriveSkillTags(skill) {
+  if (!skill) return [];
+  const t = new Set(skill.tags || []);
+  if ((skill.power || 0) > 0) t.add("damage");
+  for (const eff of skill.self || []) {
+    if (eff.type === "heal") t.add("heal");
+    else if (eff.type === "shield" || eff.type === "def_buff" || eff.type === "guard" || eff.type === "guard_active" || eff.type === "guard_restore") t.add("guard");
+    else if (eff.type === "atk_buff" || eff.type === "spd_buff") t.add("buff");
+  }
+  for (const eff of skill.onHit || []) {
+    if (eff.type === "poison" || eff.type === "bleed") t.add("debuff");
+    else if (eff.type === "atk_debuff") t.add("debuff");
+    else if (eff.type === "slow") { t.add("debuff"); t.add("control"); }
+  }
+  if (skill.inflicts) t.add("debuff"); // états élémentaires (Brûlure, Charge, Marque…)
+  if (skill.guardConvert) t.add("resource");
+  return [...t];
+}
+
+export function getSkillTags(id) {
+  return deriveSkillTags(getSkill(id));
+}
