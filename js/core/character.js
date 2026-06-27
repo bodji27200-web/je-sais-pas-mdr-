@@ -4,6 +4,7 @@ import { getClass } from "../data/classes.js";
 import { getEquipment, weaponHand } from "../data/equipment.js";
 import { getSkill } from "../data/skills.js";
 import { getSpec, SPEC_UNLOCK_LEVEL, respecCost } from "../data/specializations.js";
+import { getNode, getHeritageTrait } from "../data/classTree.js";
 import { MATERIALS } from "../data/materials.js";
 import {
   addEquipmentInstance,
@@ -25,6 +26,32 @@ const STAT_KEYS = ["hp", "atk", "def", "mag", "res", "dex", "acc", "spd", "crit"
 // stat. Renvoie un nombre fini, sinon la valeur de repli.
 function safeNum(n, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
+}
+
+// Applique un bloc de modificateurs de stat (nœud d'arbre, maîtrise, Trait
+// d'héritage) sur l'objet `stats` { hp, atk, def, mag, res, dex, acc, spd, crit,
+// critDmg }. Pourcentages (…Pct) multiplicatifs ; valeurs plates (…Flat) additives.
+// Vocabulaire data-driven : ajouter une clé = une ligne ici, rien dans le moteur.
+export function applyNodeStatMods(stats, m) {
+  if (!m) return;
+  // multiplicatifs
+  if (m.hpPct) stats.hp *= 1 + m.hpPct;
+  if (m.atkPct) stats.atk *= 1 + m.atkPct;
+  if (m.defPct) stats.def *= 1 + m.defPct;
+  if (m.spdPct) stats.spd *= 1 + m.spdPct;
+  if (m.magPct) stats.mag *= 1 + m.magPct;
+  if (m.resPct) stats.res *= 1 + m.resPct;
+  if (m.dexPct) stats.dex *= 1 + m.dexPct;
+  if (m.accPct) stats.acc *= 1 + m.accPct;
+  // additifs
+  if (m.critFlat) stats.crit = (stats.crit || 0) + m.critFlat;
+  if (m.critDmgFlat) stats.critDmg = (stats.critDmg || 0) + m.critDmgFlat;
+  if (m.accFlat) stats.acc = (stats.acc || 0) + m.accFlat;
+  if (m.dexFlat) stats.dex = (stats.dex || 0) + m.dexFlat;
+  if (m.magFlat) stats.mag = (stats.mag || 0) + m.magFlat;
+  if (m.resFlat) stats.res = (stats.res || 0) + m.resFlat;
+  if (m.hpFlat) stats.hp = (stats.hp || 0) + m.hpFlat;
+  if (m.atkFlat) stats.atk = (stats.atk || 0) + m.atkFlat;
 }
 
 // Slots d'armure pris en compte pour les bonus de matériau (seuils 2 / 4 pièces).
@@ -119,15 +146,11 @@ export function getDerivedStats(state) {
     if (pp.critFlat) stats.crit = (stats.crit || 0) + pp.critFlat;
   }
 
-  // Spécialisation : modificateurs permanents + maîtrise d'arme.
+  // Nœud d'arbre équipé (= spécialisation généralisée) : modificateurs permanents
+  // + maîtrise d'arme. Réutilise EXACTEMENT le mécanisme des spécialisations.
   const spec = getActiveSpec(state);
   if (spec) {
-    const m = spec.statMods || {};
-    if (m.hpPct) stats.hp *= 1 + m.hpPct;
-    if (m.defPct) stats.def *= 1 + m.defPct;
-    if (m.atkPct) stats.atk *= 1 + m.atkPct;
-    if (m.spdPct) stats.spd *= 1 + m.spdPct;
-    if (m.critFlat) stats.crit = (stats.crit || 0) + m.critFlat;
+    applyNodeStatMods(stats, spec.statMods);
 
     // Maîtrise : bonus si l'arme de prédilection de la voie est équipée dans
     // l'une OU l'autre main (dual-wield pris en compte).
@@ -135,14 +158,12 @@ export function getDerivedStats(state) {
       const t = ch.equipment[s] ? getEquipment(ch.equipment[s].baseId) : null;
       return t && t.wtype === spec.mastery.wtype;
     });
-    if (wieldsMastery) {
-      const k = spec.mastery;
-      if (k.atkPct) stats.atk *= 1 + k.atkPct;
-      if (k.defPct) stats.def *= 1 + k.defPct;
-      if (k.spdPct) stats.spd *= 1 + k.spdPct;
-      if (k.critFlat) stats.crit = (stats.crit || 0) + k.critFlat;
-    }
+    if (wieldsMastery) applyNodeStatMods(stats, spec.mastery);
   }
+
+  // Trait d'héritage externe équipé (Lot 15) : un seul, bonus mineur permanent.
+  const trait = getEquippedHeritage(state);
+  if (trait && trait.statMods) applyNodeStatMods(stats, trait.statMods);
 
   return {
     maxHp: Math.max(1, Math.round(safeNum(stats.hp, 1))),
@@ -191,13 +212,22 @@ export function getStatDetails(state) {
 
 // --- Spécialisations ---
 
-// Spécialisation active (ou null si non choisie / id inconnu).
+// Nœud d'arbre actif (= spécialisation/classe avancée équipée), ou null si profil
+// de base. Résout d'abord l'arbre complet (getNode), puis retombe sur les 15
+// spécialisations historiques (getSpec) pour toute compatibilité.
 export function getActiveSpec(state) {
   const id = state.character.specId;
   if (!id) return null;
-  const spec = getSpec(id);
-  // Sécurité : la voie doit appartenir à la classe du personnage.
-  return spec && spec.classId === state.character.classId ? spec : null;
+  const node = getNode(id) || getSpec(id);
+  if (!node || node.base) return null; // un nœud de base = profil de base (aucun mod)
+  // Sécurité : le nœud doit appartenir à la voie du personnage.
+  return node.classId === state.character.classId ? node : null;
+}
+
+// Trait d'héritage externe actuellement équipé (un seul), ou null.
+export function getEquippedHeritage(state) {
+  const id = state.character && state.character.heritageTrait;
+  return id ? getHeritageTrait(id) : null;
 }
 
 // La spécialisation est-elle débloquée (niveau atteint) ?
@@ -280,7 +310,10 @@ export function canWieldWeapon(state, tpl) {
   if (!tpl || tpl.slot !== "weapon" || !tpl.wtype) return true;
   const cls = getClass(state.character.classId);
   if (!cls || !cls.weapons) return true;
-  return cls.weapons.includes(tpl.wtype);
+  if (cls.weapons.includes(tpl.wtype)) return true;
+  // Les nœuds hybrides autorisent des armes supplémentaires (Lame runique : wand…).
+  const node = getActiveSpec(state);
+  return !!(node && node.addWeapons && node.addWeapons.includes(tpl.wtype));
 }
 
 // Une arme à deux mains occupe-t-elle actuellement la main principale ?

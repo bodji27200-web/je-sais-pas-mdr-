@@ -13,7 +13,7 @@ import { getSkill, deriveSkillTags } from "../data/skills.js";
 import { getClass } from "../data/classes.js";
 import { getEquipment } from "../data/equipment.js";
 import { getResource } from "../data/resources.js";
-import { getDerivedStats, gainCharXp, clampHp, getActiveSpec, activeMaterialBehaviors, familyCounts, gearCombatBonuses, equippedWeaponElement } from "../core/character.js";
+import { getDerivedStats, gainCharXp, clampHp, getActiveSpec, getEquippedHeritage, activeMaterialBehaviors, familyCounts, gearCombatBonuses, equippedWeaponElement } from "../core/character.js";
 import { MATERIAL_BEHAVIOR } from "../data/materials.js";
 import { getState as getStateDef } from "../data/states.js";
 import { ELEMENT_ORDER } from "../data/elements.js";
@@ -63,7 +63,10 @@ export const HARD_CRIT_CAP = 85;
 export const CRIT_DMG_DEFAULT = 60; // ×1,6 (rétro-compatible avec l'ancien CRIT_MULT)
 export const CRIT_DMG_CAP = 150; // au plus ×2,5
 export function critMultOf(c) {
-  const cd = Math.min(CRIT_DMG_CAP, c && Number.isFinite(c.critDmg) ? c.critDmg : CRIT_DMG_DEFAULT);
+  let cd = c && Number.isFinite(c.critDmg) ? c.critDmg : CRIT_DMG_DEFAULT;
+  // Passif de nœud : Dégâts critiques bonus (plafonné globalement par CRIT_DMG_CAP).
+  if (c && c.pp && c.pp.critDmgBonus) cd += c.pp.critDmgBonus;
+  cd = Math.min(CRIT_DMG_CAP, cd);
   return 1 + Math.max(0, cd) / 100;
 }
 // Chance de critique effective : la part venant de la STAT est plafonnée à 50 %,
@@ -257,17 +260,41 @@ export function buildPlayerCombatant(state) {
     ["basic_attack", ...cls.skills, ...((spec && spec.grants) || [])],
     cls.passive
   );
-  // Passive de spécialisation : fusionnée aux effets de combat de la classe.
+  // Passive de spécialisation/nœud : fusionnée aux effets de combat de la classe.
   if (spec && spec.passive) mergePp(player.pp, spec.passive);
 
-  // Ressource de classe (Lot 8) : transitoire au combat, jamais persistée.
+  // Garde-réserve permanente modifiée par le nœud (Bastion, Roi-bastion…).
+  if (spec && spec.guardMaxPct && player.guardMax > 0) {
+    player.guardMax = Math.round(player.guardMax * (1 + spec.guardMaxPct));
+    player.guardPool = player.guardMax;
+  }
+
+  // Ressource de classe (Lot 8) : transitoire au combat, jamais persistée. Un
+  // nœud peut moduler la réserve (Apostat : Mana max réduit -> risque réel).
   const resDef = getClassResource(state.character.classId);
   if (resDef) {
+    const rmod = (spec && spec.resource) || {};
+    const max = Math.max(1, Math.round(resDef.max * (1 + (rmod.maxPct || 0))));
+    const start = Math.min(max, Math.round((resDef.start || 0) * (1 + (rmod.startPct || 0))));
     player.res = {
       id: resDef.id, name: resDef.name, color: resDef.color, icon: resDef.icon,
-      cur: Math.min(resDef.max, resDef.start || 0), max: resDef.max,
+      cur: start, max,
       gen: resDef, // les règles de gain sont lues directement depuis la définition
     };
+  }
+
+  // Trait d'héritage externe (Lot 15) — effets de combat mineurs (les statMods
+  // sont déjà intégrés aux stats dérivées). Garde-réserve / réserve de ressource.
+  const heritage = getEquippedHeritage(state);
+  if (heritage) {
+    if (heritage.guardMaxPct && player.guardMax > 0) {
+      player.guardMax = Math.round(player.guardMax * (1 + heritage.guardMaxPct));
+      player.guardPool = player.guardMax;
+    }
+    if (heritage.resource && heritage.resource.startPct && player.res) {
+      player.res.cur = Math.min(player.res.max, Math.round(player.res.cur * (1 + heritage.resource.startPct)));
+    }
+    if (heritage.passive) mergePp(player.pp, heritage.passive);
   }
 
   // Passifs comportementaux des matériaux d'armure (4 pièces).
@@ -449,6 +476,9 @@ function sumBuff(c, type) {
 function effectiveAtk(c) {
   let mult = 1 + sumBuff(c, "atk_buff") - sumBuff(c, "atk_debuff");
   if (c.pp.lowHpAtk && c.hp / c.maxHp < c.pp.lowHpAtk.threshold) mult += c.pp.lowHpAtk.bonus;
+  // Apostat : plus puissant à FAIBLE ressource (risque réel : sorts indisponibles).
+  if (c.pp.lowResourceAtk && c.res && c.res.max > 0 && c.res.cur / c.res.max < c.pp.lowResourceAtk.threshold)
+    mult += c.pp.lowResourceAtk.bonus;
   if (c.phaseAtkPct) mult += c.phaseAtkPct; // enrage de phase (boss)
   return Math.max(0.1, c.atk * mult);
 }

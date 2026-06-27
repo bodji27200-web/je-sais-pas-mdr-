@@ -22,7 +22,7 @@ export const SAVE_KEY = "idle_rpg_save_v1";
 // Copie de sécurité écrite AVANT toute migration : si une migration tournait mal
 // dans une future version, on garde une trace de la sauvegarde d'origine.
 export const BACKUP_KEY = "idle_rpg_save_backup";
-export const SAVE_VERSION = 12;
+export const SAVE_VERSION = 13;
 
 let state = null;
 
@@ -60,8 +60,16 @@ export function newGame(name, classId) {
       xp: 0,
       hpCurrent: cls.baseStats.hp, // ajusté ensuite par les stats dérivées
       equipment: { weapon: null, offhand: null, head: null, chest: null, hands: null, legs: null, feet: null, accessory: null, accessory2: null },
-      specId: null, // voie de spécialisation (choisie au niveau 10)
+      specId: null, // nœud d'arbre équipé (= spécialisation/classe avancée), ou null
       specChanges: 0, // nombre de changements de voie payés (coût croissant)
+      // Arbre de classes (Lot 15) :
+      unlockedNodes: [classId], // nœuds débloqués (le nœud de base de la voie d'office)
+      mastery: {}, // Maîtrise par nœud : { [nodeId]: { level, xp } }
+      ownedHeritage: [], // Traits d'héritage débloqués (nœuds à Maîtrise max)
+      heritageTrait: null, // Trait d'héritage externe équipé (un seul)
+      // Bibliothèque de compétences : actives apprises (persistent au changement de
+      // classe) + sélection emportée au combat (nombre d'emplacements croissant).
+      library: { learned: [], equipped: [] },
     },
     jobs: {
       woodcutting: { level: 1, xp: 0 },
@@ -252,6 +260,27 @@ function migrate(parsed) {
     const ch = parsed.character;
     if (ch && typeof ch.hpCurrent === "number" && !Number.isFinite(ch.hpCurrent)) ch.hpCurrent = 1;
     parsed.version = 12;
+  }
+  // v12 -> v13 : arbre de classes (Lot 15). Nouveaux champs personnage (non
+  // destructifs) : nœuds débloqués, Maîtrise par classe, Traits d'héritage,
+  // bibliothèque de compétences. Une ancienne spécialisation correspond à un
+  // nœud de l'arbre : on la considère DÉBLOQUÉE (instr. 315) — aucune perte de
+  // niveau, équipement, familiers, ressources ni progression.
+  if (parsed.version === 12) {
+    const ch = parsed.character;
+    if (ch) {
+      const unlocked = new Set(Array.isArray(ch.unlockedNodes) ? ch.unlockedNodes : []);
+      if (ch.classId) unlocked.add(ch.classId); // nœud de base de la voie
+      if (ch.specId) unlocked.add(ch.specId); // ancienne spécialisation -> nœud débloqué
+      ch.unlockedNodes = [...unlocked];
+      if (!ch.mastery || typeof ch.mastery !== "object") ch.mastery = {};
+      if (!Array.isArray(ch.ownedHeritage)) ch.ownedHeritage = [];
+      if (ch.heritageTrait === undefined) ch.heritageTrait = null;
+      if (!ch.library || typeof ch.library !== "object") ch.library = { learned: [], equipped: [] };
+      if (!Array.isArray(ch.library.learned)) ch.library.learned = [];
+      if (!Array.isArray(ch.library.equipped)) ch.library.equipped = [];
+    }
+    parsed.version = 13;
   }
   return parsed.version === SAVE_VERSION ? parsed : null;
 }

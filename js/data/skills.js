@@ -472,6 +472,290 @@ export const SKILLS = {
     self: [{ type: "def_buff", amount: 0.45, turns: 2 }, { type: "shield", pctMaxHp: 0.22, turns: 3 }],
     desc: "Bouclier de braise : défense +45 % et absorption sur 3 tours.",
   },
+
+  // ===========================================================================
+  // ARBRE DE CLASSES (Lot 15) — compétences des nœuds avancés et hybrides.
+  // Chaque nœud de l'arbre accorde au moins une compétence active (existante ou
+  // ci-dessous) + applique une capacité passive réellement lue par le moteur.
+  // On réutilise STRICTEMENT le vocabulaire d'effets déjà supporté par
+  // systems/combat.js (rien de nouveau côté moteur ici).
+  // ===========================================================================
+
+  // ----------------------------- VOIE GUERRIER -----------------------------
+  tw_combat_combo: {
+    id: "tw_combat_combo", name: "Combo martial", type: "active", power: 0.8, hits: 2, cooldown: 1, cost: 15,
+    target: "enemy", anim: "light", desc: "Deux frappes enchaînées (80 % chacune).",
+  },
+  tw_arms_mastery: {
+    id: "tw_arms_mastery", name: "Frappe magistrale", type: "active", power: 1.6, cooldown: 2, cost: 25,
+    target: "enemy", anim: "heavy", critBonus: 15, desc: "Une frappe d'expert (160 %, +15 % crit).",
+  },
+  tw_duelist_riposte: {
+    id: "tw_duelist_riposte", name: "Riposte", type: "active", power: 1.2, cooldown: 2, cost: 25,
+    target: "enemy", anim: "light", self: [{ type: "guard", reduce: 0.4, turns: 1 }, { type: "def_buff", amount: 0.2, turns: 2 }],
+    desc: "Frappe en se couvrant (120 %), réduit le prochain coup reçu et la défense monte.",
+  },
+  tw_guardbreak: {
+    id: "tw_guardbreak", name: "Brise-garde", type: "active", power: 1.0, cooldown: 2, cost: 30,
+    target: "enemy", anim: "heavy", inflicts: "expose", guardConvert: { pctMax: 0.4, ratio: 1.1 },
+    desc: "Fracasse la garde (100 %), expose la cible et convertit ta Garde en dégâts.",
+  },
+  tw_blood_rampage: {
+    id: "tw_blood_rampage", name: "Carnage sanglant", type: "active", power: 1.9, cooldown: 3, cost: 40,
+    target: "enemy", anim: "heavy", critBonus: 15, desc: "Déchaînement brutal (190 %), d'autant plus fort à bas PV.",
+  },
+  tw_runeblade_arc: {
+    id: "tw_runeblade_arc", name: "Arc runique", type: "active", power: 1.6, cooldown: 2, cost: 35,
+    target: "enemy", anim: "magic", element: "fire", inflicts: "burn",
+    desc: "Lame enchantée de Feu (160 %) qui embrase la cible.",
+  },
+  tw_steel_sunder: {
+    id: "tw_steel_sunder", name: "Fracture d'acier", type: "active", power: 1.5, cooldown: 2, cost: 30,
+    target: "enemy", anim: "heavy", inflicts: "expose", onHit: [{ type: "atk_debuff", amount: 0.2, turns: 2 }],
+    desc: "Brise l'armure (150 %), expose la cible et affaiblit son attaque.",
+  },
+  tw_war_avatar_storm: {
+    id: "tw_war_avatar_storm", name: "Tempête de guerre", type: "active", power: 0.8, hits: 4, cooldown: 3, cost: 50,
+    target: "enemy", anim: "heavy", desc: "Quatre frappes ravageuses (80 % chacune).",
+  },
+  tw_carnage_reap: {
+    id: "tw_carnage_reap", name: "Moisson de carnage", type: "active", power: 2.4, cooldown: 3, cost: 55,
+    target: "enemy", anim: "heavy", critBonus: 30, desc: "Frappe titanesque (240 %, +30 % crit).",
+  },
+
+  // ----------------------------- VOIE GARDIEN -----------------------------
+  tg_rampart_aegis: {
+    id: "tg_rampart_aegis", name: "Égide du rempart", type: "active", power: 0, cooldown: 3, cost: 25,
+    target: "self", anim: "buff", self: [{ type: "def_buff", amount: 0.4, turns: 2 }, { type: "shield", pctMaxHp: 0.2, turns: 2 }],
+    desc: "Défense +40 % et bouclier (20 % PV) sur 2 tours.",
+  },
+  tg_rampart_smash: {
+    id: "tg_rampart_smash", name: "Charge du rempart", type: "active", power: 1.2, cooldown: 2, cost: 25,
+    target: "enemy", anim: "heavy", onHit: [{ type: "atk_debuff", amount: 0.2, turns: 2 }],
+    desc: "Bouscule la cible (120 %) et affaiblit son attaque.",
+  },
+  tg_bastion_wall: {
+    id: "tg_bastion_wall", name: "Mur de bastion", type: "active", power: 0, cooldown: 4, cost: 35,
+    target: "self", anim: "buff", self: [{ type: "guard_active", turns: 3, absorb: 0.7 }, { type: "def_buff", amount: 0.5, turns: 3 }, { type: "guard_restore", pctMax: 0.3 }],
+    desc: "Lève une Garde massive (absorbe 70 % pendant 3 tours), défense +50 % et restaure de la Garde.",
+  },
+  tg_rune_paladin_smite: {
+    id: "tg_rune_paladin_smite", name: "Châtiment runique", type: "active", power: 1.4, cooldown: 2, cost: 30,
+    target: "enemy", anim: "magic", element: "light", inflicts: "expose", self: [{ type: "heal", pctMaxHp: 0.1 }],
+    desc: "Frappe de Lumière (140 %) qui expose la cible et te soigne de 10 %.",
+  },
+  tg_royal_protector: {
+    id: "tg_royal_protector", name: "Garde royale", type: "active", power: 0, cooldown: 3, cost: 30,
+    target: "self", anim: "buff", self: [{ type: "guard_restore", pctMax: 0.4 }, { type: "def_buff", amount: 0.3, turns: 2 }, { type: "guard_active", turns: 2, absorb: 0.5 }],
+    desc: "Restaure 40 % de Garde, défense +30 % et Garde active 2 tours.",
+  },
+  tg_steel_colossus_quake: {
+    id: "tg_steel_colossus_quake", name: "Séisme colossal", type: "active", power: 1.6, cooldown: 3, cost: 35,
+    target: "enemy", anim: "heavy", onHit: [{ type: "slow", amount: 0.25, turns: 2 }],
+    desc: "Frappe sismique (160 %) qui ralentit la cible.",
+  },
+  tg_sacred_aegis: {
+    id: "tg_sacred_aegis", name: "Égide sacrée", type: "active", power: 0, cooldown: 4, cost: 35,
+    target: "self", anim: "buff", self: [{ type: "shield", pctMaxHp: 0.3, turns: 3 }, { type: "heal", pctMaxHp: 0.12 }, { type: "guard_active", turns: 2, absorb: 0.5 }],
+    desc: "Bouclier sacré (30 % PV), soin (12 %) et Garde active.",
+  },
+  tg_living_fortress_convert: {
+    id: "tg_living_fortress_convert", name: "Riposte de la forteresse", type: "active", power: 0.6, cooldown: 2, cost: 25,
+    target: "enemy", anim: "heavy", guardConvert: { pctMax: 0.6, ratio: 1.2 },
+    desc: "Frappe (60 %) puis convertit une large part de ta Garde en dégâts directs.",
+  },
+  tg_titan_bulwark: {
+    id: "tg_titan_bulwark", name: "Rempart titanesque", type: "active", power: 0, cooldown: 4, cost: 40,
+    target: "self", anim: "buff", self: [{ type: "def_buff", amount: 0.6, turns: 3 }, { type: "guard_active", turns: 3, absorb: 0.75 }, { type: "guard_restore", pctMax: 0.4 }],
+    desc: "Défense +60 %, Garde active (75 %, 3 tours) et restauration de Garde.",
+  },
+  tg_primordial_guard: {
+    id: "tg_primordial_guard", name: "Garde primordiale", type: "active", power: 1.4, cooldown: 3, cost: 35,
+    target: "enemy", anim: "heavy", self: [{ type: "guard_restore", pctMax: 0.3 }], guardConvert: { pctMax: 0.3, ratio: 1.0 },
+    desc: "Frappe (140 %), restaure de la Garde et en convertit une part en dégâts.",
+  },
+  tg_bastion_king_decree: {
+    id: "tg_bastion_king_decree", name: "Décret du roi-bastion", type: "active", power: 1.6, cooldown: 3, cost: 45,
+    target: "enemy", anim: "heavy", self: [{ type: "def_buff", amount: 0.4, turns: 2 }], guardConvert: { pctMax: 0.5, ratio: 1.3 },
+    desc: "Frappe royale (160 %), défense +40 % et conversion massive de Garde.",
+  },
+
+  // ----------------------------- VOIE ARCHER -----------------------------
+  ta_scout_mark: {
+    id: "ta_scout_mark", name: "Tir de repérage", type: "active", power: 0.9, cooldown: 1, cost: 15,
+    target: "enemy", anim: "ranged", inflicts: "expose", desc: "Flèche de repérage (90 %) qui marque (expose) la cible.",
+  },
+  ta_sharpshooter_aim: {
+    id: "ta_sharpshooter_aim", name: "Tir parfait", type: "active", power: 1.8, cooldown: 3, cost: 40,
+    target: "enemy", anim: "ranged", critBonus: 40, desc: "Tir minutieux (180 %, +40 % crit).",
+  },
+  ta_tracker_markshot: {
+    id: "ta_tracker_markshot", name: "Tir traqueur", type: "active", power: 1.2, cooldown: 2, cost: 25,
+    target: "enemy", anim: "ranged", inflicts: "expose", onHit: [{ type: "bleed", pctAtk: 0.3, turns: 3 }],
+    desc: "Marque et saigne la cible (120 %) : la Marque amplifie tes dégâts.",
+  },
+  ta_beastmaster_call: {
+    id: "ta_beastmaster_call", name: "Appel de la meute", type: "active", power: 0.8, cooldown: 2, cost: 20,
+    target: "enemy", anim: "ranged", self: [{ type: "atk_buff", amount: 0.2, turns: 3 }],
+    desc: "Coordonne l'attaque avec ton familier (80 %) et galvanise (ATK +20 %).",
+  },
+  ta_rune_hunter_shot: {
+    id: "ta_rune_hunter_shot", name: "Flèche runique", type: "active", power: 1.4, cooldown: 2, cost: 30,
+    target: "enemy", anim: "magic", element: "lightning", inflicts: "charge",
+    desc: "Flèche de Foudre (140 %) qui accumule une Charge.",
+  },
+  ta_stormeye_volley: {
+    id: "ta_stormeye_volley", name: "Salve d'œil-tempête", type: "active", power: 0.55, hits: 3, cooldown: 2, cost: 30,
+    target: "enemy", anim: "ranged", critBonus: 10, desc: "Trois tirs rapides (55 % chacun, +10 % crit).",
+  },
+  ta_falconer_dive: {
+    id: "ta_falconer_dive", name: "Piqué du faucon", type: "active", power: 1.5, cooldown: 2, cost: 30,
+    target: "enemy", anim: "ranged", onHit: [{ type: "slow", amount: 0.25, turns: 2 }],
+    desc: "Le familier plonge avec toi (150 %) et ralentit la cible.",
+  },
+  ta_spectral_bolt: {
+    id: "ta_spectral_bolt", name: "Carreau spectral", type: "active", power: 1.4, cooldown: 2, cost: 35,
+    target: "enemy", anim: "ranged", inflicts: "expose", guardConvert: { pctMax: 0.0, ratio: 0 },
+    desc: "Carreau perce-garde (140 %) qui expose la cible (lourd contre les boucliers).",
+  },
+  ta_celestial_shot: {
+    id: "ta_celestial_shot", name: "Tir céleste", type: "active", power: 2.0, cooldown: 3, cost: 45,
+    target: "enemy", anim: "ranged", critBonus: 30, desc: "Tir foudroyant (200 %, +30 % crit).",
+  },
+  ta_hunt_lord_rain: {
+    id: "ta_hunt_lord_rain", name: "Pluie de flèches", type: "active", power: 0.7, hits: 4, cooldown: 3, cost: 50,
+    target: "enemy", anim: "ranged", desc: "Déluge de quatre flèches (70 % chacune).",
+  },
+  ta_world_eye_pierce: {
+    id: "ta_world_eye_pierce", name: "Œil perçant", type: "active", power: 2.2, cooldown: 3, cost: 50,
+    target: "enemy", anim: "ranged", critBonus: 35, inflicts: "expose",
+    desc: "Tir absolu (220 %, +35 % crit) qui expose la cible.",
+  },
+
+  // ----------------------------- VOIE MAGE -----------------------------
+  tm_arcanist_blast: {
+    id: "tm_arcanist_blast", name: "Déflagration arcanique", type: "active", power: 1.8, cooldown: 1, cost: 30,
+    target: "enemy", anim: "magic", element: "chaos", desc: "Explosion d'arcanes purs (180 %, Chaos).",
+  },
+  tm_elementalist_bolt: {
+    id: "tm_elementalist_bolt", name: "Trait élémentaire", type: "active", power: 1.7, cooldown: 1, cost: 30,
+    target: "enemy", anim: "magic", element: "fire", inflicts: "burn", desc: "Trait de Feu (170 %) qui embrase.",
+  },
+  tm_rune_sorcerer_hex: {
+    id: "tm_rune_sorcerer_hex", name: "Maléfice runique", type: "active", power: 1.5, cooldown: 2, cost: 35,
+    target: "enemy", anim: "magic", element: "umbral", inflicts: "soulmark", onHit: [{ type: "atk_debuff", amount: 0.2, turns: 2 }],
+    desc: "Maléfice d'Umbral (150 %) : Marque funéraire et attaque réduite.",
+  },
+  tm_weaver_reaction: {
+    id: "tm_weaver_reaction", name: "Tissage des éléments", type: "active", power: 1.4, cooldown: 2, cost: 35,
+    target: "enemy", anim: "magic", element: "water", inflicts: "wet",
+    desc: "Vague d'Eau (140 %) qui trempe la cible (+ dégâts de Foudre subis : prépare une réaction).",
+  },
+  tm_spellblade_slash: {
+    id: "tm_spellblade_slash", name: "Taillade ensorcelée", type: "active", power: 1.6, cooldown: 1, cost: 30,
+    target: "enemy", anim: "magic", element: "fire", inflicts: "burn", desc: "Lame magique de Feu (160 %) qui embrase.",
+  },
+  tm_archon_shift: {
+    id: "tm_archon_shift", name: "Bascule d'archonte", type: "active", power: 1.8, cooldown: 2, cost: 35,
+    target: "enemy", anim: "magic", element: "lightning", inflicts: "charge",
+    desc: "Foudre d'archonte (180 %) qui accumule une Charge (exploite Trempé).",
+  },
+  tm_pactmaster_sacrifice: {
+    id: "tm_pactmaster_sacrifice", name: "Pacte de sang", type: "active", power: 1.5, cooldown: 2, cost: 35,
+    target: "enemy", anim: "magic", element: "umbral", self: [{ type: "atk_buff", amount: 0.25, turns: 3 }],
+    desc: "Sacrifie une part de sa puissance (150 %, Umbral) pour décupler ses attaques.",
+  },
+  tm_apostate_surge: {
+    id: "tm_apostate_surge", name: "Déferlante apostate", type: "active", power: 2.0, cooldown: 2, cost: 45,
+    target: "enemy", anim: "magic", element: "chaos", desc: "Décharge instable (200 %, Chaos), redoutable à bas Mana.",
+  },
+  tm_arcane_sovereign_nova: {
+    id: "tm_arcane_sovereign_nova", name: "Nova souveraine", type: "active", power: 2.3, cooldown: 3, cost: 55,
+    target: "enemy", anim: "magic", element: "chaos", inflicts: "unstable", desc: "Cataclysme arcanique (230 %) qui déstabilise.",
+  },
+  tm_void_oracle_collapse: {
+    id: "tm_void_oracle_collapse", name: "Effondrement du Néant", type: "active", power: 2.4, cooldown: 3, cost: 55,
+    target: "enemy", anim: "magic", element: "umbral", inflicts: "soulmark", desc: "Gouffre d'Umbral (240 %) qui marque l'âme.",
+  },
+
+  // ----------------------------- VOIE ASSASSIN -----------------------------
+  ts_rogue_backstab: {
+    id: "ts_rogue_backstab", name: "Coup dans le dos", type: "active", power: 1.4, cooldown: 1, cost: 20,
+    target: "enemy", anim: "light", critBonus: 25, desc: "Frappe sournoise (140 %, +25 % crit).",
+  },
+  ts_shadowblade_flurry: {
+    id: "ts_shadowblade_flurry", name: "Lames d'ombre", type: "active", power: 0.6, hits: 3, cooldown: 2, cost: 30,
+    target: "enemy", anim: "light", critBonus: 12, desc: "Trois frappes furtives (60 % chacune, +12 % crit).",
+  },
+  ts_venom_multi: {
+    id: "ts_venom_multi", name: "Multi-venin", type: "active", power: 0.9, cooldown: 2, cost: 25,
+    target: "enemy", anim: "light", onHit: [{ type: "poison", pctAtk: 0.25, turns: 3 }, { type: "poison", pctAtk: 0.25, turns: 3 }],
+    desc: "Applique plusieurs poisons faibles (90 % + 2 poisons cumulés).",
+  },
+  ts_night_duelist: {
+    id: "ts_night_duelist", name: "Duel nocturne", type: "active", power: 1.2, cooldown: 2, cost: 25,
+    target: "enemy", anim: "light", critBonus: 20, self: [{ type: "guard", reduce: 0.5, turns: 1 }],
+    desc: "Frappe en contre (120 %, +20 % crit) et pare le prochain coup.",
+  },
+  ts_saboteur_cut: {
+    id: "ts_saboteur_cut", name: "Sabotage", type: "active", power: 1.1, cooldown: 2, cost: 30,
+    target: "enemy", anim: "light", inflicts: "expose", onHit: [{ type: "atk_debuff", amount: 0.25, turns: 2 }],
+    desc: "Entaille (110 %) : expose la cible (défense/résistance réduites) et l'affaiblit.",
+  },
+  ts_void_dancer_step: {
+    id: "ts_void_dancer_step", name: "Pas du vide", type: "active", power: 1.0, cooldown: 2, cost: 25,
+    target: "enemy", anim: "light", self: [{ type: "spd_buff", amount: 0.3, turns: 2 }, { type: "guard", reduce: 0.4, turns: 1 }],
+    desc: "Frappe insaisissable (100 %) : Clairvoyance +30 % et esquive le prochain coup.",
+  },
+  ts_soul_reaper: {
+    id: "ts_soul_reaper", name: "Faux d'âme", type: "active", power: 1.8, cooldown: 3, cost: 45,
+    target: "enemy", anim: "light", element: "umbral", inflicts: "soulmark", critBonus: 20,
+    desc: "Faux d'Umbral (180 %, +20 % crit) qui marque l'âme — mortelle sur cible affaiblie.",
+  },
+  ts_spectral_stalker: {
+    id: "ts_spectral_stalker", name: "Traque spectrale", type: "active", power: 1.6, cooldown: 2, cost: 35,
+    target: "enemy", anim: "light", critBonus: 30, desc: "Embuscade fantôme (160 %, +30 % crit).",
+  },
+  ts_nightwalker_rampage: {
+    id: "ts_nightwalker_rampage", name: "Furie nocturne", type: "active", power: 1.7, cooldown: 2, cost: 40,
+    target: "enemy", anim: "light", critBonus: 15, desc: "Déchaînement de lames (170 %), décuplé à bas PV.",
+  },
+  ts_threshold_execute: {
+    id: "ts_threshold_execute", name: "Sentence du seuil", type: "active", power: 2.2, cooldown: 3, cost: 50,
+    target: "enemy", anim: "light", critBonus: 40, desc: "Exécution (220 %, +40 % crit) sur cible affaiblie.",
+  },
+
+  // -------------------- BRANCHE NÉCROMANCIEN (Mage + Assassin) --------------------
+  tn_necro_bolt: {
+    id: "tn_necro_bolt", name: "Trait nécrotique", type: "active", power: 1.5, cooldown: 1, cost: 30,
+    target: "enemy", anim: "magic", element: "umbral", inflicts: "soulmark",
+    desc: "Trait d'Umbral (150 %) qui appose la Marque funéraire (coupe la régénération).",
+  },
+  tn_soul_fragment: {
+    id: "tn_soul_fragment", name: "Récolte de fragments", type: "active", power: 1.2, cooldown: 2, cost: 25,
+    target: "enemy", anim: "magic", element: "umbral", self: [{ type: "heal", pctMaxHp: 0.06 }],
+    desc: "Arrache un Fragment d'âme (120 %, Umbral) et te soigne légèrement.",
+  },
+
+  // -------------------- INVOCATIONS (classes invocateur / nécromancien) --------------------
+  // Compétences qui posent une VRAIE créature sur le terrain (voir data/summons.js
+  // et le moteur d'invocations dans systems/combat.js). `summon` = id de créature.
+  // Nombre d'invocations STRICTEMENT limité (voir summoner.max du nœud).
+  summon_arcane_wisp: {
+    id: "summon_arcane_wisp", name: "Invoquer un feu follet", type: "active", power: 0, cooldown: 3, cost: 30,
+    target: "self", anim: "buff", tags: ["summon"], summon: "sm_arcane_wisp",
+    desc: "Invoque un feu follet arcanique temporaire qui attaque l'ennemi à chaque tour (1 max).",
+  },
+  summon_bone_thrall: {
+    id: "summon_bone_thrall", name: "Invoquer un serviteur d'os", type: "active", power: 0, cooldown: 3, cost: 35,
+    target: "self", anim: "buff", tags: ["summon"], summon: "sm_bone_thrall",
+    desc: "Invoque un serviteur d'os temporaire (2 max) qui frappe et affaiblit l'ennemi.",
+  },
+  summon_skeleton: {
+    id: "summon_skeleton", name: "Lever un squelette", type: "active", power: 0, cooldown: 2, cost: 30,
+    target: "self", anim: "buff", tags: ["summon"], summon: "sm_skeleton",
+    desc: "Lève un squelette PERMANENT (jusqu'à destruction) qui combat à tes côtés (nombre limité).",
+  },
 };
 
 export function getSkill(id) {
