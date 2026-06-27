@@ -19,6 +19,7 @@ import { getState as getStateDef } from "../data/states.js";
 import { ELEMENT_ORDER } from "../data/elements.js";
 import { getClassResource } from "../data/classResources.js";
 import { effectiveFamiliarPassive, gainEquippedFamiliarXp, addEgg } from "./familiars.js";
+import { combatActiveSkills, isOffPathSkill, OFF_PATH_POWER_MULT, gainMasteryOnWin } from "./classtree.js";
 import { getEgg } from "../data/familiars.js";
 import { rollAmount } from "../core/progression.js";
 import { addGold, addResource, addEquipmentInstance } from "../core/state.js";
@@ -254,12 +255,16 @@ export function buildPlayerCombatant(state) {
   const ds = getDerivedStats(state);
   const cls = getClass(state.character.classId);
   const spec = getActiveSpec(state);
+  // Kit actif = bibliothèque emportée (loadout) ou kit naturel (voie + nœud) par
+  // défaut. Compétences HORS-VOIE marquées (puissance réduite, instr. compétences).
+  const activeKit = combatActiveSkills(state);
   const player = makeCombatant(
     state.character.name,
     { maxHp: ds.maxHp, hp: Math.max(1, Math.round(state.character.hpCurrent)), atk: ds.atk, def: ds.def, spd: ds.spd, crit: ds.crit, mag: ds.mag, mres: ds.res, dex: ds.dex, acc: ds.acc, critDmg: ds.critDmg, guardMax: guardMaxFor(state.character.classId, state.character.level, ds.def) },
-    ["basic_attack", ...cls.skills, ...((spec && spec.grants) || [])],
+    ["basic_attack", ...activeKit],
     cls.passive
   );
+  player.offPath = new Set(activeKit.filter((id) => isOffPathSkill(state, id)));
   // Passive de spécialisation/nœud : fusionnée aux effets de combat de la classe.
   if (spec && spec.passive) mergePp(player.pp, spec.passive);
 
@@ -685,6 +690,9 @@ function useSkill(combat, actor, other, skillId) {
 
   // Dégâts (éventuellement multi-frappes).
   let landed = false;
+  // Pénalité HORS-VOIE : une compétence apprise hors de la voie naturelle frappe
+  // moins fort (affichée dans l'UI de la bibliothèque). Ne touche que le joueur.
+  const powerMult = actor.offPath && actor.offPath.has(skillId) ? OFF_PATH_POWER_MULT : 1;
   if (skill.power > 0) {
     const hits = skill.hits || 1;
     let total = 0;
@@ -692,7 +700,7 @@ function useSkill(combat, actor, other, skillId) {
     // Multi-frappes : la puissance est déjà répartie par frappe dans les données
     // (instr. 96). Chaque frappe vérifie SÉPARÉMENT l'esquive et le critique.
     for (let i = 0; i < hits && other.hp > 0; i++) {
-      const r = dealDamage(combat, actor, other, skill.power, { skillId, critBonus: skill.critBonus || 0, concBonus, element: skill.element || actor.weaponElement || actor.element || null, unavoidable: skill.unavoidable });
+      const r = dealDamage(combat, actor, other, skill.power * powerMult, { skillId, critBonus: skill.critBonus || 0, concBonus, element: skill.element || actor.weaponElement || actor.element || null, unavoidable: skill.unavoidable });
       total += r.dmg;
       anyCrit = anyCrit || r.isCrit;
       if (!r.evaded) landed = true;
@@ -1122,6 +1130,10 @@ function finishCombat(state, combat, result) {
   // Familier équipé : gagne de l'XP (plafonnée au niveau du héros) + du lien.
   const famGain = gainEquippedFamiliarXp(state, xpGain);
 
+  // Maîtrise de la classe ÉQUIPÉE (instr. mastery) : +1 par victoire, bonus boss.
+  // N'augmente JAMAIS pour une autre classe (lit equippedNodeId).
+  const masteryGain = gainMasteryOnWin(state, enemy.isBoss ? 3 : 1);
+
   state.counters.kills += 1;
   if (!state.counters.defeated) state.counters.defeated = {};
   state.counters.defeated[enemy.id] = (state.counters.defeated[enemy.id] || 0) + 1;
@@ -1130,10 +1142,12 @@ function finishCombat(state, combat, result) {
     state.flags.bossDefeated = true;
   }
 
-  combat.rewards = { xp: xpGain, gold: goldGain, drops, levels, familiar: famGain, enraged };
+  combat.rewards = { xp: xpGain, gold: goldGain, drops, levels, familiar: famGain, enraged, mastery: masteryGain };
   log(combat, `${enemy.name}${enraged ? " (enragé)" : ""} est vaincu ! +${xpGain} XP, +${goldGain} or.`, "reward");
   if (levels > 0) log(combat, `Niveau supérieur ! Tu passes niveau ${state.character.level}.`, "reward");
   if (famGain && famGain.levels > 0) log(combat, `Ton familier gagne ${famGain.levels} niveau(x) !`, "reward");
+  if (masteryGain && masteryGain.leveledUp) log(combat, `Maîtrise de classe : palier ${masteryGain.level} atteint !`, "reward");
+  if (masteryGain && masteryGain.heritageUnlocked) log(combat, `Trait d'héritage débloqué !`, "reward");
 }
 
 // ===========================================================================
