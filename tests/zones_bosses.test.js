@@ -63,13 +63,26 @@ test("les ennemis d'une zone se débloquent dans l'ordre", () => {
   assert.equal(enemyUnlock(s, "miner_wraith").unlocked, true);
 });
 
-test("le boss télégraphie une intention ; un ennemi normal n'en a pas", () => {
+test("aucun ennemi (boss inclus) n'annonce sa prochaine action (instr. 29-30, 272)", () => {
   const s = ready();
   const cBoss = startCombat(s, "vorrak_collapse");
-  const info = enemyIntentInfo(cBoss);
-  assert.ok(info && typeof info.name === "string", "le boss annonce une action");
+  // La prochaine action n'est jamais télégraphiée : on ne révèle rien à l'avance.
+  assert.equal(enemyIntentInfo(cBoss), null, "le boss ne télégraphie pas son action");
   const cNorm = startCombat(s, "dust_weaver");
-  assert.equal(enemyIntentInfo(cNorm), null, "un ennemi normal ne télégraphie pas");
+  assert.equal(enemyIntentInfo(cNorm), null, "un ennemi normal ne télégraphie pas non plus");
+  // Le journal ne contient aucune annonce du type « prépare ».
+  assert.ok(!cBoss.log.some((l) => /prépare/i.test(l.text)), "le journal n'annonce aucune action à venir");
+});
+
+test("mémoire IA : l'historique du joueur est enregistré et borné (instr. 277)", () => {
+  withSeed(11, () => {
+    const c = startCombat(ready("warrior", 16), "shale_golem", { forceEnrage: false });
+    const s2 = ready("warrior", 16);
+    for (let i = 0; i < 10 && c.status === "active"; i++) resolveRound(s2, c, "basic_attack");
+    assert.ok(Array.isArray(c.playerHistory), "l'historique du joueur existe");
+    assert.ok(c.playerHistory.length <= 6, "fenêtre glissante bornée à 6 actions");
+    assert.ok(c.playerHistory.every((id) => id === "basic_attack"), "l'historique reflète les actions réelles");
+  });
 });
 
 test("les phases de boss se déclenchent sous les seuils de PV (règles + effets)", () => {
