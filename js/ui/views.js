@@ -1263,13 +1263,20 @@ function fighterImg(path) {
 // Barre de vie rattachée à un combattant (au-dessus de sa tête).
 // idbase : "player" / "enemy". Reste fixe pendant le dash (hors .fighter-move).
 function renderHpBar(idbase, c) {
+  // Garde-réserve (Lot 3) : fine barre sous les PV, visible seulement si le
+  // combattant possède une réserve ; surlignée quand la Garde est active.
+  const guard = c && c.guardMax > 0
+    ? `<div class="fighter-guard ${idbase}${c.guardActive ? " active" : ""}" id="bt-${idbase}-guard" title="Garde ${fmt(c.guardPool)}/${fmt(c.guardMax)}">
+         <div class="fighter-guard-fill" id="bt-${idbase}-guard-fill" style="width:${pct(c.guardPool, c.guardMax)}%"></div>
+       </div>`
+    : "";
   return `
     <div class="fighter-hp ${idbase}">
       <div class="fighter-hp-track">
         <div class="fighter-hp-fill ${idbase}" id="bt-${idbase}-fill" style="width:${pct(c.hp, c.maxHp)}%"></div>
       </div>
       <span class="fighter-hp-text" id="bt-${idbase}-num">${fmt(c.hp)}/${fmt(c.maxHp)}</span>
-    </div>`;
+    </div>${guard}`;
 }
 
 // Un combattant posé dans la scène. `side` : "hero" (gauche) / "enemy" (droite).
