@@ -89,6 +89,37 @@ export function magBonus(mag) {
   return Math.min(MAG_CAP, Math.max(0, mag || 0) / MAG_K);
 }
 
+// --- Garde : réserve défensive numérique (instr. 71-85) ----------------------
+// Réserve SÉPARÉE des PV et de la Défense. Quand la Garde est ACTIVE, une part
+// des dégâts (35 % par défaut, plafonnée à 80 %) est redirigée vers la réserve ;
+// la réserve épuisée, la Garde active prend fin (rupture). Le maximum dépend du
+// niveau, de la Défense et de la CLASSE (le Gardien en a beaucoup plus).
+export const GUARD_ABSORB_MIN = 0.35;
+export const GUARD_ABSORB_MAX = 0.8;
+export const GUARD_BY_CLASS = {
+  guardian: { base: 60, per: 3 },
+  warrior: { base: 30, per: 2 },
+  archer: { base: 16, per: 1.1 },
+  mage: { base: 14, per: 1.0 },
+  assassin: { base: 16, per: 1.1 },
+};
+export function guardMaxFor(classId, level, def) {
+  const k = GUARD_BY_CLASS[classId] || { base: 18, per: 1.2 };
+  return Math.max(0, Math.round(k.base + k.per * Math.max(0, (level || 1) - 1) + (def || 0) * 0.4));
+}
+export function clampAbsorb(a) {
+  return Math.min(GUARD_ABSORB_MAX, Math.max(GUARD_ABSORB_MIN, Number.isFinite(a) ? a : GUARD_ABSORB_MIN));
+}
+// Calcule l'absorption d'une réserve de Garde active (pure, testable). Renvoie la
+// part absorbée, les dégâts restants pour les PV, la réserve restante et si la
+// Garde casse (réserve épuisée -> rupture, instr. 76-77).
+export function guardAbsorb(guardActive, guardPool, dmg) {
+  if (!guardActive || guardPool <= 0 || dmg <= 0) return { toGuard: 0, remaining: dmg, pool: guardPool, broken: false };
+  const toGuard = Math.min(guardPool, Math.round(dmg * clampAbsorb(guardActive.absorb)));
+  const pool = guardPool - toGuard;
+  return { toGuard, remaining: dmg - toGuard, pool, broken: pool <= 0 };
+}
+
 function makeCombatant(name, stats, skillIds, passiveId) {
   const passive = passiveId ? getSkill(passiveId) : null;
   return {
@@ -100,7 +131,9 @@ function makeCombatant(name, stats, skillIds, passiveId) {
     spd: stats.spd, // spd = Clairvoyance (clé moteur historique)
     crit: stats.crit,
     mag: stats.mag != null ? stats.mag : 0,
-    res: stats.res != null ? stats.res : 0,
+    // mres = Résistance (mitigation magique). Nom DISTINCT de `res` ci-dessous,
+    // qui est la RESSOURCE DE CLASSE (Mana/Rage/…). Ne pas confondre.
+    mres: stats.mres != null ? stats.mres : 0,
     dex: stats.dex != null ? stats.dex : 0,
     acc: stats.acc != null ? stats.acc : 0,
     critDmg: stats.critDmg != null ? stats.critDmg : CRIT_DMG_DEFAULT,
@@ -113,7 +146,11 @@ function makeCombatant(name, stats, skillIds, passiveId) {
     resist: {}, // résistances élémentaires { element: facteur } (1 = neutre)
     shield: 0,
     shieldTurns: 0,
-    guard: null, // { reduce, turns }
+    guard: null, // brace : réduit la PROCHAINE attaque reçue { reduce, turns }
+    // Garde-réserve (instr. 71-85) — séparée des PV et de la Défense.
+    guardMax: stats.guardMax || 0,
+    guardPool: stats.guardPool != null ? stats.guardPool : stats.guardMax || 0,
+    guardActive: null, // { turns, absorb } quand la Garde redirige les dégâts
     cooldowns: {},
     res: null, // ressource de classe { id, name, color, icon, cur, max, gen } — joueur seulement
     nextAt: 0,
@@ -216,7 +253,7 @@ export function buildPlayerCombatant(state) {
   const spec = getActiveSpec(state);
   const player = makeCombatant(
     state.character.name,
-    { maxHp: ds.maxHp, hp: Math.max(1, Math.round(state.character.hpCurrent)), atk: ds.atk, def: ds.def, spd: ds.spd, crit: ds.crit, mag: ds.mag, res: ds.res, dex: ds.dex, acc: ds.acc, critDmg: ds.critDmg },
+    { maxHp: ds.maxHp, hp: Math.max(1, Math.round(state.character.hpCurrent)), atk: ds.atk, def: ds.def, spd: ds.spd, crit: ds.crit, mag: ds.mag, mres: ds.res, dex: ds.dex, acc: ds.acc, critDmg: ds.critDmg, guardMax: guardMaxFor(state.character.classId, state.character.level, ds.def) },
     ["basic_attack", ...cls.skills, ...((spec && spec.grants) || [])],
     cls.passive
   );
@@ -296,6 +333,12 @@ export function startCombat(state, enemyId, opts = {}) {
   if (!enemy) return null;
 
   const player = buildPlayerCombatant(state);
+  // Action « Défendre » disponible pour TOUTES les classes en combat réel (instr.
+  // 78, 80). Ajoutée ici (pas dans buildPlayerCombatant) : les duels d'équilibrage
+  // appellent buildPlayerCombatant directement -> aucun impact sur l'équilibrage.
+  if (!player.skills.includes("defend")) player.skills.push("defend");
+  // Le Gardien commence avec la Garde active plusieurs tours (instr. 79).
+  if (state.character.classId === "guardian") player.guardActive = { turns: 3, absorb: 0.45 };
 
   // Les ennemis ne déclarent que hp/atk/def/spd/crit : on DÉRIVE les nouvelles
   // stats (mag/res/dex/acc/critDmg) à partir de leur fiche, avec possibilité de
@@ -306,10 +349,13 @@ export function startCombat(state, enemyId, opts = {}) {
     {
       maxHp: es.hp, atk: es.atk, def: es.def, spd: es.spd, crit: es.crit,
       mag: es.mag != null ? es.mag : Math.round(es.atk * 0.3),
-      res: es.res != null ? es.res : Math.round(es.def * 0.6),
+      mres: es.res != null ? es.res : Math.round(es.def * 0.6),
       dex: es.dex != null ? es.dex : Math.round(es.spd * 0.55),
       acc: es.acc != null ? es.acc : Math.round(es.spd * 0.4 + es.crit * 0.4),
       critDmg: es.critDmg != null ? es.critDmg : CRIT_DMG_DEFAULT,
+      // Garde-réserve ennemie (instr. 85) : dérivée de la Défense, plus grande
+      // pour les boss/tanks. Surchargeable par enemy.stats.guard.
+      guardMax: es.guard != null ? es.guard : Math.round(es.def * 1.2 + (enemy.isBoss ? 40 : enemy.role === "tank" ? 30 : 8)),
     },
     ["basic_attack", ...(enemy.skills || [])],
     enemy.passive || null
@@ -350,7 +396,7 @@ export function startCombat(state, enemyId, opts = {}) {
     e.spd = Math.max(1, Math.round(e.spd * ENRAGE_MULT));
     e.crit = Math.round(e.crit * ENRAGE_MULT);
     e.mag = Math.round(e.mag * ENRAGE_MULT);
-    e.res = Math.round(e.res * ENRAGE_MULT);
+    e.mres = Math.round(e.mres * ENRAGE_MULT);
     e.dex = Math.round(e.dex * ENRAGE_MULT);
     e.acc = Math.round(e.acc * ENRAGE_MULT);
   }
@@ -360,6 +406,13 @@ export function startCombat(state, enemyId, opts = {}) {
     const b = state.bestiary[enemy.id] || (state.bestiary[enemy.id] = { seen: false, resistKnown: false });
     b.seen = true;
   }
+
+  // Initiative de départ (instr. 61-62, 68) : la Clairvoyance ouvre le combat
+  // (pas plus rapide = step plus court = agit plus tôt), avec une petite variation
+  // aléatoire CONTRÔLÉE pour départager équitablement les égalités. La variation
+  // reste assez faible pour qu'un gros investissement en Clairvoyance reste visible.
+  player.nextAt = (SPEED_UNIT / effectiveSpd(player)) * Math.random() * 0.6;
+  e.nextAt = (SPEED_UNIT / effectiveSpd(e)) * Math.random() * 0.6;
 
   const intro = e.enraged
     ? { text: `Un ${enemy.name} ENRAGÉ surgit ! Statistiques décuplées — récompenses accrues.`, kind: "enemy" }
@@ -424,6 +477,21 @@ function applyEffect(target, eff, sourceAtk, combat, who) {
     case "guard":
       target.guard = { reduce: eff.reduce, turns: eff.turns };
       break;
+    case "guard_active": {
+      // Active la Garde-réserve : redirige une part des dégâts (instr. 73-75).
+      target.guardActive = { turns: eff.turns, absorb: clampAbsorb(eff.absorb) };
+      log(combat, `${target.name} lève sa Garde.`, who);
+      break;
+    }
+    case "guard_restore": {
+      // Restaure de la Garde (instr. 78) — JAMAIS des PV (pas un soin déguisé, instr. 81).
+      const amt = eff.pctMax ? Math.round(target.guardMax * eff.pctMax) : Math.round(eff.amount || 0);
+      if (amt > 0 && target.guardMax > 0) {
+        target.guardPool = Math.min(target.guardMax, target.guardPool + amt);
+        log(combat, `${target.name} restaure ${amt} de Garde.`, who);
+      }
+      break;
+    }
     case "shield": {
       const amt = Math.round(target.maxHp * eff.pctMaxHp);
       target.shield = Math.max(target.shield, amt);
@@ -497,7 +565,7 @@ function dealDamage(combat, attacker, defender, power, opts = {}) {
   // décroissants, plafonnés). Les attaques SANS élément restent purement physiques.
   if (opts.element) {
     base *= 1 + magBonus(attacker.mag);
-    base *= 1 - resReduction(defender.res);
+    base *= 1 - resReduction(defender.mres);
   }
 
   base *= 0.9 + Math.random() * 0.2; // variance ±10 %
@@ -519,6 +587,24 @@ function dealDamage(combat, attacker, defender, power, opts = {}) {
     dmg = Math.max(1, Math.round(dmg * (1 - MATERIAL_BEHAVIOR.stabilite.reduce)));
     defender._stabilityUsed = true;
     log(combat, `${defender.name} encaisse le premier coup (Stabilité).`, defender === combat.player ? "player" : "enemy");
+  }
+  // GARDE-RÉSERVE active : redirige une part des dégâts vers la réserve (instr.
+  // 73-77). La part absorbée est retirée de la réserve, le reste touchera les PV.
+  // Réserve vidée -> la Garde active prend fin (rupture). Dégâts de Garde et de PV
+  // sont journalisés SÉPARÉMENT (instr. 82).
+  if (defender.guardActive && defender.guardPool > 0 && dmg > 0) {
+    const g = guardAbsorb(defender.guardActive, defender.guardPool, dmg);
+    if (g.toGuard > 0) {
+      defender.guardPool = g.pool;
+      dmg = g.remaining;
+      gainResource(defender, "onGuardAbsorb");
+      combat.lastFx.push({ target: defender === combat.enemy ? "enemy" : "player", dmg: g.toGuard, crit: false, guard: true });
+      log(combat, `${defender.name} encaisse ${g.toGuard} sur sa Garde.`, defender === combat.player ? "player" : "enemy");
+      if (g.broken) {
+        defender.guardActive = null;
+        log(combat, `La Garde de ${defender.name} est brisée !`, defender === combat.enemy ? "player" : "enemy");
+      }
+    }
   }
   // Bouclier : absorbe avant les PV.
   if (defender.shield > 0) {
@@ -596,6 +682,20 @@ function useSkill(combat, actor, other, skillId) {
   if (landed && skill.onHit) for (const eff of skill.onHit) applyEffect(other, eff, actor.atk, combat, kind);
   // État élémentaire infligé par la compétence (Brûlure, Trempé, Charge...).
   if (landed && skill.inflicts) applyState(combat, other, skill.inflicts, actor.atk, kind);
+
+  // CONVERSION de Garde en dégâts (instr. 83-84) : consomme une part RÉELLE de la
+  // réserve pour un supplément de dégâts directs (l'identité « offensive » de
+  // certaines classes défensives). Indépendant de l'esquive (effet déjà payé).
+  if (skill.guardConvert && actor.guardPool > 0 && other.hp > 0) {
+    const spend = Math.min(actor.guardPool, Math.round(actor.guardMax * (skill.guardConvert.pctMax || 0)));
+    if (spend > 0) {
+      actor.guardPool -= spend;
+      const bonus = Math.max(1, Math.round(spend * (skill.guardConvert.ratio || 1)));
+      other.hp = Math.max(0, other.hp - bonus);
+      combat.lastFx.push({ target: other === combat.enemy ? "enemy" : "player", dmg: bonus, crit: false });
+      log(combat, `${actor.name} convertit sa Garde en force (+${bonus} dégâts).`, kind);
+    }
+  }
 
   // Recharge réduite par la Vitesse (plafonnée). Une compétence garde toujours
   // au moins 1 tour de recharge.
@@ -782,6 +882,7 @@ function upkeep(combat) {
     for (const id of Object.keys(c.cooldowns)) if (c.cooldowns[id] > 0) c.cooldowns[id] -= 1;
     c.buffs = c.buffs.filter((b) => --b.turns > 0);
     if (c.guard && --c.guard.turns <= 0) c.guard = null;
+    if (c.guardActive && --c.guardActive.turns <= 0) c.guardActive = null; // expiration de la Garde active
     if (c.shieldTurns > 0 && --c.shieldTurns <= 0) c.shield = 0;
     // Dégâts sur la durée.
     if (c.dots.length) {
@@ -1051,6 +1152,7 @@ function simStartTurnUpkeep(combat, c) {
   for (const id of Object.keys(c.cooldowns)) if (c.cooldowns[id] > 0) c.cooldowns[id] -= 1;
   c.buffs = c.buffs.filter((b) => --b.turns > 0);
   if (c.guard && --c.guard.turns <= 0) c.guard = null;
+  if (c.guardActive && --c.guardActive.turns <= 0) c.guardActive = null;
   if (c.shieldTurns > 0 && --c.shieldTurns <= 0) c.shield = 0;
   let dot = 0;
   for (const d of c.dots) dot += d.dmg;

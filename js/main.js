@@ -223,6 +223,10 @@ function animateRound(combat) {
       num.className = "dmg-float evade";
       num.textContent = "Esquive";
       if (spr) pulseClass(spr, "hit-" + dir, 200);
+    } else if (fx.guard) {
+      // Dégâts absorbés par la Garde-réserve : affichés à part (instr. 82).
+      num.className = "dmg-float guard";
+      num.textContent = "-" + fx.dmg + " Garde";
     } else {
       num.className = "dmg-float" + (fx.crit ? " crit" : "");
       num.textContent = "-" + fx.dmg + (fx.crit ? " !" : "");
@@ -306,6 +310,16 @@ function setText(id, t) {
   const el = document.getElementById(id);
   if (el) el.textContent = t;
 }
+// Met à jour la barre de Garde-réserve d'un combattant (largeur + surlignage actif).
+function updateGuardBar(idbase, c) {
+  if (!c || !c.guardMax) return;
+  setWidth("bt-" + idbase + "-guard-fill", c.guardPool, c.guardMax);
+  const wrap = document.getElementById("bt-" + idbase + "-guard");
+  if (wrap) {
+    wrap.classList.toggle("active", !!c.guardActive);
+    wrap.title = "Garde " + fmt(c.guardPool) + "/" + fmt(c.guardMax);
+  }
+}
 
 // Re-render de l'écran seul (et des objectifs), sans toucher au topbar.
 function renderScreenOnly() {
@@ -388,6 +402,9 @@ function updateBattle(state, combat) {
   setText("bt-enemy-num", fmt(combat.enemy.hp) + "/" + fmt(combat.enemy.maxHp));
   setWidth("bt-player-fill", combat.player.hp, combat.player.maxHp);
   setText("bt-player-num", fmt(combat.player.hp) + "/" + fmt(combat.player.maxHp));
+  // Garde-réserve : largeur + état actif (surlignage), pour joueur et ennemi.
+  updateGuardBar("player", combat.player);
+  updateGuardBar("enemy", combat.enemy);
   setText("bt-turn", combat.turn);
   const fc = document.getElementById("bt-forecast");
   if (fc) fc.innerHTML = renderForecast(combat);

@@ -44,7 +44,28 @@ export const SKILLS = {
   // --- Commun ---
   basic_attack: {
     id: "basic_attack", name: "Attaque", type: "active", power: 1.0, cooldown: 0, cost: 0,
-    target: "enemy", anim: "light", desc: "Une attaque simple (100 % des dégâts). Gratuite : elle génère ta ressource de classe.",
+    target: "enemy", anim: "light", tags: ["damage"],
+    desc: "Une attaque simple (100 % des dégâts). Gratuite : elle génère ta ressource de classe.",
+  },
+  // Action défensive universelle (Lot 3) : lève la Garde-réserve (redirige une
+  // part des dégâts), réduit le prochain coup et restaure un peu de Garde.
+  defend: {
+    id: "defend", name: "Défendre", type: "active", power: 0, cooldown: 2, cost: 0,
+    target: "self", anim: "buff", tags: ["guard"],
+    self: [
+      { type: "guard_active", turns: 2, absorb: 0.4 },
+      { type: "guard_restore", pctMax: 0.2 },
+      { type: "guard", reduce: 0.3, turns: 1 },
+    ],
+    desc: "Te mets en garde : redirige une partie des dégâts reçus vers ta réserve de Garde (2 tours), réduit le prochain coup de 30 % et restaure 20 % de ta Garde.",
+  },
+  // Conversion de Garde en dégâts (instr. 83) — outil de classe défensive offensive.
+  // Non assignée à un kit pour l'instant (aucun impact d'équilibrage).
+  guard_breaker: {
+    id: "guard_breaker", name: "Riposte de Garde", type: "active", power: 0.8, cooldown: 2, cost: 25,
+    target: "enemy", anim: "heavy", tags: ["damage", "guard"],
+    guardConvert: { pctMax: 0.5, ratio: 1.0 },
+    desc: "Frappe (80 %) puis convertit jusqu'à la moitié de ta réserve de Garde en dégâts directs supplémentaires.",
   },
 
   // ===================== GUERRIER (Rage) =====================
