@@ -7,7 +7,8 @@ import { getClass, CLASSES } from "../data/classes.js";
 import { getSkill } from "../data/skills.js";
 import { getClassResource } from "../data/classResources.js";
 import { FAMILIARS, allFamiliars, FAMILIAR_ROLES, EGGS, LINK_MAX, FEED_ESSENCE_COST } from "../data/familiars.js";
-import { ensureFamiliars, familiarLevelCap } from "../systems/familiars.js";
+import { ensureFamiliars, familiarLevelCap, familiarPosture, familiarSkills } from "../systems/familiars.js";
+import { FAM_SKILLS, FAM_POSTURES, FAM_POSTURE_LABELS } from "../data/famskills.js";
 import { familiarXpAt } from "../data/curves.js";
 import { JOBS, unlockedTiers, bestTier, nextTier } from "../data/jobs.js";
 import { RESOURCES, getResource } from "../data/resources.js";
@@ -927,6 +928,25 @@ function familiarPassiveLines(fam) {
   return out;
 }
 
+// Familier ACTIF (Lot 16) : kit de compétences autonomes + posture d'IA réglable.
+function familiarBattleLines(state, fam, owned) {
+  const kit = familiarSkills(fam)
+    .map((id) => FAM_SKILLS[id])
+    .filter(Boolean)
+    .map((sk) => `<span class="spec-bonus">${esc(sk.name)}</span>`)
+    .join("");
+  const cur = familiarPosture(state, fam.id);
+  const postures = FAM_POSTURES
+    .map((p) => `<button class="zone-chip tiny ${cur === p ? "active" : ""}" data-act="familiar-posture" data-id="${fam.id}" data-posture="${p}">${esc(FAM_POSTURE_LABELS[p])}</button>`)
+    .join("");
+  return `
+    <div class="fam-battle">
+      <span class="muted small">Partenaire autonome · agit seul en combat</span>
+      <div class="spec-bonuses">${kit}</div>
+      <div class="fam-postures">${postures}</div>
+    </div>`;
+}
+
 function filterChip(act, key, val, cur, label) {
   return `<button class="zone-chip ${cur === val ? "active" : ""}" data-act="${act}" data-key="${key}" data-val="${val}">${esc(label)}</button>`;
 }
@@ -992,6 +1012,7 @@ export function renderFamiliars(state, filters = { element: "all", role: "all", 
             ${linkPips(owned.link)}
             <div class="spec-bonuses">${passives}</div>
             <p class="muted small">${esc(fam.desc)}</p>
+            ${familiarBattleLines(state, fam, owned)}
             <div class="fam-actions">
               <button class="btn tiny ${equipped ? "" : "primary"}" data-act="equip-familiar" data-id="${fam.id}">${equipped ? "Équipé ✓" : "Équiper"}</button>
               <button class="btn tiny" data-act="feed-familiar" data-id="${fam.id}" ${owned.link >= LINK_MAX || f.essence < FEED_ESSENCE_COST ? "disabled" : ""}>Nourrir · ${FEED_ESSENCE_COST} ✦</button>
@@ -1295,10 +1316,39 @@ function renderFighter(side, spritePath, emoji, hpC, idbase, isBoss) {
 // Familier équipé : petit sprite près du héros (Lot 11). Espacé, ne recrée rien.
 function renderFamiliarSprite(fam) {
   return `
-    <div class="fighter familiar-pet" id="bt-familiar">
+    <div class="fighter familiar-pet" id="bt-familiar" title="Familier autonome (partenaire)">
       <div class="fighter-shadow small"></div>
       <div class="fighter-sprite">${fighterImg(fam.sprite)}</div>
     </div>`;
+}
+
+// Invocations du héros (Lot 16) : VRAIES unités, donc barre de PV + états + mort.
+// Conteneur rafraîchi de façon ciblée (#bt-summons) : les unités apparaissent et
+// disparaissent en cours de combat. Une invocation morte n'est plus affichée.
+function renderSummonUnit(sm) {
+  return `
+    <div class="fighter summon-unit" id="bt-summon-${sm.uid}" title="${esc(sm.name)} (invocation)">
+      <div class="fighter-hp summon">
+        <div class="fighter-hp-track">
+          <div class="fighter-hp-fill summon" id="bt-summon-${sm.uid}-fill" style="width:${pct(sm.hp, sm.maxHp)}%"></div>
+        </div>
+        <span class="fighter-hp-text">${fmt(sm.hp)}/${fmt(sm.maxHp)}</span>
+      </div>
+      <div class="fighter-states small">${renderStates(sm)}</div>
+      <div class="fighter-move">
+        <div class="fighter-shadow small"></div>
+        <div class="fighter-sprite">
+          <span class="sprite-emoji summon-emoji">✶</span>
+          <div class="sprite-anim">${fighterImg(sm.sprite)}</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+export function renderSummons(combat) {
+  const list = (combat.summons || []).filter((s) => s.hp > 0);
+  if (!list.length) return "";
+  return list.map(renderSummonUnit).join("");
 }
 
 export function renderBattle(state, combat) {
@@ -1324,6 +1374,7 @@ export function renderBattle(state, combat) {
         <div class="arena-stage">
           ${renderFighter("hero", heroClass.sprite, classEmoji(heroClass.id), p, "player", false)}
           ${p.familiar ? renderFamiliarSprite(p.familiar) : ""}
+          <div class="arena-summons" id="bt-summons">${renderSummons(combat)}</div>
           ${renderFighter("enemy", e.sprite, e.icon, e, "enemy", e.isBoss)}
         </div>
       </div>

@@ -409,6 +409,24 @@ a { color: var(--gold); }
 .familiar-pet .fighter-sprite { width: 86px; height: 86px; }
 .fighter-shadow.small { transform: scale(0.6); opacity: 0.5; }
 
+/* Invocations : vraies unités (barre de PV + état + mort), groupées devant le
+   héros. Petites, sombres, lisibles ; tactiles (pas d'interaction directe). */
+.arena-summons { position: absolute; left: 12%; bottom: 4%; z-index: 3; display: flex; gap: 14px; align-items: flex-end; pointer-events: none; }
+.summon-unit { position: relative; width: 64px; transform: scale(0.82); transform-origin: bottom center; }
+.summon-unit .fighter-sprite { width: 58px; height: 58px; }
+.summon-unit .fighter-hp.summon { position: absolute; top: -16px; left: 50%; transform: translateX(-50%); width: 60px; }
+.summon-unit .fighter-hp.summon .fighter-hp-track { height: 5px; }
+.summon-unit .fighter-hp.summon .fighter-hp-fill.summon { background: linear-gradient(90deg, #7ec0ff, #4a7fd6); }
+.summon-unit .fighter-hp.summon .fighter-hp-text { font-size: 0.6rem; opacity: 0.85; }
+.summon-unit .fighter-states.small { position: absolute; top: -28px; left: 50%; transform: translateX(-50%) scale(0.78); white-space: nowrap; }
+.summon-emoji { filter: drop-shadow(0 0 4px rgba(120,180,255,0.6)); }
+
+/* Familier actif : kit + postures d'IA dans la collection. */
+.fam-battle { margin: 6px 0 2px; padding-top: 6px; border-top: 1px dashed var(--border-soft); }
+.fam-postures { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; }
+.zone-chip.tiny { padding: 3px 9px; font-size: 0.74rem; }
+@media (max-width: 640px) { .arena-summons { gap: 8px; left: 10%; } .summon-unit { width: 52px; } .summon-unit .fighter-sprite { width: 46px; height: 46px; } }
+
 /* Intention télégraphiée du boss — Lot 10 */
 .intent {
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 2px;

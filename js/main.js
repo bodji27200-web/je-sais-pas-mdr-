@@ -36,7 +36,7 @@ import { enemyUnlock, zoneUnlocked } from "./systems/zoneprog.js";
 import { getClass } from "./data/classes.js";
 import { getEnemy } from "./data/enemies.js";
 import { ZONES } from "./data/zones.js";
-import { hatchEgg, equipFamiliar, feedFamiliar } from "./systems/familiars.js";
+import { hatchEgg, equipFamiliar, feedFamiliar, setFamiliarPosture } from "./systems/familiars.js";
 import { checkNewAchievements } from "./systems/achievements.js";
 import { getGuide } from "./data/guides.js";
 import { updateObjectives, ensureObjectives, objectiveLabel } from "./systems/objectives.js";
@@ -64,6 +64,7 @@ import {
   renderForecast,
   renderIntent,
   renderStates,
+  renderSummons,
   renderObjectives,
   renderGuide,
   renderAchievements,
@@ -213,7 +214,11 @@ function animateRound(combat) {
   }
 
   for (const fx of combat.lastFx || []) {
-    const f = document.getElementById(fx.target === "enemy" ? "bt-enemy" : "bt-hero");
+    // Cible de l'effet : ennemi, héros, ou une INVOCATION précise (summon:<uid>).
+    let elId = "bt-hero";
+    if (fx.target === "enemy") elId = "bt-enemy";
+    else if (typeof fx.target === "string" && fx.target.startsWith("summon:")) elId = "bt-summon-" + fx.target.slice(7);
+    const f = document.getElementById(elId);
     if (!f) continue;
     const num = document.createElement("span");
     const spr = f.querySelector(".fighter-sprite");
@@ -414,6 +419,9 @@ function updateBattle(state, combat) {
   if (sp) sp.innerHTML = renderStates(combat.player);
   const se = document.getElementById("bt-states-enemy");
   if (se) se.innerHTML = renderStates(combat.enemy);
+  // Invocations : conteneur ciblé (unités qui apparaissent/meurent en combat).
+  const su = document.getElementById("bt-summons");
+  if (su) su.innerHTML = renderSummons(combat);
   const lg = document.getElementById("battle-log");
   if (lg) {
     lg.innerHTML = renderBattleLog(combat);
@@ -563,6 +571,12 @@ const handlers = {
     const r = feedFamiliar(getState(), el.dataset.id);
     if (!r.ok) return toast(r.error, "warn");
     toast(`Lien renforcé (${r.link}/10)`, "good");
+    save();
+    renderAll();
+  },
+  "familiar-posture": (el) => {
+    const r = setFamiliarPosture(getState(), el.dataset.id, el.dataset.posture);
+    if (!r.ok) return toast(r.error, "warn");
     save();
     renderAll();
   },
