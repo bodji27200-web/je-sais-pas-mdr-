@@ -79,7 +79,7 @@ test("un ennemi très rapide n'agit jamais plus de 2 fois d'affilée", () => {
 
 test("un ennemi ENRAGÉ a +50 % de stats (et le combat reste cohérent)", () => {
   const s = combatReadyState();
-  const normal = startCombat(s, "feral_wolf");
+  const normal = startCombat(s, "feral_wolf", { forceEnrage: false });
   const enraged = startCombat(s, "feral_wolf", { forceEnrage: true });
   assert.equal(normal.enemy.enraged, false);
   assert.equal(enraged.enemy.enraged, true);

@@ -43,6 +43,7 @@ import { updateObjectives, ensureObjectives, objectiveLabel } from "./systems/ob
 import { setMuted, isMuted, playHit, playWin, playLose, playDing } from "./core/audio.js";
 import { getResource } from "./data/resources.js";
 import { getEquipment } from "./data/equipment.js";
+import { PRIMARY_STATS } from "./data/combatStats.js";
 import { getRecipe, STATIONS } from "./data/recipes.js";
 import { $, toast, showModal, closeModal, esc, fmt, fmtDuration } from "./ui/dom.js";
 import {
@@ -215,14 +216,25 @@ function animateRound(combat) {
     const f = document.getElementById(fx.target === "enemy" ? "bt-enemy" : "bt-hero");
     if (!f) continue;
     const num = document.createElement("span");
-    num.className = "dmg-float" + (fx.crit ? " crit" : "");
-    num.textContent = "-" + fx.dmg + (fx.crit ? " !" : "");
-    f.appendChild(num);
-    num.addEventListener("animationend", () => num.remove());
     const spr = f.querySelector(".fighter-sprite");
     const dir = fx.target === "enemy" ? "right" : "left";
-    if (spr) pulseClass(spr, (fx.crit ? "crit-" : "hit-") + dir, fx.crit ? 500 : 320);
-    playHit(fx.crit);
+    if (fx.evaded) {
+      // Esquive : pas de chiffre de dégâts, pas de son d'impact (instr. 60).
+      num.className = "dmg-float evade";
+      num.textContent = "Esquive";
+      if (spr) pulseClass(spr, "hit-" + dir, 200);
+    } else if (fx.guard) {
+      // Dégâts absorbés par la Garde-réserve : affichés à part (instr. 82).
+      num.className = "dmg-float guard";
+      num.textContent = "-" + fx.dmg + " Garde";
+    } else {
+      num.className = "dmg-float" + (fx.crit ? " crit" : "");
+      num.textContent = "-" + fx.dmg + (fx.crit ? " !" : "");
+      if (spr) pulseClass(spr, (fx.crit ? "crit-" : "hit-") + dir, fx.crit ? 500 : 320);
+      playHit(fx.crit);
+    }
+    f.appendChild(num);
+    num.addEventListener("animationend", () => num.remove());
   }
 
   combat.lastActions = [];
@@ -297,6 +309,16 @@ function setWidth(id, v, max) {
 function setText(id, t) {
   const el = document.getElementById(id);
   if (el) el.textContent = t;
+}
+// Met à jour la barre de Garde-réserve d'un combattant (largeur + surlignage actif).
+function updateGuardBar(idbase, c) {
+  if (!c || !c.guardMax) return;
+  setWidth("bt-" + idbase + "-guard-fill", c.guardPool, c.guardMax);
+  const wrap = document.getElementById("bt-" + idbase + "-guard");
+  if (wrap) {
+    wrap.classList.toggle("active", !!c.guardActive);
+    wrap.title = "Garde " + fmt(c.guardPool) + "/" + fmt(c.guardMax);
+  }
 }
 
 // Re-render de l'écran seul (et des objectifs), sans toucher au topbar.
@@ -380,6 +402,9 @@ function updateBattle(state, combat) {
   setText("bt-enemy-num", fmt(combat.enemy.hp) + "/" + fmt(combat.enemy.maxHp));
   setWidth("bt-player-fill", combat.player.hp, combat.player.maxHp);
   setText("bt-player-num", fmt(combat.player.hp) + "/" + fmt(combat.player.maxHp));
+  // Garde-réserve : largeur + état actif (surlignage), pour joueur et ennemi.
+  updateGuardBar("player", combat.player);
+  updateGuardBar("enemy", combat.enemy);
   setText("bt-turn", combat.turn);
   const fc = document.getElementById("bt-forecast");
   if (fc) fc.innerHTML = renderForecast(combat);
@@ -787,6 +812,16 @@ const handlers = {
     renderScreenOnly(); // re-render l'écran Atelier (les chips reflètent l'état)
   },
   "close-modal": () => closeModal(),
+  "stat-info": (el) => {
+    // Infobulle de statistique (accessible au toucher / clavier / Xbox, instr. 48).
+    const sd = PRIMARY_STATS[el.dataset.stat];
+    if (!sd) return;
+    showModal(`
+      <h2>${esc(sd.name)}</h2>
+      <p>${esc(sd.tip)}</p>
+      <div class="modal-actions"><button class="btn primary" data-act="close-modal">Fermer</button></div>
+    `);
+  },
 };
 
 function onClick(e) {
@@ -806,6 +841,11 @@ function boot() {
   // Entrée = valider la création.
   document.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && e.target.id === "hero-name") handlers["confirm-create"]();
+    // Échap ferme la modale active (instr. 308).
+    if (e.key === "Escape") {
+      const m = $("#modal");
+      if (m && m.classList.contains("open")) closeModal();
+    }
   });
   // Recherche de l'Atelier en direct : mise à jour CIBLÉE de la liste des
   // recettes (on ne recrée pas l'input -> le focus et le curseur sont préservés).

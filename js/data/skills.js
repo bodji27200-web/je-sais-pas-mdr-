@@ -44,7 +44,28 @@ export const SKILLS = {
   // --- Commun ---
   basic_attack: {
     id: "basic_attack", name: "Attaque", type: "active", power: 1.0, cooldown: 0, cost: 0,
-    target: "enemy", anim: "light", desc: "Une attaque simple (100 % des dégâts). Gratuite : elle génère ta ressource de classe.",
+    target: "enemy", anim: "light", tags: ["damage"],
+    desc: "Une attaque simple (100 % des dégâts). Gratuite : elle génère ta ressource de classe.",
+  },
+  // Action défensive universelle (Lot 3) : lève la Garde-réserve (redirige une
+  // part des dégâts), réduit le prochain coup et restaure un peu de Garde.
+  defend: {
+    id: "defend", name: "Défendre", type: "active", power: 0, cooldown: 2, cost: 0,
+    target: "self", anim: "buff", tags: ["guard"],
+    self: [
+      { type: "guard_active", turns: 2, absorb: 0.4 },
+      { type: "guard_restore", pctMax: 0.2 },
+      { type: "guard", reduce: 0.3, turns: 1 },
+    ],
+    desc: "Te mets en garde : redirige une partie des dégâts reçus vers ta réserve de Garde (2 tours), réduit le prochain coup de 30 % et restaure 20 % de ta Garde.",
+  },
+  // Conversion de Garde en dégâts (instr. 83) — outil de classe défensive offensive.
+  // Non assignée à un kit pour l'instant (aucun impact d'équilibrage).
+  guard_breaker: {
+    id: "guard_breaker", name: "Riposte de Garde", type: "active", power: 0.8, cooldown: 2, cost: 25,
+    target: "enemy", anim: "heavy", tags: ["damage", "guard"],
+    guardConvert: { pctMax: 0.5, ratio: 1.0 },
+    desc: "Frappe (80 %) puis convertit jusqu'à la moitié de ta réserve de Garde en dégâts directs supplémentaires.",
   },
 
   // ===================== GUERRIER (Rage) =====================
@@ -106,9 +127,9 @@ export const SKILLS = {
     desc: "Projectile magique infligeant 170 % des dégâts.",
   },
   arcane_barrier: {
-    id: "arcane_barrier", name: "Barrière arcanique", type: "active", power: 0, cooldown: 3, cost: 35,
-    target: "self", anim: "buff", self: [{ type: "shield", pctMaxHp: 0.5, turns: 3 }],
-    desc: "Crée un bouclier absorbant jusqu'à 50 % de tes PV max pendant 3 tours.",
+    id: "arcane_barrier", name: "Barrière arcanique", type: "active", power: 0, cooldown: 4, cost: 35,
+    target: "self", anim: "buff", self: [{ type: "shield", pctMaxHp: 0.38, turns: 2 }],
+    desc: "Crée un bouclier absorbant jusqu'à 38 % de tes PV max pendant 2 tours.",
   },
   arcane_influx: {
     id: "arcane_influx", name: "Afflux magique", type: "passive",
@@ -168,7 +189,7 @@ export const SKILLS = {
     id: "pin_down", name: "Clouer au sol", type: "active", power: 1.2, cooldown: 2, cost: 25,
     target: "enemy", anim: "heavy",
     onHit: [{ type: "slow", amount: 0.3, turns: 2 }, { type: "atk_debuff", amount: 0.2, turns: 2 }],
-    desc: "Empale (120 %), ralentit (-30 % VIT) et affaiblit (-20 % ATK).",
+    desc: "Empale (120 %), ralentit (-30 % CLV) et affaiblit (-20 % ATK).",
   },
 
   // -- Archer --
@@ -286,7 +307,7 @@ export const SKILLS = {
   boss_quake: {
     id: "boss_quake", name: "Choc sismique", type: "active", power: 2.4, cooldown: 4,
     target: "enemy", anim: "heavy", onHit: [{ type: "slow", amount: 0.25, turns: 2 }],
-    desc: "Martèle le sol (240 %) et déstabilise l'adversaire (VIT -25 %).",
+    desc: "Martèle le sol (240 %) et déstabilise l'adversaire (CLV -25 %).",
   },
   boss_guard: {
     id: "boss_guard", name: "Garde du chef", type: "active", power: 0, cooldown: 4,
@@ -455,4 +476,35 @@ export const SKILLS = {
 
 export function getSkill(id) {
   return SKILLS[id] || null;
+}
+
+// --- Tags d'IA (instr. 236-239) ----------------------------------------------
+// Le moteur ne doit PAS dépendre du texte français pour comprendre une compétence.
+// Les tags décrivent la fonction d'une compétence dans un vocabulaire stable :
+//   damage · heal · guard · cleanse · buff · debuff · execute · summon · control · resource
+// Une compétence peut fournir `tags` explicitement ; sinon ils sont DÉRIVÉS de ses
+// mécaniques (source de vérité unique : les données de la compétence, pas la desc).
+export const SKILL_TAGS = ["damage", "heal", "guard", "cleanse", "buff", "debuff", "execute", "summon", "control", "resource"];
+
+export function deriveSkillTags(skill) {
+  if (!skill) return [];
+  const t = new Set(skill.tags || []);
+  if ((skill.power || 0) > 0) t.add("damage");
+  for (const eff of skill.self || []) {
+    if (eff.type === "heal") t.add("heal");
+    else if (eff.type === "shield" || eff.type === "def_buff" || eff.type === "guard" || eff.type === "guard_active" || eff.type === "guard_restore") t.add("guard");
+    else if (eff.type === "atk_buff" || eff.type === "spd_buff") t.add("buff");
+  }
+  for (const eff of skill.onHit || []) {
+    if (eff.type === "poison" || eff.type === "bleed") t.add("debuff");
+    else if (eff.type === "atk_debuff") t.add("debuff");
+    else if (eff.type === "slow") { t.add("debuff"); t.add("control"); }
+  }
+  if (skill.inflicts) t.add("debuff"); // états élémentaires (Brûlure, Charge, Marque…)
+  if (skill.guardConvert) t.add("resource");
+  return [...t];
+}
+
+export function getSkillTags(id) {
+  return deriveSkillTags(getSkill(id));
 }

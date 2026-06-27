@@ -32,11 +32,11 @@ export const MATERIALS = {
     name: "Cuir",
     color: "#c08a3e",
     identity: "Mobilité, précision, esquive contrôlée.",
-    bonus2: { statMods: { spdPct: 0.05, critFlat: 3 }, label: "2 pièces : +5 % VIT · +3 % crit" },
+    bonus2: { statMods: { spdPct: 0.05, critFlat: 3 }, label: "2 pièces : +5 % CLV · +3 % crit" },
     bonus4: {
       statMods: { spdPct: 0.04, critFlat: 3 },
       behavior: "souplesse",
-      label: "4 pièces : +4 % VIT · Souplesse (esquive ; +crit après une esquive)",
+      label: "4 pièces : +4 % CLV · Souplesse (esquive ; +crit après une esquive)",
     },
   },
   metal: {

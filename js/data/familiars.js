@@ -25,14 +25,15 @@ export const FAMILIARS = {
   pebble_mite: {
     id: "pebble_mite", name: "Pétroglyphe", element: "nature", role: "protecteur", rarity: "common",
     image: "assets/familiars/pebble_mite.png", sprite: "assets/familiars/pebble_mite.png",
-    passive: { maxHpPct: 0.04 },
-    desc: "Une petite créature de pierre qui endurcit la peau de son maître (PV max +4 %).",
+    // Rôle IRREMPLAÇABLE (instr. 294) : seul familier qui renforce la Garde-réserve.
+    passive: { guardMaxPct: 0.18 },
+    desc: "Une petite créature de pierre qui consolide la Garde de son maître (réserve de Garde +18 %).",
   },
   spark_mote: {
     id: "spark_mote", name: "Grésille", element: "lightning", role: "rapide", rarity: "common",
     image: "assets/familiars/spark_mote.png", sprite: "assets/familiars/spark_mote.png",
     passive: { spdPct: 0.04 },
-    desc: "Une étincelle vive qui presse le pas de son maître (Vitesse +4 %).",
+    desc: "Une étincelle vive qui presse le pas de son maître (Clairvoyance +4 %).",
   },
 
   // --- Inhabituels ---
@@ -52,7 +53,7 @@ export const FAMILIARS = {
     id: "gale_finch", name: "Bourrasque", element: "wind", role: "rapide", rarity: "uncommon",
     image: "assets/familiars/gale_finch.png", sprite: "assets/familiars/gale_finch.png",
     passive: { spdPct: 0.06, critFlat: 3 },
-    desc: "Un oiseau de vent : Vitesse +6 % et critique +3 %.",
+    desc: "Un oiseau de vent : Clairvoyance +6 % et critique +3 %.",
   },
   thorn_cub: {
     id: "thorn_cub", name: "Ronceau", element: "nature", role: "protecteur", rarity: "uncommon",
@@ -66,7 +67,7 @@ export const FAMILIARS = {
     id: "cinder_hound", name: "Tisonnier", element: "fire", role: "rapide", rarity: "rare",
     image: "assets/familiars/cinder_hound.png", sprite: "assets/familiars/cinder_hound.png",
     passive: { spdPct: 0.06, elementDmgPct: { fire: 0.1 } },
-    desc: "Un molosse de cendres : Vitesse +6 % et Feu +10 %.",
+    desc: "Un molosse de cendres : Clairvoyance +6 % et Feu +10 %.",
   },
   storm_drake: {
     id: "storm_drake", name: "Fulgureau", element: "lightning", role: "offensif", rarity: "rare",
@@ -126,3 +127,8 @@ export function getEgg(id) {
 // Coût en Essence de familier pour nourrir (un cran de lien).
 export const FEED_ESSENCE_COST = 3;
 export const LINK_MAX = 10;
+
+// Plafond DUR de régénération de PV apportée par un familier (instr. 100, 298) :
+// un familier passif ne doit jamais restaurer plus de quelques pourcents des PV
+// max par tour, sinon il neutralise seul un boss.
+export const FAMILIAR_REGEN_CAP = 0.03;

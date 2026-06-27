@@ -298,9 +298,40 @@ a { color: var(--gold); }
   border-radius: 10px;
 }
 .stat-ico { font-size: 1.1rem; }
-.stat-lbl { flex: 1; color: var(--muted); font-size: 0.9rem; }
+/* Sigle CSS sobre (pas d'emoji) pour les statistiques. */
+.stat-sigil {
+  font-family: "Cinzel", serif;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--gold);
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  padding: 2px 5px;
+  min-width: 30px;
+  text-align: center;
+}
+.stat-lbl { flex: 1; color: var(--muted); font-size: 0.9rem; display: flex; align-items: center; gap: 6px; }
 .stat-val { font-weight: 700; color: var(--gold); }
 .stat-break { flex-basis: 100%; font-size: 0.74rem; opacity: 0.85; }
+/* Bouton « ? » discret : expose l'infobulle au toucher (mobile/Xbox) et au survol. */
+.stat-info {
+  appearance: none;
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  line-height: 14px;
+  padding: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border-soft);
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+.stat-info:hover, .stat-info:focus-visible { color: var(--gold); border-color: var(--gold); outline: none; }
 
 /* Aperçu de l'ordre des tours (combat) */
 .turn-forecast { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin: 6px 0 2px; padding: 0 2px; }
@@ -928,6 +959,32 @@ a { color: var(--gold); }
   animation: dmgRise 0.9s ease-out forwards;
 }
 .dmg-float.crit { color: var(--gold); font-size: 1.55rem; }
+/* Esquive : on affiche « Esquive » au lieu d'un 0 (instr. 60). */
+.dmg-float.evade { color: #7fe3c0; font-size: 1.05rem; font-style: italic; }
+/* Dégâts absorbés par la Garde-réserve : couleur distincte des PV (instr. 82). */
+.dmg-float.guard { color: #8fb8ff; font-size: 1rem; }
+/* Barre de Garde-réserve sous les PV d'un combattant (fine, sobre). */
+.fighter-guard {
+  width: 64px;
+  margin: 2px auto 0;
+  opacity: 0.55;
+  transition: opacity 0.2s ease;
+}
+.fighter-guard.active { opacity: 1; }
+.fighter-guard-track {
+  height: 4px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(143, 184, 255, 0.35);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.fighter-guard-fill {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, #5a9bd4, #8fb8ff);
+  transition: width 0.25s ease;
+}
+.fighter-guard.active .fighter-guard-track { border-color: rgba(143, 184, 255, 0.85); box-shadow: 0 0 6px rgba(143, 184, 255, 0.5); }
 @keyframes dmgRise {
   0% { opacity: 0; transform: translate(-50%, 6px) scale(0.7); }
   20% { opacity: 1; transform: translate(-50%, -6px) scale(1.1); }
