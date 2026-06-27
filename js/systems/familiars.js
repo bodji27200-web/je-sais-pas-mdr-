@@ -6,6 +6,7 @@
 // joue pas à la place du joueur.
 
 import { getFamiliar, familiarsByRarity, getEgg, FEED_ESSENCE_COST, LINK_MAX, FAMILIAR_REGEN_CAP } from "../data/familiars.js";
+import { defaultFamSkills, defaultPosture, FAM_POSTURES } from "../data/famskills.js";
 import { familiarXpAt } from "../data/curves.js";
 import { applyXp } from "../core/progression.js";
 
@@ -134,4 +135,56 @@ export function effectiveFamiliarPassive(state) {
   // lien, un familier ne restaure jamais plus de quelques % des PV max par tour.
   if (p.hpRegenPct) p.hpRegenPct = Math.min(FAMILIAR_REGEN_CAP, p.hpRegenPct);
   return { id: fam.id, sprite: fam.sprite, image: fam.image, element: fam.element, role: fam.role, passive: p, level: o.level, link: o.link };
+}
+
+// --- Familier ACTIF (autonome) ----------------------------------------------
+// Le familier équipé n'est plus un simple bonus passif : c'est un partenaire
+// autonome qui choisit et lance des compétences en combat (voir allyAct dans
+// systems/combat.js). Les helpers ci-dessous fournissent son kit, sa posture
+// d'IA et les paramètres de combat ; le passif léger ci-dessus reste appliqué.
+
+// Posture d'IA du familier équipé (modifiable par le joueur). Stockée par familier.
+export function familiarPosture(state, id) {
+  const f = ensureFamiliars(state);
+  const o = f.owned[id];
+  const fam = getFamiliar(id);
+  if (!o || !fam) return null;
+  return o.posture || defaultPosture(fam);
+}
+
+export function setFamiliarPosture(state, id, posture) {
+  const f = ensureFamiliars(state);
+  const o = f.owned[id];
+  if (!o) return { ok: false, error: "Familier non possédé." };
+  if (!FAM_POSTURES.includes(posture)) return { ok: false, error: "Posture inconnue." };
+  o.posture = posture;
+  return { ok: true, posture };
+}
+
+// Compétences ACTIVES du familier équipé (déclarées sur le familier, sinon kit
+// par défaut dérivé du rôle/élément). Renvoie une liste d'ids de famskills.
+export function familiarSkills(fam) {
+  return (fam && Array.isArray(fam.skills) && fam.skills.length) ? fam.skills : defaultFamSkills(fam);
+}
+
+// Données de combat du familier équipé : tout ce dont le moteur a besoin pour le
+// faire agir (kit, posture, puissance dérivée du lien/niveau). null si aucun.
+export function equippedFamiliarBattle(state) {
+  const f = ensureFamiliars(state);
+  if (!f.equipped) return null;
+  const fam = getFamiliar(f.equipped);
+  const o = f.owned[f.equipped];
+  if (!fam || !o) return null;
+  // Facteur de puissance : croît avec la rareté et le lien, fortement borné pour
+  // que le familier épaule sans jamais voler la victoire au joueur.
+  const rarityFactor = { common: 0.28, uncommon: 0.33, rare: 0.4, epic: 0.46, legendary: 0.52 }[fam.rarity] || 0.3;
+  const linkBonus = Math.min(0.12, (o.link || 0) * 0.012);
+  return {
+    id: fam.id, name: fam.name, element: fam.element, role: fam.role,
+    rarity: fam.rarity, level: o.level, link: o.link,
+    posture: o.posture || defaultPosture(fam),
+    skills: familiarSkills(fam),
+    powerFactor: rarityFactor + linkBonus, // fraction de l'Attaque du héros
+    sprite: fam.sprite, image: fam.image,
+  };
 }

@@ -18,8 +18,11 @@ import { MATERIAL_BEHAVIOR } from "../data/materials.js";
 import { getState as getStateDef } from "../data/states.js";
 import { ELEMENT_ORDER } from "../data/elements.js";
 import { getClassResource } from "../data/classResources.js";
-import { effectiveFamiliarPassive, gainEquippedFamiliarXp, addEgg } from "./familiars.js";
-import { combatActiveSkills, isOffPathSkill, OFF_PATH_POWER_MULT, gainMasteryOnWin } from "./classtree.js";
+import { effectiveFamiliarPassive, gainEquippedFamiliarXp, addEgg, equippedFamiliarBattle } from "./familiars.js";
+import { combatActiveSkills, isOffPathSkill, OFF_PATH_POWER_MULT, gainMasteryOnWin, equippedNodeId } from "./classtree.js";
+import { getFamSkill } from "../data/famskills.js";
+import { getSummon, SUMMON_SLOTS_HARD_CAP } from "../data/summons.js";
+import { getNode } from "../data/classTree.js";
 import { getEgg } from "../data/familiars.js";
 import { rollAmount } from "../core/progression.js";
 import { addGold, addResource, addEquipmentInstance } from "../core/state.js";
@@ -226,7 +229,7 @@ function applyState(combat, target, stateId, sourceAtk, who) {
   if (def.charge && entry.stacks >= def.charge.dischargeAt) {
     const dmg = Math.max(1, Math.round(sourceAtk * def.charge.pctAtk));
     target.hp = Math.max(0, target.hp - dmg);
-    combat.lastFx.push({ target: target === combat.enemy ? "enemy" : "player", dmg, crit: false, dot: true });
+    combat.lastFx.push({ target: sideOf(combat, target), dmg, crit: false, dot: true });
     log(combat, `Décharge ! ${target.name} subit ${dmg} dégâts de Foudre.`, who);
     target.states = target.states.filter((s) => s !== entry);
   }
@@ -465,11 +468,33 @@ export function startCombat(state, enemyId, opts = {}) {
     lastFx: [],
     lastActions: [],
   };
+
+  // Alliés du héros (instr.) — DEUX systèmes distincts.
+  // 1) Familier autonome (sans PV, non ciblable) : créé au démarrage du combat.
+  combat.ally = buildFamiliarAlly(state, player);
+  // 2) Invocations : emplacements limités par la classe ÉQUIPÉE (summoner.max),
+  //    bornés par un plafond dur. Commence vide ; les compétences en posent.
+  combat.summons = [];
+  combat._summonUid = 0;
+  const sNode = getNode(equippedNodeId(state));
+  const sCfg = sNode && sNode.summoner;
+  combat.summonCap = sCfg ? Math.max(0, Math.min(SUMMON_SLOTS_HARD_CAP, sCfg.max || 0)) : 0;
+  combat.summonPermanent = !!(sCfg && sCfg.permanent);
+
   return combat;
 }
 
 function log(combat, text, kind = "info") {
   combat.log.push({ text, kind });
+}
+
+// Identifiant de « camp » pour les effets visuels (lastFx). Le joueur et l'ennemi
+// ont une cible fixe ; une invocation porte son propre `fxId` (= "summon:<uid>")
+// pour que l'UI affiche les dégâts sur la bonne unité (instr. ciblage/dégâts).
+function sideOf(combat, c) {
+  if (c === combat.enemy) return "enemy";
+  if (c === combat.player) return "player";
+  return c.fxId || "player";
 }
 
 // --- Stats effectives (avec buffs/debuffs + passives de combat) ---
@@ -569,7 +594,7 @@ function dealDamage(combat, attacker, defender, power, opts = {}) {
         defender.buffs.push({ type: "crit_buff", amount: cfg.critBuff, turns: cfg.critTurns });
       }
       log(combat, `${defender.name} esquive l'attaque.`, defender === combat.player ? "player" : "enemy");
-      combat.lastFx.push({ target: defender === combat.enemy ? "enemy" : "player", dmg: 0, crit: false, evaded: true });
+      combat.lastFx.push({ target: sideOf(combat, defender), dmg: 0, crit: false, evaded: true });
       return { dmg: 0, isCrit: false, evaded: true };
     }
   }
@@ -636,7 +661,7 @@ function dealDamage(combat, attacker, defender, power, opts = {}) {
       defender.guardPool = g.pool;
       dmg = g.remaining;
       gainResource(defender, "onGuardAbsorb");
-      combat.lastFx.push({ target: defender === combat.enemy ? "enemy" : "player", dmg: g.toGuard, crit: false, guard: true });
+      combat.lastFx.push({ target: sideOf(combat, defender), dmg: g.toGuard, crit: false, guard: true });
       log(combat, `${defender.name} encaisse ${g.toGuard} sur sa Garde.`, defender === combat.player ? "player" : "enemy");
       if (g.broken) {
         defender.guardActive = null;
@@ -662,7 +687,7 @@ function dealDamage(combat, attacker, defender, power, opts = {}) {
     attacker.hp = Math.min(attacker.maxHp, attacker.hp + heal);
   }
 
-  combat.lastFx.push({ target: defender === combat.enemy ? "enemy" : "player", dmg, crit: isCrit });
+  combat.lastFx.push({ target: sideOf(combat, defender), dmg, crit: isCrit });
   return { dmg, isCrit };
 }
 
@@ -675,6 +700,19 @@ function useSkill(combat, actor, other, skillId) {
   // Coût en ressource de classe (Lot 8) : déduit à l'usage. L'éligibilité est
   // déjà vérifiée en amont (playerCanUse / IA), on borne par sécurité.
   if (actor.res && skill.cost) actor.res.cur = Math.max(0, actor.res.cur - skill.cost);
+
+  // Compétence d'INVOCATION : pose une vraie créature (emplacement limité). Réservé
+  // au joueur ; sans effet en duel (pas de file d'invocations).
+  if (skill.summon && isPlayer && combat.summons) {
+    addSummon(combat, skill.summon);
+    if (skill.power <= 0 && !skill.self) {
+      log(combat, `${actor.name} utilise ${skill.name}.`, kind);
+      if (skill.cooldown > 0) actor.cooldowns[skillId] = Math.max(1, Math.round(skill.cooldown * cdFactor(actor.spd)));
+      if (actor.res) gainResource(actor, "onDefensiveSkill");
+      combat.lastActions.push({ actor: kind, skillId, anim: skill.anim || "buff", isBuff: true, hasDamage: false });
+      return;
+    }
+  }
 
   // Effets sur soi (buff, bouclier, garde, soin).
   if (skill.self) for (const eff of skill.self) applyEffect(actor, eff, actor.atk, combat, kind);
@@ -981,6 +1019,36 @@ function upkeep(combat) {
       if (c.hp > 0) gainResource(c, "regenPerTurn");
     }
   }
+
+  // Familier autonome : décrément de ses recharges (il n'a ni PV ni état).
+  if (combat.ally) {
+    for (const id of Object.keys(combat.ally.cooldowns)) if (combat.ally.cooldowns[id] > 0) combat.ally.cooldowns[id] -= 1;
+  }
+
+  // Invocations : entretien PROPRE (recharges, buffs, bouclier, DoT, états,
+  // durée de vie). Une invocation expirée ou achevée par un DoT est retirée.
+  if (combat.summons && combat.summons.length) {
+    for (const s of combat.summons) {
+      for (const id of Object.keys(s.cooldowns)) if (s.cooldowns[id] > 0) s.cooldowns[id] -= 1;
+      s.buffs = s.buffs.filter((b) => --b.turns > 0);
+      if (s.shieldTurns > 0 && --s.shieldTurns <= 0) s.shield = 0;
+      let dot = 0;
+      for (const d of s.dots) dot += d.dmg;
+      s.dots = s.dots.filter((d) => --d.turns > 0);
+      let sdot = 0;
+      for (const st of s.states) if (st.dotDmg) sdot += st.dotDmg;
+      s.states = s.states.filter((st) => --st.turns > 0);
+      const tot = dot + sdot;
+      if (tot > 0 && s.hp > 0) {
+        s.hp = Math.max(0, s.hp - tot);
+        combat.lastFx.push({ target: sideOf(combat, s), dmg: tot, crit: false, dot: true });
+      }
+      if (s.ttl != null && s.ttl > 0) s.ttl -= 1;
+      if (s.ttl != null && s.ttl <= 0 && s.hp > 0) { s.hp = 0; s._expired = true; }
+    }
+    cleanupSummons(combat);
+  }
+
   combat.turn += 1;
 }
 
@@ -988,6 +1056,279 @@ function checkDeaths(state, combat) {
   if (combat.status !== "active") return;
   if (combat.enemy.hp <= 0) finishCombat(state, combat, "won");
   else if (combat.player.hp <= 0) finishCombat(state, combat, "lost");
+}
+
+// ===========================================================================
+// ALLIÉS DU HÉROS : FAMILIER AUTONOME + INVOCATIONS
+// ---------------------------------------------------------------------------
+// Deux systèmes DISTINCTS (instr.) :
+//  - le FAMILIER équipé est un partenaire autonome SANS PV, NON ciblable, qui ne
+//    meurt jamais : il choisit et lance des compétences (famskills) selon son
+//    rôle, sa posture d'IA et l'état du héros. Il épaule, il ne gagne pas à sa
+//    place : 1 action/manche, dégâts/soins MODESTES et plafonnés.
+//  - les INVOCATIONS sont de VRAIES unités : PV, ciblables, subissent dégâts /
+//    buffs / altérations, peuvent MOURIR, occupent un emplacement limité.
+
+// --- Familier autonome -------------------------------------------------------
+function buildFamiliarAlly(state, player) {
+  const b = equippedFamiliarBattle(state);
+  if (!b) return null;
+  const atk = Math.max(1, Math.round(player.atk * b.powerFactor));
+  const ally = makeCombatant(
+    b.name,
+    {
+      maxHp: 1, hp: 1, atk, def: 0,
+      spd: Math.max(1, Math.round(player.spd * 0.9)),
+      crit: Math.min(40, Math.round(player.crit * 0.8)),
+      mag: Math.round(player.mag * 0.7),
+      mres: 0, dex: 0, acc: player.acc, critDmg: player.critDmg,
+    },
+    [], null
+  );
+  ally.isFamiliar = true;
+  ally.fxId = "familiar";
+  ally.role = b.role; ally.element = b.element; ally.posture = b.posture;
+  ally.famSkills = b.skills; ally.level = b.level; ally.link = b.link; ally.rarity = b.rarity;
+  ally.sprite = b.sprite; ally.image = b.image; ally.famId = b.id;
+  return ally;
+}
+
+// Plafond DUR de soin apporté par un familier en une fois (instr. : un familier
+// ne doit jamais restaurer trop de PV d'un coup).
+const FAMILIAR_HEAL_CAP = 0.08;
+
+// Score d'une compétence de familier selon l'état du combat ET la posture d'IA.
+// Tient compte (instr.) des PV/Mana/Garde/altérations du héros, des buffs ennemis,
+// des résistances élémentaires, des recharges et du rôle.
+function scoreFamSkill(combat, ally, id) {
+  const sk = getFamSkill(id);
+  if (!sk) return -Infinity;
+  const hero = combat.player, enemy = combat.enemy;
+  const hpFrac = hero.hp / hero.maxHp;
+  const resFrac = hero.res && hero.res.max > 0 ? hero.res.cur / hero.res.max : 1;
+  const guardFrac = hero.guardMax > 0 ? hero.guardPool / hero.guardMax : 1;
+  const heroAfflicted = hero.dots.length > 0 || hero.states.length > 0;
+  const enemyBuffed = enemy.buffs.some((b) => b.type === "atk_buff" || b.type === "def_buff" || b.type === "spd_buff");
+  const enemyLow = enemy.hp / enemy.maxHp < 0.35;
+
+  // Poids de posture (agressif / équilibré / soutien / prudent).
+  const P = ally.posture || "equilibre";
+  const wAtk = P === "agressif" ? 1.4 : P === "soutien" ? 0.7 : P === "prudent" ? 0.85 : 1;
+  const wSup = P === "soutien" ? 1.4 : P === "prudent" ? 1.25 : P === "agressif" ? 0.6 : 1;
+
+  let sc = 0;
+  switch (sk.kind) {
+    case "attack": {
+      sc = 40 + (sk.power || 1) * 30;
+      if (enemyLow) sc += 25; // aider à achever
+      // Résistances élémentaires de la cible : on évite de taper dans une résistance.
+      if (sk.element && enemy.resist && enemy.resist[sk.element] != null) {
+        const m = enemy.resist[sk.element];
+        sc *= m; // >1 vulnérable (favorisé), <1 résistant (pénalisé)
+      }
+      sc *= wAtk;
+      break;
+    }
+    case "heal":
+      sc = (hpFrac < 0.85 ? (1 - hpFrac) * 160 - 10 : -100) * wSup;
+      break;
+    case "shield":
+      sc = (hpFrac < 0.7 && hero.shield <= 0 ? 70 + (1 - hpFrac) * 60 : -60) * wSup;
+      break;
+    case "guard":
+      sc = (hero.guardMax > 0 && guardFrac < 0.55 ? 60 + (1 - guardFrac) * 70 : -100) * wSup;
+      break;
+    case "resource":
+      sc = (hero.res && resFrac < 0.55 ? 50 + (1 - resFrac) * 80 : -100) * wSup;
+      break;
+    case "cleanse":
+      sc = (heroAfflicted ? 90 : -100) * wSup;
+      break;
+    case "dispel":
+      sc = (enemyBuffed ? 85 : -100) * (P === "agressif" ? 1.2 : 1);
+      break;
+    case "empower":
+      sc = (!hero.buffs.some((b) => b.type === "atk_buff") ? 45 + (hpFrac > 0.5 ? 20 : 0) : -120) * (P === "soutien" ? 1.2 : 1);
+      break;
+  }
+  return sc;
+}
+
+// Applique la compétence choisie par le familier (effets MODESTES et plafonnés).
+function applyFamSkill(state, combat, ally, id) {
+  const sk = getFamSkill(id);
+  const hero = combat.player, enemy = combat.enemy;
+  const tag = `${ally.name} (familier)`;
+  switch (sk.kind) {
+    case "attack": {
+      const r = dealDamage(combat, ally, enemy, sk.power || 1, { element: sk.element || null, skillId: "fam_" + id });
+      if (r.evaded) log(combat, `${tag} attaque — esquivé !`, "player");
+      else log(combat, `${tag} inflige ${r.dmg} dégâts${r.isCrit ? " (CRITIQUE !)" : ""}.`, r.isCrit ? "crit" : "player");
+      break;
+    }
+    case "heal": {
+      const pct = Math.min(FAMILIAR_HEAL_CAP, sk.pctMaxHp || 0);
+      const amt = Math.round(hero.maxHp * pct * healingMult(hero));
+      hero.hp = Math.min(hero.maxHp, hero.hp + amt);
+      log(combat, `${tag} soigne le héros de ${amt} PV.`, "player");
+      break;
+    }
+    case "shield": {
+      applyEffect(hero, { type: "shield", pctMaxHp: Math.min(0.1, sk.pctMaxHp || 0.08), turns: 2 }, ally.atk, combat, "player");
+      break;
+    }
+    case "guard": {
+      applyEffect(hero, { type: "guard_restore", pctMax: sk.guardPct || 0.3 }, ally.atk, combat, "player");
+      break;
+    }
+    case "resource": {
+      if (hero.res && hero.res.max > 0) {
+        const amt = Math.round(hero.res.max * (sk.resPct || 0.18));
+        hero.res.cur = Math.min(hero.res.max, hero.res.cur + amt);
+        log(combat, `${tag} restitue ${amt} ${hero.res.name} au héros.`, "player");
+      }
+      break;
+    }
+    case "cleanse": {
+      if (hero.dots.length) { hero.dots.shift(); log(combat, `${tag} purifie une altération du héros.`, "player"); }
+      else if (hero.states.length) { hero.states.shift(); log(combat, `${tag} purifie une altération du héros.`, "player"); }
+      break;
+    }
+    case "dispel": {
+      const i = enemy.buffs.findIndex((b) => b.type === "atk_buff" || b.type === "def_buff" || b.type === "spd_buff");
+      if (i >= 0) { const b = enemy.buffs.splice(i, 1)[0]; log(combat, `${tag} dissipe un renforcement de ${enemy.name}.`, "player"); }
+      break;
+    }
+    case "empower": {
+      applyEffect(hero, { type: "atk_buff", amount: sk.amount || 0.12, turns: sk.turns || 3 }, ally.atk, combat, "player");
+      log(combat, `${tag} exalte le héros (Attaque renforcée).`, "player");
+      break;
+    }
+  }
+  combat.lastActions.push({ actor: "familiar", skillId: id, anim: sk.kind === "attack" ? "light" : "buff", hasDamage: sk.kind === "attack" });
+}
+
+// Action autonome du familier (allyAct) : 1 action/manche, jamais de boucle.
+function allyAct(state, combat) {
+  const ally = combat.ally;
+  if (!ally || combat.status !== "active") return;
+  const ready = ally.famSkills.filter((id) => (ally.cooldowns[id] || 0) <= 0 && getFamSkill(id));
+  if (!ready.length) return;
+  let best = null, bestScore = 0;
+  for (const id of ready) {
+    const sc = scoreFamSkill(combat, ally, id) * (0.95 + Math.random() * 0.1);
+    if (sc > bestScore) { bestScore = sc; best = id; }
+  }
+  if (!best) return; // rien d'utile ce tour : le familier patiente (anti-gaspillage)
+  applyFamSkill(state, combat, ally, best);
+  const sk = getFamSkill(best);
+  if (sk.cooldown > 0) ally.cooldowns[best] = sk.cooldown;
+}
+
+// --- Invocations -------------------------------------------------------------
+function makeSummon(combat, defId) {
+  const def = getSummon(defId);
+  if (!def) return null;
+  const p = combat.player;
+  const s = def.stats || {};
+  const sm = makeCombatant(
+    def.name,
+    {
+      maxHp: Math.max(1, Math.round(p.maxHp * (s.hpPct || 0.3))),
+      atk: Math.max(1, Math.round(p.atk * (s.atkPct || 0.5))),
+      def: Math.round(p.def * (s.defPct || 0.5)),
+      spd: Math.max(1, Math.round(p.spd * (s.spdPct || 1))),
+      crit: Math.round(p.crit * (s.critPct || 0.8)),
+      mag: Math.round(p.mag * (s.magPct || 0.4)),
+      mres: Math.round(p.mres * (s.defPct || 0.5)),
+      dex: Math.round(p.dex * 0.6),
+      acc: Math.round(p.acc * 0.85),
+      critDmg: p.critDmg,
+    },
+    [], null
+  );
+  sm.isSummon = true;
+  sm.defId = defId; sm.summonId = defId;
+  sm.element = def.element; sm.role = def.role; sm.taunt = !!def.taunt;
+  sm.ttl = def.ttl == null ? null : def.ttl;
+  sm.power = def.power || 1; sm.onHit = def.onHit || null; sm.onHitCounter = 0;
+  sm.sprite = def.sprite; sm.image = def.image;
+  combat._summonUid = (combat._summonUid || 0) + 1;
+  sm.uid = combat._summonUid;
+  sm.fxId = "summon:" + sm.uid;
+  return sm;
+}
+
+// Pose une invocation en respectant la limite d'emplacements (instr.). Emplacements
+// pleins -> remplacement PROPRE de la plus ancienne (FIFO), jamais de dépassement.
+function addSummon(combat, defId) {
+  const cap = combat.summonCap || 0;
+  if (cap <= 0) { log(combat, "Cette classe ne peut pas invoquer.", "info"); return null; }
+  const def = getSummon(defId);
+  if (!def) return null;
+  while (combat.summons.length >= cap && combat.summons.length > 0) {
+    const old = combat.summons.shift();
+    log(combat, `${old.name} se dissipe pour céder son emplacement.`, "info");
+  }
+  const sm = makeSummon(combat, defId);
+  if (!sm) return null;
+  combat.summons.push(sm);
+  log(combat, `${combat.player.name} invoque ${def.name} (${combat.summons.length}/${cap}).`, "player");
+  return sm;
+}
+
+function summonCount(combat) {
+  return combat.summons ? combat.summons.filter((s) => s.hp > 0).length : 0;
+}
+
+// Retrait des invocations mortes (PV<=0) ou expirées (durée écoulée). Aucune
+// action n'est jamais résolue après la mort d'une unité (instr.).
+function cleanupSummons(combat) {
+  if (!combat.summons || !combat.summons.length) return;
+  const alive = [];
+  for (const s of combat.summons) {
+    if (s.hp <= 0) log(combat, `${s.name} ${s._expired ? "se dissipe" : "est détruit"}.`, s._expired ? "info" : "enemy");
+    else alive.push(s);
+  }
+  combat.summons = alive;
+}
+
+// Action d'une invocation : frappe l'ennemi avec sa propre IA simple.
+function summonAct(state, combat, sm) {
+  if (combat.status !== "active" || sm.hp <= 0 || combat.enemy.hp <= 0) return;
+  const enemy = combat.enemy;
+  const r = dealDamage(combat, sm, enemy, sm.power || 1, { element: sm.element || null, skillId: "sm_atk" });
+  if (r.evaded) log(combat, `${sm.name} attaque — esquivé !`, "player");
+  else log(combat, `${sm.name} inflige ${r.dmg} dégâts${r.isCrit ? " (CRITIQUE !)" : ""}.`, r.isCrit ? "crit" : "player");
+  // Malus périodique (serviteur d'os) appliqué seulement si la frappe a porté.
+  if (!r.evaded && sm.onHit && enemy.hp > 0) {
+    sm.onHitCounter = (sm.onHitCounter || 0) + 1;
+    if (sm.onHitCounter % (sm.onHit.every || 1) === 0) applyEffect(enemy, sm.onHit, sm.atk, combat, "player");
+  }
+  combat.lastActions.push({ actor: "summon", uid: sm.uid, anim: "light", hasDamage: true });
+}
+
+// Phase alliée d'une manche : les invocations agissent (chacune 1×), puis le
+// familier. Bornée : aucune unité n'agit plus d'une fois par manche.
+function resolveAllies(state, combat) {
+  if (combat.status !== "active") return;
+  for (const sm of [...combat.summons]) {
+    if (combat.status !== "active") break;
+    if (sm.hp > 0) { summonAct(state, combat, sm); checkDeaths(state, combat); }
+  }
+  cleanupSummons(combat);
+  if (combat.status === "active") allyAct(state, combat);
+}
+
+// Choix de la cible d'une attaque ennemie : le héros par défaut ; une invocation
+// peut absorber l'agression (un protecteur « provoque » fortement) — instr. ciblage.
+function chooseEnemyTarget(combat) {
+  const alive = (combat.summons || []).filter((s) => s.hp > 0);
+  if (!alive.length) return combat.player;
+  const taunters = alive.filter((s) => s.taunt);
+  if (taunters.length && Math.random() < 0.7) return taunters[Math.floor(Math.random() * taunters.length)];
+  if (Math.random() < 0.6) return combat.player;
+  return alive[Math.floor(Math.random() * alive.length)];
 }
 
 // Le joueur peut-il lancer la compétence ? (recharge terminée ET ressource
@@ -1046,9 +1387,10 @@ export function resolveRound(state, combat, playerSkillId) {
   // fraîchement et n'est révélée qu'au moment de son exécution (instr. 29-30).
   let eActed = 0;
   while (combat.status === "active" && combat.enemy.nextAt <= combat.player.nextAt + 1e-6 && eActed < MAX_CONSEC) {
-    useSkill(combat, combat.enemy, combat.player, nextEnemySkill(combat));
+    useSkill(combat, combat.enemy, chooseEnemyTarget(combat), nextEnemySkill(combat));
     combat.enemy.nextAt += SPEED_UNIT / effectiveSpd(combat.enemy);
     eActed++;
+    cleanupSummons(combat); // une invocation a pu tomber sous le coup de l'ennemi
     checkDeaths(state, combat);
   }
 
@@ -1056,9 +1398,10 @@ export function resolveRound(state, combat, playerSkillId) {
   if (eActed === 0) {
     combat.pConsec += 1;
     if (combat.status === "active" && combat.pConsec >= MAX_CONSEC) {
-      useSkill(combat, combat.enemy, combat.player, nextEnemySkill(combat));
+      useSkill(combat, combat.enemy, chooseEnemyTarget(combat), nextEnemySkill(combat));
       combat.enemy.nextAt += SPEED_UNIT / effectiveSpd(combat.enemy);
       combat.pConsec = 0;
+      cleanupSummons(combat);
       checkDeaths(state, combat);
     } else if (combat.status === "active") {
       log(combat, "Grâce à ta vitesse, tu enchaînes une action !", "info");
@@ -1066,6 +1409,9 @@ export function resolveRound(state, combat, playerSkillId) {
   } else {
     combat.pConsec = 0;
   }
+
+  // Phase alliée : invocations puis familier autonome agissent (1×/manche).
+  if (combat.status === "active") resolveAllies(state, combat);
 
   if (combat.status === "active") {
     upkeep(combat);
