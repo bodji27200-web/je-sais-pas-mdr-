@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <!-- Ciel : bleu doux en haut, horizon chaud (ambiance fantasy lisible) -->
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#5fa8e0"/>
+      <stop offset="48%" stop-color="#a7d6ef"/>
+      <stop offset="78%" stop-color="#e8eecf"/>
+      <stop offset="100%" stop-color="#ffe3ad"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fff6d6"/>
+      <stop offset="100%" stop-color="#fff6d6" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Sol : bande de scène claire pour poser les combattants -->
+    <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#74c052"/>
+      <stop offset="22%" stop-color="#5fae42"/>
+      <stop offset="100%" stop-color="#3f7d2c"/>
+    </linearGradient>
+    <!-- Vignette : assombrit légèrement les bords pour concentrer le regard -->
+    <radialGradient id="vignette" cx="50%" cy="58%" r="72%">
+      <stop offset="62%" stop-color="#000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#0c1a26" stop-opacity="0.34"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Ciel -->
+  <rect width="960" height="540" fill="url(#sky)"/>
+  <circle cx="730" cy="120" r="170" fill="url(#sun)"/>
+  <circle cx="730" cy="120" r="40" fill="#fff4c4"/>
+
+  <!-- Nuages doux -->
+  <g fill="#ffffff">
+    <g opacity="0.9">
+      <ellipse cx="175" cy="116" rx="58" ry="24"/>
+      <ellipse cx="220" cy="104" rx="44" ry="28"/>
+      <ellipse cx="128" cy="110" rx="38" ry="20"/>
+    </g>
+    <g opacity="0.7">
+      <ellipse cx="560" cy="78" rx="50" ry="20"/>
+      <ellipse cx="600" cy="68" rx="36" ry="24"/>
+      <ellipse cx="522" cy="74" rx="32" ry="16"/>
+    </g>
+    <g opacity="0.55">
+      <ellipse cx="860" cy="150" rx="44" ry="18"/>
+      <ellipse cx="892" cy="142" rx="30" ry="20"/>
+    </g>
+  </g>
+
+  <!-- Reliefs lointains (perspective atmosphérique : plus c'est loin, plus c'est pâle/bleu) -->
+  <path d="M0 372 Q160 300 340 350 T700 348 T960 356 L960 540 L0 540 Z" fill="#9cc3d8"/>
+  <path d="M0 392 Q220 322 470 372 T960 372 L960 540 L0 540 Z" fill="#7fb487" opacity="0.92"/>
+
+  <!-- Silhouettes de pins au loin (fantasy, discrètes) -->
+  <g fill="#5f9e6b" opacity="0.85">
+    <path d="M150 372 l14 -34 l14 34 z"/>
+    <path d="M168 372 l14 -28 l14 28 z"/>
+    <path d="M812 372 l16 -38 l16 38 z"/>
+    <path d="M832 372 l13 -26 l13 26 z"/>
+    <path d="M470 360 l11 -22 l11 22 z"/>
+  </g>
+
+  <!-- Sol de combat (la « scène ») -->
+  <rect x="0" y="392" width="960" height="148" fill="url(#ground)"/>
+  <rect x="0" y="392" width="960" height="6" fill="#8fd267" opacity="0.9"/>
+
+  <!-- Touffes d'herbe / reliefs de sol discrets -->
+  <g fill="#54a23c" opacity="0.85">
+    <ellipse cx="120" cy="470" rx="74" ry="26"/>
+    <ellipse cx="840" cy="476" rx="80" ry="26"/>
+    <ellipse cx="480" cy="500" rx="120" ry="22"/>
+  </g>
+  <g fill="#caa15a" opacity="0.5">
+    <ellipse cx="300" cy="486" rx="40" ry="7"/>
+    <ellipse cx="640" cy="492" rx="48" ry="8"/>
+  </g>
+
+  <!-- Vignette de focus -->
+  <rect width="960" height="540" fill="url(#vignette)"/>
+</svg>
