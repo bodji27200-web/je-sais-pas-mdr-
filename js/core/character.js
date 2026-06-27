@@ -16,7 +16,16 @@ import { applyXp, charXpToNext } from "./progression.js";
 // Régénération hors combat : fraction des PV max récupérée par seconde.
 export const OUT_OF_COMBAT_REGEN_PER_SEC = 0.03;
 
-const STAT_KEYS = ["hp", "atk", "def", "spd", "crit"];
+// Stats principales calculées. `hp`/`spd` gardent leur clé moteur historique
+// (spd = Clairvoyance côté UI). Les stats ajoutées (mag/res/dex/acc/critDmg)
+// sont ADDITIVES : elles ne modifient pas les multiplicateurs existants.
+const STAT_KEYS = ["hp", "atk", "def", "mag", "res", "dex", "acc", "spd", "crit", "critDmg"];
+
+// Garde-fou (instr. 319) : jamais de NaN / Infinity / valeur aberrante dans une
+// stat. Renvoie un nombre fini, sinon la valeur de repli.
+function safeNum(n, fallback = 0) {
+  return Number.isFinite(n) ? n : fallback;
+}
 
 // Slots d'armure pris en compte pour les bonus de matériau (seuils 2 / 4 pièces).
 // Cinq emplacements -> les seuils 2 et 4 sont atteignables, et les builds
@@ -136,11 +145,16 @@ export function getDerivedStats(state) {
   }
 
   return {
-    maxHp: Math.max(1, Math.round(stats.hp)),
-    atk: Math.max(1, Math.round(stats.atk)),
-    def: Math.max(0, Math.round(stats.def)),
-    spd: Math.max(1, Math.round(stats.spd)),
-    crit: Math.max(0, Math.round(stats.crit * 10) / 10),
+    maxHp: Math.max(1, Math.round(safeNum(stats.hp, 1))),
+    atk: Math.max(1, Math.round(safeNum(stats.atk, 1))),
+    def: Math.max(0, Math.round(safeNum(stats.def))),
+    mag: Math.max(0, Math.round(safeNum(stats.mag))),
+    res: Math.max(0, Math.round(safeNum(stats.res))),
+    dex: Math.max(0, Math.round(safeNum(stats.dex))),
+    acc: Math.max(0, Math.round(safeNum(stats.acc))),
+    spd: Math.max(1, Math.round(safeNum(stats.spd, 1))),
+    crit: Math.max(0, Math.round(safeNum(stats.crit) * 10) / 10),
+    critDmg: Math.max(0, Math.round(safeNum(stats.critDmg, 60))),
   };
 }
 
@@ -163,7 +177,7 @@ export function getStatDetails(state) {
     for (const k of Object.keys(es)) equip[k] = (equip[k] || 0) + es[k];
   }
 
-  const nameMap = { hp: "maxHp", atk: "atk", def: "def", spd: "spd", crit: "crit" };
+  const nameMap = { hp: "maxHp", atk: "atk", def: "def", mag: "mag", res: "res", dex: "dex", acc: "acc", spd: "spd", crit: "crit", critDmg: "critDmg" };
   const details = {};
   for (const k of STAT_KEYS) {
     const tk = nameMap[k];

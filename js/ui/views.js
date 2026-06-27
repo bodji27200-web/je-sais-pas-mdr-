@@ -32,20 +32,12 @@ import { OBJECTIVES, objectiveHint, rewardLabel } from "../systems/objectives.js
 import { getGuide } from "../data/guides.js";
 import { evaluateAchievements, unlockedCount } from "../systems/achievements.js";
 import { ACHIEVEMENTS } from "../data/achievements.js";
+import { PRIMARY_STATS, STAT_PANEL_ORDER } from "../data/combatStats.js";
+import { dodgeChance, resReduction, BASE_CRIT_CAP } from "../systems/combat.js";
 
 // Icône pièce d'or (image fournie). Utilisée dans les contextes HTML (pas les
 // attributs title ni les toasts, qui restent en texte).
 const COIN = '<img class="coin-ico" src="assets/ui/gold.png" alt="or" />';
-
-const STAT_LABELS = { maxHp: "PV max", atk: "Attaque", def: "Défense", spd: "Vitesse", crit: "Critique" };
-const STAT_ICONS = { maxHp: "❤️", atk: "⚔️", def: "🛡️", spd: "💨", crit: "🎯" };
-const STAT_TIP = {
-  maxHp: "Quantité totale de dégâts que tu peux encaisser.",
-  atk: "Base de tes dégâts infligés.",
-  def: "Réduit chaque attaque reçue avec des rendements décroissants (formule def/(def+90)), plafonnée à 75 % : jamais 0 dégât.",
-  spd: "La Vitesse détermine la fréquence des actions (initiative). Un personnage plus rapide agit plus souvent (au plus 2 fois d'affilée) et réduit légèrement ses recharges (jusqu'à -20 %).",
-  crit: "Chance d'infliger un coup critique (×1,6 dégâts).",
-};
 
 // ---------------------------------------------------------------------------
 // Création de personnage
@@ -168,29 +160,44 @@ export function renderCharacter(state) {
   const cls = getClass(ch.classId);
   const ds = getDerivedStats(state);
 
+  // Stats principales : libellés/infobulles depuis la source unique
+  // (data/combatStats.js) ; valeurs depuis getStatDetails (mêmes chiffres qu'en
+  // combat, instr. 50). Un bouton « ? » discret expose l'infobulle au toucher
+  // (mobile/Xbox), en plus du survol (instr. 48).
   const det = getStatDetails(state);
-  const stats = ["maxHp", "atk", "def", "spd", "crit"]
-    .map((k) => {
-      const d = det[k];
-      const parts = [`base ${fmt(d.base)}`];
-      if (d.equip) parts.push(`équip. ${d.equip > 0 ? "+" : ""}${fmt(d.equip)}`);
-      if (d.bonus) parts.push(`bonus ${d.bonus > 0 ? "+" : ""}${fmt(d.bonus)}`);
-      // Détail spécifique : réduction de dégâts effective de la Défense.
-      let extra = "";
-      if (k === "def") {
-        const red = Math.round(Math.min(DEF_CAP, d.total / (d.total + DEF_K)) * 100);
-        extra = ` <span class="muted">→ −${red}% dégâts subis</span>`;
-      }
-      const valTxt = k === "crit" ? d.total + " %" : fmt(d.total);
-      return `
-        <div class="stat" title="${esc(STAT_TIP[k])}">
-          <span class="stat-ico">${STAT_ICONS[k]}</span>
-          <span class="stat-lbl">${STAT_LABELS[k]}</span>
+  const stats = STAT_PANEL_ORDER.map((id) => {
+    const sd = PRIMARY_STATS[id];
+    const d = det[sd.key];
+    if (!d) return "";
+    const parts = [`base ${fmt(d.base)}`];
+    if (d.equip) parts.push(`équip. ${d.equip > 0 ? "+" : ""}${fmt(d.equip)}`);
+    if (d.bonus) parts.push(`bonus ${d.bonus > 0 ? "+" : ""}${fmt(d.bonus)}`);
+    // Détail effectif (mêmes formules que le moteur) selon la stat.
+    let extra = "";
+    if (sd.key === "def") {
+      const red = Math.round(Math.min(DEF_CAP, d.total / (d.total + DEF_K)) * 100);
+      extra = ` <span class="muted">→ −${red}% dégâts physiques</span>`;
+    } else if (sd.key === "res") {
+      extra = ` <span class="muted">→ −${Math.round(resReduction(d.total) * 100)}% dégâts magiques</span>`;
+    } else if (sd.key === "dex") {
+      // Esquive effective contre la Précision moyenne d'un adversaire de même niveau
+      // (référence indicative ; le calcul réel oppose la Précision réelle).
+      const refAcc = Math.round(10 + ch.level * 0.9);
+      extra = ` <span class="muted">→ ~${Math.round(dodgeChance(d.total, refAcc) * 100)}% d'esquive (plafond 60%)</span>`;
+    } else if (sd.key === "crit" && d.total > BASE_CRIT_CAP) {
+      // La part de la STAT est plafonnée à 50 % en combat (instr. 50, 92).
+      extra = ` <span class="muted">→ plafonnée à ${BASE_CRIT_CAP}% en combat</span>`;
+    }
+    const valTxt = sd.pct ? d.total + " %" : fmt(d.total);
+    return `
+        <div class="stat">
+          <span class="stat-ico stat-sigil">${esc(sd.abbr)}</span>
+          <span class="stat-lbl">${esc(sd.name)}
+            <button class="stat-info" data-act="stat-info" data-stat="${id}" title="${esc(sd.tip)}" aria-label="Aide ${esc(sd.name)}">?</button></span>
           <span class="stat-val">${valTxt}</span>
           <span class="stat-break muted small">${parts.join(" · ")}${extra}</span>
         </div>`;
-    })
-    .join("");
+  }).join("");
 
   const acc2Locked = !accessory2Unlocked(state);
   // Main principale tenant une arme à deux mains -> la main gauche est « occupée ».
@@ -273,7 +280,7 @@ export function renderCharacter(state) {
 function specBonusLines(spec) {
   const out = [];
   const m = spec.statMods || {};
-  const pctLbl = { atkPct: "ATK", defPct: "DEF", hpPct: "PV", spdPct: "VIT" };
+  const pctLbl = { atkPct: "ATK", defPct: "DEF", hpPct: "PV", spdPct: "CLV" };
   for (const k of Object.keys(pctLbl)) if (m[k]) out.push(`${m[k] > 0 ? "+" : ""}${Math.round(m[k] * 100)} % ${pctLbl[k]}`);
   if (m.critFlat) out.push(`+${m.critFlat} % crit`);
   const p = spec.passive || {};
@@ -365,7 +372,7 @@ function statLine(stats) {
   return Object.keys(stats)
     .map((k) => {
       const v = stats[k];
-      const label = { hp: "PV", atk: "ATK", def: "DEF", spd: "VIT", crit: "CRIT" }[k] || k;
+      const label = { hp: "PV", atk: "ATK", def: "DEF", spd: "CLV", crit: "CRIT" }[k] || k;
       return `${v > 0 ? "+" : ""}${v} ${label}`;
     })
     .join(" · ");
@@ -396,7 +403,7 @@ function affixList(inst) {
   return `<div class="affixes">${inst.affixes.map((af) => `<span class="affix">${esc(affixText(af))}</span>`).join("")}</div>`;
 }
 
-const STAT_SHORT = { hp: "PV", atk: "ATK", def: "DEF", spd: "VIT", crit: "CRIT" };
+const STAT_SHORT = { hp: "PV", atk: "ATK", def: "DEF", spd: "CLV", crit: "CRIT" };
 
 // Comparaison honnête stat par stat (candidat vs pièce équipée). Pas de « score »
 // unique : on montre les vraies différences, au joueur de décider selon son build.
@@ -910,7 +917,7 @@ function familiarPassiveLines(fam) {
   if (p.lifestealPct) out.push(`Vol de vie +${Math.round(p.lifestealPct * 100)} %`);
   if (p.hpRegenPct) out.push(`Régén. ${Math.round(p.hpRegenPct * 100)} %/tour`);
   if (p.critFlat) out.push(`Crit +${p.critFlat} %`);
-  if (p.spdPct) out.push(`Vitesse +${Math.round(p.spdPct * 100)} %`);
+  if (p.spdPct) out.push(`Clairvoyance +${Math.round(p.spdPct * 100)} %`);
   if (p.maxHpPct) out.push(`PV max +${Math.round(p.maxHpPct * 100)} %`);
   if (p.elementDmgPct) for (const el of Object.keys(p.elementDmgPct)) {
     const e = getElement(el);

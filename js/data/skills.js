@@ -168,7 +168,7 @@ export const SKILLS = {
     id: "pin_down", name: "Clouer au sol", type: "active", power: 1.2, cooldown: 2, cost: 25,
     target: "enemy", anim: "heavy",
     onHit: [{ type: "slow", amount: 0.3, turns: 2 }, { type: "atk_debuff", amount: 0.2, turns: 2 }],
-    desc: "Empale (120 %), ralentit (-30 % VIT) et affaiblit (-20 % ATK).",
+    desc: "Empale (120 %), ralentit (-30 % CLV) et affaiblit (-20 % ATK).",
   },
 
   // -- Archer --
@@ -286,7 +286,7 @@ export const SKILLS = {
   boss_quake: {
     id: "boss_quake", name: "Choc sismique", type: "active", power: 2.4, cooldown: 4,
     target: "enemy", anim: "heavy", onHit: [{ type: "slow", amount: 0.25, turns: 2 }],
-    desc: "Martèle le sol (240 %) et déstabilise l'adversaire (VIT -25 %).",
+    desc: "Martèle le sol (240 %) et déstabilise l'adversaire (CLV -25 %).",
   },
   boss_guard: {
     id: "boss_guard", name: "Garde du chef", type: "active", power: 0, cooldown: 4,
