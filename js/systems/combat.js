@@ -9,7 +9,7 @@
 // (≤ 2 d'affilée). À la fin, c'est de nouveau au joueur.
 
 import { getEnemy } from "../data/enemies.js";
-import { getSkill } from "../data/skills.js";
+import { getSkill, deriveSkillTags } from "../data/skills.js";
 import { getClass } from "../data/classes.js";
 import { getEquipment } from "../data/equipment.js";
 import { getResource } from "../data/resources.js";
@@ -771,10 +771,12 @@ function playerPattern(combat) {
   const sk = getSkill(top);
   return { id: top, frac, aggressive: !!(sk && (sk.power || 0) > 0) };
 }
-// Une compétence est-elle « défensive » (soutien sur soi) ?
+// Une compétence est-elle « défensive » (soutien sur soi) ? Classement DATA-DRIVEN
+// via les tags d'IA (instr. 238-239) : aucune dépendance au texte français.
 function isDefensiveSkill(s) {
-  return !!(s.self && (!s.power || s.power === 0) &&
-    s.self.some((e) => ["guard", "def_buff", "shield", "guard_active", "guard_restore", "heal"].includes(e.type)));
+  if (!s || (s.power || 0) > 0) return false;
+  const tags = deriveSkillTags(s);
+  return tags.includes("guard") || tags.includes("heal");
 }
 
 function scoreEnemySkill(combat, id) {
