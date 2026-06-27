@@ -515,29 +515,60 @@ a { color: var(--gold); }
 .mat-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
 .mat-tier { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
 .mat-tier.on { color: var(--gold); }
-.recipe-grid {
+/* Atelier — menu maître/détail (grille dense de tuiles + panneau de détail) */
+.craft-layout { display: grid; grid-template-columns: 1fr; gap: 14px; }
+@media (min-width: 760px) {
+  .craft-layout { grid-template-columns: minmax(0, 1fr) 300px; align-items: start; }
+  .craft-detail { position: sticky; top: 10px; }
+}
+.craft-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(206px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(94px, 1fr));
   gap: 8px;
 }
-.recipe {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 9px 10px;
-  background: var(--panel);
-  border: 1px solid var(--border-soft);
-  border-radius: 10px;
+.craft-tile {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 9px 6px 8px;
+  background: var(--panel); border: 1px solid var(--border-soft); border-radius: 10px;
+  color: var(--text); font: inherit; cursor: pointer; text-align: center;
+  transition: border-color .12s ease, transform .08s ease, background .12s ease;
 }
-.recipe .sigil { flex: 0 0 auto; }
-.recipe.cant { opacity: 0.7; }
-.recipe-body { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.recipe-body strong { font-size: 0.92rem; line-height: 1.15; }
-.recipe-meta { display: block; font-size: 0.68rem; line-height: 1.25; margin: 1px 0; }
-.recipe .btn.tiny { flex: 0 0 auto; align-self: stretch; }
-.ingredients { display: flex; flex-wrap: wrap; gap: 4px 8px; margin-top: 1px; }
-.ingredient { font-size: 0.72rem; color: var(--muted); }
-.ingredient.missing { color: #e08a86; }
+.craft-tile:hover { border-color: var(--gold-dim); transform: translateY(-1px); }
+.craft-tile.selected {
+  border-color: var(--gold); background: rgba(224, 178, 87, 0.10);
+  box-shadow: inset 0 0 0 1px var(--gold-dim);
+}
+.craft-tile.locked { opacity: 0.5; }
+.craft-tile-name { font-size: 0.72rem; line-height: 1.15; max-height: 2.3em; overflow: hidden; word-break: break-word; }
+.craft-tile-badge { position: absolute; top: 4px; right: 5px; font-size: 0.68rem; }
+.craft-tile-badge.ok { color: #74c490; }
+.craft-tile-badge.lock { opacity: 0.65; }
+
+.craft-detail {
+  background: var(--panel); border: 1px solid var(--border-soft);
+  border-radius: 12px; padding: 14px;
+}
+.craft-detail-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; text-align: center; padding: 24px 12px;
+}
+.craft-detail-empty-ico { font-size: 1.9rem; opacity: 0.7; }
+.craft-detail-head { display: flex; gap: 12px; align-items: center; }
+.craft-detail-head .sigil { flex: 0 0 auto; }
+.craft-detail-id { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.craft-detail-id strong { font-size: 1.02rem; line-height: 1.15; }
+.craft-detail-desc { margin: 10px 0 0; font-style: italic; }
+.craft-detail-stats { margin: 10px 0 2px; font-size: 0.88rem; }
+.craft-ing-box { margin: 12px 0; border-top: 1px solid var(--border-soft); padding-top: 10px; }
+.craft-ing-title {
+  margin: 0 0 7px; font-size: 0.72rem; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.craft-ing { display: flex; justify-content: space-between; gap: 10px; font-size: 0.84rem; padding: 3px 0; }
+.craft-ing-qty { color: var(--muted); white-space: nowrap; }
+.craft-ing.missing .craft-ing-qty { color: #e08a86; }
+.craft-make-btn { width: 100%; margin-top: 4px; }
 
 /* --- Inventaire ---------------------------------------------------------- */
 .inv-grid {

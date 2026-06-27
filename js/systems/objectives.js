@@ -35,7 +35,8 @@ export const QUESTS = [
     check: (s) => (s.counters.crafted || 0) > 0 },
   { id: "equipWeapon", label: "Équiper une arme", reward: { gold: 40 },
     hint: (s) => `Équipe ${classWeaponHint(s)} (ou toute arme compatible) depuis le Sac.`,
-    check: (s) => !!s.character.equipment.weapon },
+    // Main droite OU main gauche : équiper une arme dans n'importe quelle main compte.
+    check: (s) => !!(s.character.equipment.weapon || s.character.equipment.offhand) },
   { id: "firstKill", label: "Vaincre un ennemi", reward: { gold: 50 },
     hint: () => "Rends-toi dans l'onglet Combat et affronte un ennemi.",
     check: (s) => s.counters.kills > 0 },

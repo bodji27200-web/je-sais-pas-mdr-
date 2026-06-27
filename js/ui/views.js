@@ -15,7 +15,7 @@ import { EQUIPMENT, getEquipment, SLOTS, ARMOR_FAMILIES, weaponHand } from "../d
 import { effectiveStats, MAX_UPGRADE } from "../core/items.js";
 import { getRarity } from "../data/rarities.js";
 import { upgradeCost, canUpgrade, dismantleReward } from "../systems/gear.js";
-import { RECIPES, STATIONS } from "../data/recipes.js";
+import { RECIPES, STATIONS, getRecipe } from "../data/recipes.js";
 import { ENEMIES, getEnemy } from "../data/enemies.js";
 import { ZONES, allZones } from "../data/zones.js";
 import { enemyUnlock, zoneProgress, zoneUnlocked, defeatedCount } from "../systems/zoneprog.js";
@@ -632,19 +632,23 @@ function renderCraftFilterBar(state, f) {
     </div>`;
 }
 
-export function renderCraft(state, filters = defaultCraftFilters()) {
+export function renderCraft(state, filters = defaultCraftFilters(), selectedId = null) {
   return `
     <section class="panel">
       <h2>Atelier</h2>
       <p class="muted small">Transforme tes ressources en équipement. Chaque arme forgée reçoit un élément et des affixes aléatoires : re-craft pour varier ton build.</p>
       ${renderProfessionsSummary(state)}
       ${renderCraftFilterBar(state, filters)}
-      <div id="craft-results">${renderCraftResults(state, filters)}</div>
+      <div class="craft-layout">
+        <div id="craft-results">${renderCraftResults(state, filters, selectedId)}</div>
+        <aside id="craft-detail" class="craft-detail">${renderCraftDetail(state, selectedId)}</aside>
+      </div>
     </section>`;
 }
 
-// Liste filtrée des recettes, groupée par catégorie (mise à jour ciblée possible).
-export function renderCraftResults(state, filters = defaultCraftFilters()) {
+// Recettes filtrées, groupées par catégorie, en grille dense de tuiles compactes
+// (sélection -> panneau de détail). Mise à jour ciblée possible.
+export function renderCraftResults(state, filters = defaultCraftFilters(), selectedId = null) {
   const f = filters;
   let recipes = RECIPES.filter((r) => {
     // Cohérence : par défaut (filtre « toutes classes »), on masque les armes que
@@ -673,53 +677,89 @@ export function renderCraftResults(state, filters = defaultCraftFilters()) {
   return order
     .filter((c) => groups[c])
     .map((c) => {
-      const items = groups[c].map((r) => renderRecipe(state, r)).join("");
-      return `<div class="craft-cat"><h3 class="section-title">${esc(labels[c])}</h3><div class="recipe-grid">${items}</div></div>`;
+      const items = groups[c].map((r) => renderCraftTile(state, r, selectedId)).join("");
+      return `<div class="craft-cat"><h3 class="section-title">${esc(labels[c])} <span class="muted small">(${groups[c].length})</span></h3><div class="craft-grid">${items}</div></div>`;
     })
     .join("");
 }
 
-function renderRecipe(state, recipe) {
+// Tuile compacte d'une recette (icône + nom + état réalisable). Cliquable.
+function renderCraftTile(state, recipe, selectedId) {
   const out = recipe.output;
   const outDef = out.type === "equipment" ? getEquipment(out.id) : getResource(out.id);
-  const check = canCraft(state, recipe);
-  const station = STATIONS[recipe.station];
+  const ok = canCraft(state, recipe).ok;
+  const sel = recipe.id === selectedId ? " selected" : "";
+  const badge = ok
+    ? '<span class="craft-tile-badge ok" title="Réalisable">✓</span>'
+    : '<span class="craft-tile-badge lock" title="Conditions non remplies">🔒</span>';
+  return `
+    <button class="craft-tile ${ok ? "craftable" : "locked"}${sel}" data-act="craft-select" data-recipe="${recipe.id}" title="${esc(outDef.name)}">
+      ${sigil(outDef.image, outDef.icon)}
+      <span class="craft-tile-name">${esc(outDef.name)}${out.qty > 1 ? " ×" + out.qty : ""}</span>
+      ${badge}
+    </button>`;
+}
 
-  const inputs = recipe.inputs
+// Panneau de détail d'une recette sélectionnée (stats, ingrédients, fabriquer).
+export function renderCraftDetail(state, recipeId) {
+  const recipe = recipeId ? getRecipe(recipeId) : null;
+  if (!recipe) {
+    return `<div class="craft-detail-empty muted">
+      <span class="craft-detail-empty-ico">⚒️</span>
+      <p>Choisis un objet à gauche pour voir ses détails et le fabriquer.</p>
+    </div>`;
+  }
+  const out = recipe.output;
+  const outDef = out.type === "equipment" ? getEquipment(out.id) : getResource(out.id);
+  const station = STATIONS[recipe.station];
+  const check = canCraft(state, recipe);
+  const times = craftableTimes(state, recipe);
+  const profReq = recipe.profReq || 1;
+  const typeLabel = out.type === "resource" ? "Matériau" : SLOTS[outDef.slot] || "Objet";
+  const isWeapon = out.type === "equipment" && outDef.slot === "weapon";
+
+  const metaBits = [typeLabel, `${station ? esc(station.name) : "Métier"} niv. ${profReq}`];
+  if (recipe.levelReq) metaBits.push("Niv. " + recipe.levelReq);
+
+  const statsLine = out.type === "equipment"
+    ? `<p class="craft-detail-stats">${statLine(outDef.stats)} ${familyTag(outDef)}</p>
+       <p class="muted small">✦ ${isWeapon ? "Élément + affixes" : "Affixes"} aléatoires à chaque fabrication</p>`
+    : `<p class="muted small">+${recipe.profXp || 0} XP ${esc(station ? station.name : "métier")}</p>`;
+
+  const desc = outDef.desc ? `<p class="muted small craft-detail-desc">${esc(outDef.desc)}</p>` : "";
+
+  const ing = recipe.inputs
     .map((inp) => {
       const r = getResource(inp.resource);
       const have = state.inventory.resources[inp.resource] || 0;
-      const ok = have >= inp.qty;
-      return `<span class="ingredient ${ok ? "" : "missing"}">${r.icon} ${esc(r.name)} ${have}/${inp.qty}</span>`;
+      const enough = have >= inp.qty;
+      return `<div class="craft-ing ${enough ? "" : "missing"}">
+        <span class="craft-ing-name">${r.icon} ${esc(r.name)}</span>
+        <span class="craft-ing-qty">${fmt(have)} / ${inp.qty}</span>
+      </div>`;
     })
     .join("");
 
-  // Méta : type + métier requis + classes compatibles (armes) + XP de métier.
-  const typeLabel =
-    out.type === "resource" ? "Matériau" : SLOTS[outDef.slot] || "Objet";
-  const profReq = recipe.profReq || 1;
-  const metaParts = [typeLabel, `${station ? esc(station.name) : ""} niv. ${profReq}`];
-  if (recipe.levelReq) metaParts.push("Niv. " + recipe.levelReq);
-  const meta = `<span class="recipe-meta muted">${metaParts.filter(Boolean).join(" · ")}</span>`;
-
-  const isWeapon = out.type === "equipment" && outDef.slot === "weapon";
-  const extra = out.type === "equipment" ? `<span class="recipe-meta muted">✦ ${isWeapon ? "Élément + affixes" : "Affixes"} aléatoires</span>` : "";
-  const stats = out.type === "equipment"
-    ? `<span class="muted small">${statLine(outDef.stats)} ${familyTag(outDef)}</span>${extra}`
-    : `<span class="muted small">+${recipe.profXp || 0} XP ${esc(station ? station.name : "métier")}</span>`;
+  const btnLabel = check.ok
+    ? (times > 1 ? `Fabriquer · ${times} possibles` : "Fabriquer")
+    : esc(check.reason);
 
   return `
-    <div class="recipe ${check.ok ? "" : "cant"}">
-      ${sigil(outDef.image, outDef.icon)}
-      <div class="recipe-body">
-        <strong>${esc(outDef.name)}${out.qty > 1 ? " ×" + out.qty : ""}</strong>
-        ${meta}
-        ${stats}
-        <div class="ingredients">${inputs}</div>
+    <div class="craft-detail-card">
+      <div class="craft-detail-head">
+        ${sigil(outDef.image, outDef.icon, "lg")}
+        <div class="craft-detail-id">
+          <strong>${esc(outDef.name)}${out.qty > 1 ? " ×" + out.qty : ""}</strong>
+          <span class="muted small">${metaBits.filter(Boolean).join(" · ")}</span>
+        </div>
       </div>
-      <button class="btn tiny ${check.ok ? "primary" : ""}" data-act="craft" data-id="${recipe.id}" ${check.ok ? "" : "disabled"} title="${check.ok ? "Fabriquer" : esc(check.reason)}">
-        ${check.ok ? "Fabriquer" : esc(check.reason)}
-      </button>
+      ${desc}
+      ${statsLine}
+      <div class="craft-ing-box">
+        <h4 class="craft-ing-title">Ingrédients</h4>
+        ${ing || '<p class="muted small">Aucun ingrédient.</p>'}
+      </div>
+      <button class="btn primary craft-make-btn" data-act="craft" data-id="${recipe.id}" ${check.ok ? "" : "disabled"} title="${check.ok ? "Fabriquer cet objet" : esc(check.reason)}">${btnLabel}</button>
     </div>`;
 }
 

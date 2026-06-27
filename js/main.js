@@ -52,6 +52,7 @@ import {
   renderJobs,
   renderCraft,
   renderCraftResults,
+  renderCraftDetail,
   defaultCraftFilters,
   renderInventory,
   renderFamiliars,
@@ -84,6 +85,8 @@ let currentZoneId = null; // zone sélectionnée dans le menu Combat (défaut : 
 let familiarFilters = { element: "all", role: "all", rarity: "all" };
 // Filtres de l'Atelier (persistants pendant la session).
 let craftFilters = defaultCraftFilters();
+// Recette sélectionnée dans l'Atelier (affichée dans le panneau de détail).
+let craftSelectedId = null;
 let lastTick = Date.now();
 let tickCount = 0;
 // Pendant qu'une animation de tour joue, on bloque les clics (évite de
@@ -133,7 +136,7 @@ function renderScreen() {
     case "jobs":
       return renderJobs(state);
     case "craft":
-      return renderCraft(state, craftFilters);
+      return renderCraft(state, craftFilters, craftSelectedId);
     case "inventory":
       return renderInventory(state);
     case "familiars":
@@ -553,9 +556,20 @@ const handlers = {
     save();
     renderAll();
   },
+  // Sélection d'une recette dans la grille : met à jour le panneau de détail et
+  // le surlignage SANS reconstruire la grille (pas d'images recréées).
+  "craft-select": (el) => {
+    craftSelectedId = el.dataset.recipe;
+    const detail = document.getElementById("craft-detail");
+    if (detail) detail.innerHTML = renderCraftDetail(getState(), craftSelectedId);
+    document.querySelectorAll(".craft-tile.selected").forEach((t) => t.classList.remove("selected"));
+    const tile = document.querySelector(`.craft-tile[data-recipe="${craftSelectedId}"]`);
+    if (tile) tile.classList.add("selected");
+  },
   craft: (el) => {
     const r = craft(getState(), el.dataset.id);
     if (!r.ok) return toast(r.error, "warn");
+    craftSelectedId = el.dataset.id; // on garde l'objet sélectionné après fabrication
     const recipe = getRecipe(el.dataset.id);
     const outDef = recipe.output.type === "equipment" ? getEquipment(recipe.output.id) : getResource(recipe.output.id);
     toast("Fabriqué : " + outDef.name, "good");
@@ -800,7 +814,7 @@ function boot() {
       craftFilters.search = e.target.value;
       const results = document.getElementById("craft-results");
       const state = getState();
-      if (results && state) results.innerHTML = renderCraftResults(state, craftFilters);
+      if (results && state) results.innerHTML = renderCraftResults(state, craftFilters, craftSelectedId);
     }
   });
 
