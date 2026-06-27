@@ -677,11 +677,11 @@ a { color: var(--gold); }
 .fighter.enemy .sprite-anim { animation-delay: -1.3s; }
 /* Persos relativement petits : ~15 % de la hauteur d'arène (boss ~24 %). */
 .sprite-img {
-  height: 15cqh; width: auto; max-width: 100%;
+  height: 22cqh; width: auto; max-width: 100%;
   object-fit: contain; z-index: 1;
   filter: drop-shadow(0 5px 4px rgba(0,0,0,0.4));
 }
-.fighter.boss .sprite-img { height: 24cqh; }
+.fighter.boss .sprite-img { height: 30cqh; }
 .fighter.enemy .sprite-img { transform: scaleX(-1); } /* l'ennemi fait face au héros */
 
 /* Barre de vie rattachée, au-dessus de chaque combattant. */
