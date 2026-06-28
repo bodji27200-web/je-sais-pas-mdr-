@@ -77,6 +77,103 @@ export const ZONES = {
     ],
     bossUnlock: { level: 15, prevKills: 3 },
   },
+
+  // === Contenu endgame (Lot 17) — 5 nouvelles zones de boss ==================
+  frostwind_peaks: {
+    id: "frostwind_peaks", name: "Pics du Vent Gelé", icon: "🏔️",
+    image: "assets/zones/frostwind_peaks.png", arena: "assets/backgrounds/zone4.png",
+    recommendedLevel: 16, elements: ["water", "wind"],
+    desc: "Des sommets battus par un blizzard éternel où rôdent revenants et gardiens de glace. Le Tyran Boréal y règne.",
+    enemies: ["frost_revenant", "glacier_brute", "gale_harpy", "rime_warden", "frost_shaman"],
+    boss: "borealis_tyrant", unlock: { prevBoss: "ignar_emberheart" },
+    progression: [
+      { enemy: "frost_revenant", level: 16, prevKills: 0, clearKills: 3 },
+      { enemy: "glacier_brute", level: 17, prevKills: 3, clearKills: 3 },
+      { enemy: "gale_harpy", level: 18, prevKills: 3, clearKills: 3 },
+      { enemy: "rime_warden", level: 20, prevKills: 3, clearKills: 3 },
+      { enemy: "frost_shaman", level: 21, prevKills: 3, clearKills: 3 },
+    ],
+    bossUnlock: { level: 22, prevKills: 3 },
+  },
+  verdant_abyss: {
+    id: "verdant_abyss", name: "Abysse Verdoyant", icon: "🌿",
+    image: "assets/zones/verdant_abyss.png", arena: "assets/backgrounds/zone5.png",
+    recommendedLevel: 23, elements: ["nature", "umbral"],
+    desc: "Une jungle souterraine pourrissante où la vie et la mort se confondent. Silgaïa, la Mère-Racine, y a pris racine.",
+    enemies: ["spore_horror", "thornback_maw", "gloom_stalker", "bog_leviathan", "blight_priest"],
+    boss: "rootmother_silgaia", unlock: { prevBoss: "borealis_tyrant" },
+    progression: [
+      { enemy: "spore_horror", level: 23, prevKills: 0, clearKills: 3 },
+      { enemy: "thornback_maw", level: 24, prevKills: 3, clearKills: 3 },
+      { enemy: "gloom_stalker", level: 25, prevKills: 3, clearKills: 3 },
+      { enemy: "bog_leviathan", level: 27, prevKills: 3, clearKills: 3 },
+      { enemy: "blight_priest", level: 29, prevKills: 3, clearKills: 3 },
+    ],
+    bossUnlock: { level: 30, prevKills: 3 },
+  },
+  stormspire_heights: {
+    id: "stormspire_heights", name: "Hauteurs de Foudrépointe", icon: "🌩️",
+    image: "assets/zones/stormspire_heights.png", arena: "assets/backgrounds/zone6.png",
+    recommendedLevel: 31, elements: ["lightning", "wind"],
+    desc: "Des aiguilles de roche où la foudre ne s'éteint jamais. L'Archonte Voltaïque canalise l'orage primordial.",
+    enemies: ["storm_revenant", "voltaic_golem", "thunderbird", "arc_warlock", "tempest_knight"],
+    boss: "voltaic_archon", unlock: { prevBoss: "rootmother_silgaia" },
+    progression: [
+      { enemy: "storm_revenant", level: 31, prevKills: 0, clearKills: 3 },
+      { enemy: "voltaic_golem", level: 33, prevKills: 3, clearKills: 3 },
+      { enemy: "thunderbird", level: 35, prevKills: 3, clearKills: 3 },
+      { enemy: "arc_warlock", level: 38, prevKills: 3, clearKills: 3 },
+      { enemy: "tempest_knight", level: 42, prevKills: 3, clearKills: 3 },
+    ],
+    bossUnlock: { level: 45, prevKills: 3 },
+  },
+  obsidian_necropolis: {
+    id: "obsidian_necropolis", name: "Nécropole d'Obsidienne", icon: "🏛️",
+    image: "assets/zones/obsidian_necropolis.png", arena: "assets/backgrounds/zone7.png",
+    recommendedLevel: 46, elements: ["umbral", "light"],
+    desc: "Une cité des morts taillée dans le verre volcanique. Morthane, le Roi-Liche, y commande une légion éternelle.",
+    enemies: ["bone_legionnaire", "wraith_inquisitor", "obsidian_colossus", "soul_harvester", "doom_herald"],
+    boss: "lich_king_morthane", unlock: { prevBoss: "voltaic_archon" },
+    progression: [
+      { enemy: "bone_legionnaire", level: 46, prevKills: 0, clearKills: 3 },
+      { enemy: "wraith_inquisitor", level: 49, prevKills: 3, clearKills: 3 },
+      { enemy: "obsidian_colossus", level: 52, prevKills: 3, clearKills: 3 },
+      { enemy: "soul_harvester", level: 56, prevKills: 3, clearKills: 3 },
+      { enemy: "doom_herald", level: 60, prevKills: 3, clearKills: 3 },
+    ],
+    bossUnlock: { level: 65, prevKills: 3 },
+  },
+  celestial_rift: {
+    id: "celestial_rift", name: "Faille Céleste", icon: "🌠",
+    image: "assets/zones/celestial_rift.png", arena: "assets/backgrounds/zone8.png",
+    recommendedLevel: 68, elements: ["light", "chaos"],
+    desc: "Une déchirure du ciel où l'ordre et le chaos s'affrontent. Le Séraphon Astral juge tout ce qui ose approcher.",
+    enemies: ["astral_sentinel", "chaos_spawn", "seraphic_judicator", "voidmaw_horror", "fallen_archseraph"],
+    boss: "astral_seraphon", unlock: { prevBoss: "lich_king_morthane" },
+    progression: [
+      { enemy: "astral_sentinel", level: 68, prevKills: 0, clearKills: 3 },
+      { enemy: "chaos_spawn", level: 72, prevKills: 3, clearKills: 3 },
+      { enemy: "seraphic_judicator", level: 78, prevKills: 3, clearKills: 3 },
+      { enemy: "voidmaw_horror", level: 85, prevKills: 3, clearKills: 3 },
+      { enemy: "fallen_archseraph", level: 92, prevKills: 3, clearKills: 3 },
+    ],
+    bossUnlock: { level: 100, prevKills: 3 },
+  },
+
+  // === World bosses (Lot 17) — murs de prestige quasi-imbattables (exprès) ====
+  void_throne: {
+    id: "void_throne", name: "Trône du Néant", icon: "♾️",
+    image: "assets/zones/void_throne.png", arena: "assets/backgrounds/zonevoid.png",
+    recommendedLevel: 100, elements: ["chaos", "umbral"], isWorldZone: true,
+    desc: "Au-delà du monde, trois entités primordiales attendent. Nul n'est censé les vaincre — seulement leur survivre, et raconter.",
+    enemies: ["worldboss_kraltheth", "worldboss_nyxara"],
+    boss: "worldboss_primordius", unlock: { prevBoss: "astral_seraphon" },
+    progression: [
+      { enemy: "worldboss_kraltheth", level: 100, prevKills: 0, clearKills: 1 },
+      { enemy: "worldboss_nyxara", level: 100, prevKills: 0, clearKills: 1 },
+    ],
+    bossUnlock: { level: 100, prevKills: 0 },
+  },
 };
 
 export function getZone(id) {
