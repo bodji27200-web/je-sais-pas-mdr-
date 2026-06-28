@@ -180,3 +180,10 @@ test("familiers : aucun ne cumule soin fort + action bonus + résurrection (inst
     }
   }
 });
+
+test("contenu : au moins 3 familiers par rareté (Commun -> Légendaire)", async () => {
+  const { familiarsByRarity } = await import("../js/data/familiars.js");
+  for (const r of ["common", "uncommon", "rare", "epic", "legendary"]) {
+    assert.ok(familiarsByRarity(r).length >= 3, `rareté ${r} : ${familiarsByRarity(r).length} (< 3)`);
+  }
+});
