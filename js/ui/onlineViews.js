@@ -4,6 +4,7 @@
 import { getSkill } from "../data/skills.js";
 import { DUNGEONS } from "../data/dungeons.js";
 import { DUO_SKIRMISHES } from "./coopViews.js";
+import { CLASSES } from "../data/classes.js";
 
 const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const fmt = (n) => Math.round(n).toLocaleString("fr-FR");
@@ -40,7 +41,7 @@ export function renderOnlineHome(ol) {
 }
 
 // --- Lobby -------------------------------------------------------------------
-export function renderOnlineLobby(ol) {
+export function renderOnlineLobby(ol, hasLocalSave) {
   const room = ol.room;
   if (!room) return `<section class="panel"><p class="muted">Chargement du salon…</p></section>`;
   const isHost = ol.seat === "A";
@@ -48,6 +49,19 @@ export function renderOnlineLobby(ol) {
   const bothReady = room.seats.A?.ready && room.seats.B?.ready;
   const hasBothPlayers = !!(room.seats.A && room.seats.B);
   const err = ol.error ? `<p class="net-error">${esc(ol.error)}</p>` : "";
+
+  // Si le joueur n'a pas de sauvegarde locale, il choisit une classe de base.
+  const needsClassPick = !hasLocalSave;
+  const guestClass = ol.guestClass || "warrior";
+  const classPicker = needsClassPick ? `
+    <div class="net-class-pick">
+      <p class="muted small">Tu n'as pas de personnage local. Choisis une classe pour jouer :</p>
+      <div class="tree-voies" style="flex-wrap:wrap;gap:6px;margin:6px 0">
+        ${Object.values(CLASSES).map((c) =>
+          `<button class="zone-chip ${c.id === guestClass ? "active" : ""}" data-act="net-guest-class" data-cls="${c.id}">${esc(c.name)}</button>`
+        ).join("")}
+      </div>
+    </div>` : "";
 
   const codeBlock = isHost ? `
     <div class="net-invite">
@@ -105,6 +119,7 @@ export function renderOnlineLobby(ol) {
         ${seatRow("A")}
         ${seatRow("B")}
       </div>
+      ${classPicker}
       ${!myReady
         ? `<button class="btn primary" data-act="net-ready">Je suis prêt·e ✓</button>`
         : `<p class="muted small">Tu es prêt·e. ${hasBothPlayers && isHost && bothReady ? "Lance la session ci-dessous." : "En attente…"}</p>`}

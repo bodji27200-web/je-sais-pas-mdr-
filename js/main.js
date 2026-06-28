@@ -116,6 +116,7 @@ const onlineState = {
   myTarget: null,          // cible sélectionnée localement
   error: null,             // message d'erreur affiché
   serverUrl: localStorage.getItem("coop_server_url") || "ws://localhost:8080",
+  guestClass: "warrior",   // classe de repli si pas de sauvegarde locale
   // Flags de flux d'initialisation
   _createAfterWelcome: false,
   _joinAfterWelcome: null,
@@ -230,7 +231,7 @@ function renderScreen() {
         const view = onlineState.phase === "in_combat"
           ? renderOnlineCombat(onlineState)
           : onlineState.phase === "lobby"
-            ? renderOnlineLobby(onlineState)
+            ? renderOnlineLobby(onlineState, !!getState())
             : renderOnlineHome(onlineState);
         return sw + view;
       }
@@ -885,11 +886,21 @@ const handlers = {
     setupOnlineNet(url);
   },
 
-  // Lobby : se marquer prêt (envoie le loadout = state complet)
+  // Lobby : changer la classe de repli (si pas de sauvegarde locale)
+  "net-guest-class": (el) => {
+    onlineState.guestClass = el.dataset.cls;
+    renderAll();
+  },
+
+  // Lobby : se marquer prêt (envoie le loadout = state complet ou personnage de repli)
   "net-ready": () => {
     if (!onlineState.net) return;
-    const loadout = getState();
-    if (!loadout) return toast("Aucune partie chargée.", "warn");
+    let loadout = getState();
+    if (!loadout) {
+      // Pas de partie solo : crée un personnage de niveau 1 avec la classe choisie.
+      loadout = newGame("Invité·e", onlineState.guestClass || "warrior");
+      loadout.character.hpCurrent = getDerivedStats(loadout).maxHp;
+    }
     onlineState.net.ready(true, loadout);
   },
 
