@@ -368,21 +368,12 @@ export const ENRAGE_CHANCE = 0.02; // ~2 %
 export const ENRAGE_MULT = 1.5;
 export const ENRAGE_REWARD_MULT = 2;
 
-export function startCombat(state, enemyId, opts = {}) {
+// Construit un combattant ENNEMI à partir de son id (stats dérivées, résistances,
+// aura, plafond d'encaissement, passives, phases, enrage). Extrait de startCombat
+// pour être réutilisé tel quel par le moteur de combat duo (coop) — même maths.
+export function buildEnemyCombatant(enemyId, opts = {}) {
   const enemy = getEnemy(enemyId);
   if (!enemy) return null;
-
-  const player = buildPlayerCombatant(state);
-  // Action « Défendre » disponible pour TOUTES les classes en combat réel (instr.
-  // 78, 80). Ajoutée ici (pas dans buildPlayerCombatant) : les duels d'équilibrage
-  // appellent buildPlayerCombatant directement -> aucun impact sur l'équilibrage.
-  if (!player.skills.includes("defend")) player.skills.push("defend");
-  // Le Gardien commence avec la Garde active plusieurs tours (instr. 79).
-  if (state.character.classId === "guardian") player.guardActive = { turns: 3, absorb: 0.45 };
-
-  // Les ennemis ne déclarent que hp/atk/def/spd/crit : on DÉRIVE les nouvelles
-  // stats (mag/res/dex/acc/critDmg) à partir de leur fiche, avec possibilité de
-  // surcharge explicite par ennemi (forward-compatible, instr. 26-27).
   const es = enemy.stats;
   const e = makeCombatant(
     enemy.name,
@@ -393,8 +384,6 @@ export function startCombat(state, enemyId, opts = {}) {
       dex: es.dex != null ? es.dex : Math.round(es.spd * 0.55),
       acc: es.acc != null ? es.acc : Math.round(es.spd * 0.4 + es.crit * 0.4),
       critDmg: es.critDmg != null ? es.critDmg : CRIT_DMG_DEFAULT,
-      // Garde-réserve ennemie (instr. 85) : dérivée de la Défense, plus grande
-      // pour les boss/tanks. Surchargeable par enemy.stats.guard.
       guardMax: es.guard != null ? es.guard : Math.round(es.def * 1.2 + (enemy.isBoss ? 40 : enemy.role === "tank" ? 30 : 8)),
     },
     ["basic_attack", ...(enemy.skills || [])],
@@ -406,26 +395,19 @@ export function startCombat(state, enemyId, opts = {}) {
   e.sprite = enemy.sprite;
   e.isBoss = enemy.isBoss;
   e.role = enemy.role || null;
-  e.resist = enemy.resist || {}; // résistances/vulnérabilités élémentaires
-  e.aura = enemy.aura || null; // chaleur/poison ambiant inévitable (boss)
-  e.hitCap = enemy.hitCap || 0; // plafond d'encaissement par coup (anti one-shot)
-
-  // Seconde passive éventuelle (boss : 2 passives) — fusionnée dans pp.
+  e.resist = enemy.resist || {};
+  e.aura = enemy.aura || null;
+  e.hitCap = enemy.hitCap || 0;
   if (enemy.secondPassive) {
     const sp = getSkill(enemy.secondPassive);
     if (sp && sp.passive) mergePp(e.pp, sp.passive);
   }
-
-  // Phases de boss (Lot 10) : règles qui changent sous des seuils de PV.
   e.phases = enemy.phases || [];
   e.phaseIdx = 0;
   e.phaseAtkPct = 0;
   e.phaseDefShred = 0;
-  e.element = null; // élément des attaques sans élément propre (posé par les phases)
+  e.element = null;
   e.phaseName = null;
-
-  // Enragé : +50 % à toutes les stats. Forçable pour les tests :
-  // `forceEnrage: true` force l'enrage, `forceEnrage: false` le désactive.
   e.enraged = false;
   const wantEnrage = opts.forceEnrage === true || (opts.forceEnrage !== false && Math.random() < ENRAGE_CHANCE);
   if (wantEnrage) {
@@ -441,6 +423,24 @@ export function startCombat(state, enemyId, opts = {}) {
     e.dex = Math.round(e.dex * ENRAGE_MULT);
     e.acc = Math.round(e.acc * ENRAGE_MULT);
   }
+  return e;
+}
+
+export function startCombat(state, enemyId, opts = {}) {
+  const enemy = getEnemy(enemyId);
+  if (!enemy) return null;
+
+  const player = buildPlayerCombatant(state);
+  // Action « Défendre » disponible pour TOUTES les classes en combat réel (instr.
+  // 78, 80). Ajoutée ici (pas dans buildPlayerCombatant) : les duels d'équilibrage
+  // appellent buildPlayerCombatant directement -> aucun impact sur l'équilibrage.
+  if (!player.skills.includes("defend")) player.skills.push("defend");
+  // Le Gardien commence avec la Garde active plusieurs tours (instr. 79).
+  if (state.character.classId === "guardian") player.guardActive = { turns: 3, absorb: 0.45 };
+
+  // Construit le combattant ennemi (stats dérivées, résistances, aura, plafond,
+  // passives, phases, enrage). Extrait pour être réutilisé par le combat duo (coop).
+  const e = buildEnemyCombatant(enemyId, opts);
 
   // Bestiaire : on note la rencontre (les résistances se révèlent après le combat).
   if (state.bestiary) {
@@ -530,7 +530,7 @@ function defReduction(def) {
   return Math.min(DEF_CAP, def / (def + DEF_K));
 }
 
-function applyEffect(target, eff, sourceAtk, combat, who) {
+export function applyEffect(target, eff, sourceAtk, combat, who) {
   switch (eff.type) {
     case "atk_buff":
     case "def_buff":
@@ -580,7 +580,9 @@ function applyEffect(target, eff, sourceAtk, combat, who) {
 }
 
 // Calcule et applique les dégâts. opts: { skillId, critBonus, concBonus }.
-function dealDamage(combat, attacker, defender, power, opts = {}) {
+// Exporté : réutilisé tel quel par le moteur de combat duo (coop) — mêmes maths
+// (esquive, critique, défense, éléments, Garde, bouclier, plafond, vol de vie).
+export function dealDamage(combat, attacker, defender, power, opts = {}) {
   // ESQUIVE (instr. 39-60) : Dextérité du défenseur contre Précision de
   // l'attaquant, + éventuelle Souplesse (Cuir 4 pièces), le tout PLAFONNÉ à 60 %.
   // Une esquive annule les dégâts directs (le coût/effet déjà payé reste payé).
