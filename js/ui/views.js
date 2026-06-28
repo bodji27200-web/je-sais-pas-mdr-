@@ -6,7 +6,8 @@ import { esc, sigil, bar, fmt, fmtDuration, chainImg } from "./dom.js";
 import { getClass, CLASSES } from "../data/classes.js";
 import { getSkill } from "../data/skills.js";
 import { getClassResource } from "../data/classResources.js";
-import { FAMILIARS, allFamiliars, FAMILIAR_ROLES, EGGS, LINK_MAX, FEED_ESSENCE_COST } from "../data/familiars.js";
+import { FAMILIARS, allFamiliars, FAMILIAR_ROLES, EGGS, LINK_MAX, FEED_ESSENCE_COST, familiarStars } from "../data/familiars.js";
+import { getFamSkill } from "../data/famskills.js";
 import { ensureFamiliars, familiarLevelCap } from "../systems/familiars.js";
 import { familiarXpAt } from "../data/curves.js";
 import { JOBS, unlockedTiers, bestTier, nextTier } from "../data/jobs.js";
@@ -910,21 +911,20 @@ function linkPips(link) {
   return `<span class="link-bar" title="Lien ${link}/${LINK_MAX}">${s}</span>`;
 }
 
+// Refonte « combattants » (Lot 16) : on affiche les COMPÉTENCES propres du
+// familier (il combat à tes côtés avec sa propre IA), pas un passif.
 function familiarPassiveLines(fam) {
-  const p = fam.passive || {};
-  const out = [];
-  if (p.skillPowerPct) out.push(`Compétences +${Math.round(p.skillPowerPct * 100)} %`);
-  if (p.lifestealPct) out.push(`Vol de vie +${Math.round(p.lifestealPct * 100)} %`);
-  if (p.hpRegenPct) out.push(`Régén. ${Math.round(p.hpRegenPct * 100)} %/tour`);
-  if (p.critFlat) out.push(`Crit +${p.critFlat} %`);
-  if (p.spdPct) out.push(`Clairvoyance +${Math.round(p.spdPct * 100)} %`);
-  if (p.maxHpPct) out.push(`PV max +${Math.round(p.maxHpPct * 100)} %`);
-  if (p.guardMaxPct) out.push(`Garde max +${Math.round(p.guardMaxPct * 100)} %`);
-  if (p.elementDmgPct) for (const el of Object.keys(p.elementDmgPct)) {
-    const e = getElement(el);
-    out.push(`${e ? e.name : el} +${Math.round(p.elementDmgPct[el] * 100)} %`);
-  }
-  return out;
+  return (fam.skills || []).map((id) => {
+    const s = getFamSkill(id);
+    return s ? s.name : id;
+  });
+}
+
+// Petites étoiles (rareté/puissance) — sans emoji, rendu CSS sobre.
+function starRow(n) {
+  let s = "";
+  for (let i = 0; i < n; i++) s += "★";
+  return `<span class="fam-stars" title="${n} étoiles">${s}</span>`;
 }
 
 function filterChip(act, key, val, cur, label) {
@@ -986,11 +986,12 @@ export function renderFamiliars(state, filters = { element: "all", role: "all", 
           <div class="fam-portrait">${sigil(fam.image, "")}</div>
           <div class="fam-body">
             <div class="fam-title"><strong style="color:${r.color}">${esc(fam.name)}</strong>
-              <span class="tag rarity" style="border-color:${r.color};color:${r.color}">${r.name}</span></div>
+              <span class="tag rarity" style="border-color:${r.color};color:${r.color}">${r.name}</span>
+              ${starRow(familiarStars(fam, owned))}</div>
             <span class="muted small">${el ? el.icon + " " + el.name : ""} · ${role ? role.name : ""} · Niv. ${owned.level}${owned.level >= cap ? " (max)" : ""}</span>
             <div class="bar tiny"><div class="bar-fill xp" style="width:${xpPct}%"></div></div>
             ${linkPips(owned.link)}
-            <div class="spec-bonuses">${passives}</div>
+            <p class="muted small">Compétences : ${passives || "—"}</p>
             <p class="muted small">${esc(fam.desc)}</p>
             <div class="fam-actions">
               <button class="btn tiny ${equipped ? "" : "primary"}" data-act="equip-familiar" data-id="${fam.id}">${equipped ? "Équipé ✓" : "Équiper"}</button>
@@ -1005,7 +1006,7 @@ export function renderFamiliars(state, filters = { element: "all", role: "all", 
   return `
     <section class="panel">
       <h2>Familiers</h2>
-      <p class="muted small">Découverts : ${discovered}/${allFamiliars().length} · Essence de familier : <strong>${f.essence} ✦</strong>. Un familier équipé t'épaule en combat (soutien léger) et gagne de l'expérience.</p>
+      <p class="muted small">Découverts : ${discovered}/${allFamiliars().length} · Essence de familier : <strong>${f.essence} ✦</strong>. Un familier équipé COMBAT à tes côtés sur le terrain avec ses propres compétences et sa propre IA (sans PV : il ne peut être ni tué ni ciblé). Plus il a d'étoiles, plus il est fort.</p>
       <h3 class="section-title">Œufs</h3>
       <div class="egg-list">${eggBtns}</div>
       <h3 class="section-title">Collection</h3>

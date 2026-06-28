@@ -18,7 +18,8 @@ import { MATERIAL_BEHAVIOR } from "../data/materials.js";
 import { getState as getStateDef } from "../data/states.js";
 import { ELEMENT_ORDER } from "../data/elements.js";
 import { getClassResource } from "../data/classResources.js";
-import { effectiveFamiliarPassive, gainEquippedFamiliarXp, addEgg } from "./familiars.js";
+import { buildFamiliarCombatant, buildSummonCombatant, chooseFamiliarSkill, gainEquippedFamiliarXp, addEgg, FAMILIAR_REGEN_CAP } from "./familiars.js";
+import { getFamSkill } from "../data/famskills.js";
 import { combatActiveSkills, isOffPathSkill, OFF_PATH_POWER_MULT, gainMasteryOnWin } from "./classtree.js";
 import { getEgg } from "../data/familiars.js";
 import { rollAmount } from "../core/progression.js";
@@ -328,33 +329,26 @@ export function buildPlayerCombatant(state) {
   // Élément de l'arme : les attaques sans élément propre prennent celui de l'arme.
   player.weaponElement = equippedWeaponElement(state);
 
-  // Dégâts élémentaires bonus (affixes) — combinés au familier plus bas.
+  // Dégâts élémentaires bonus (affixes).
   player.elementDmg = { ...gear.elementDmg };
 
   // Effets de combat issus des affixes (vol de vie, régén).
   if (gear.pp && Object.keys(gear.pp).length) mergePp(player.pp, gear.pp);
 
-  // Familier équipé (Lot 11) : SOUTIEN LÉGER appliqué au héros en combat.
-  const fam = effectiveFamiliarPassive(state);
-  if (fam) {
-    const p = fam.passive || {};
-    if (p.maxHpPct) {
-      player.maxHp = Math.round(player.maxHp * (1 + p.maxHpPct));
-      player.hp = Math.min(player.maxHp, player.hp);
-    }
-    if (p.critFlat) player.crit += p.critFlat;
-    if (p.spdPct) player.spd = Math.max(1, player.spd * (1 + p.spdPct));
-    // Renfort de la Garde-réserve (rôle protecteur unique du Pétroglyphe, instr. 294).
-    if (p.guardMaxPct && player.guardMax > 0) {
-      player.guardMax = Math.round(player.guardMax * (1 + p.guardMaxPct));
-      player.guardPool = player.guardMax;
-    }
-    const ppAdd = {};
-    for (const k of ["skillPowerPct", "lifestealPct", "hpRegenPct"]) if (p[k]) ppAdd[k] = p[k];
-    if (Object.keys(ppAdd).length) mergePp(player.pp, ppAdd);
-    if (p.elementDmgPct) for (const el of Object.keys(p.elementDmgPct)) player.elementDmg[el] = (player.elementDmg[el] || 0) + p.elementDmgPct[el];
-    player.familiar = { id: fam.id, sprite: fam.sprite, image: fam.image, element: fam.element, role: fam.role, level: fam.level, link: fam.link };
+  // Niveau du héros (utilisé pour la mise à l'échelle des invocations).
+  player.level = state.character.level;
+
+  // Capacité d'INVOCATION du nœud équipé (Invocateur / Nécromancien) :
+  // nombre maximal de créatures simultanées (strictement limité, instr.).
+  if (spec && spec.summoner) {
+    player.summonCap = spec.summoner.max || 0;
+    player.summonPermanent = !!spec.summoner.permanent;
+  } else {
+    player.summonCap = 0;
   }
+
+  // NB : le FAMILIER n'est plus un passif appliqué au héros : c'est un combattant
+  // allié (sans PV) construit séparément dans startCombat (buildFamiliarCombatant).
 
   return player;
 }
@@ -464,7 +458,17 @@ export function startCombat(state, enemyId, opts = {}) {
     rewards: null,
     lastFx: [],
     lastActions: [],
+    allies: [], // familier + invocations (combattants sans PV, côté joueur)
+    soulFragments: 0, // ressource de combat (Fragments d'âme) pour les invocations
   };
+
+  // Familier équipé : combattant ALLIÉ sur le terrain (Lot 16). Sans PV : il agit
+  // chaque tour via sa propre IA, sans pouvoir être tué ni ciblé.
+  const fam = buildFamiliarCombatant(state);
+  if (fam) {
+    combat.allies.push(fam);
+    player.familiar = { id: fam.id, sprite: fam.sprite, image: fam.image, element: fam.element, role: fam.role, level: fam.level, link: fam.link, stars: fam.stars };
+  }
   return combat;
 }
 
@@ -676,6 +680,29 @@ function useSkill(combat, actor, other, skillId) {
   // déjà vérifiée en amont (playerCanUse / IA), on borne par sécurité.
   if (actor.res && skill.cost) actor.res.cur = Math.max(0, actor.res.cur - skill.cost);
 
+  // INVOCATION (Lot 16) : pose une vraie créature alliée, dans la LIMITE stricte
+  // du nœud (player.summonCap). Au plafond, l'invocation la plus ancienne cède la
+  // place (jamais d'accumulation infinie). Réservé au joueur.
+  if (skill.summon && isPlayer) {
+    const cap = actor.summonCap || 0;
+    if (cap > 0) {
+      const minion = buildSummonCombatant(skill.summon, actor, actor.level || 1);
+      if (minion) {
+        // Fragments d'âme accumulés -> invocations un peu plus fortes (soutien).
+        if (combat.soulFragments > 0) {
+          minion.atk = Math.round(minion.atk * (1 + Math.min(0.3, combat.soulFragments * 0.05)));
+        }
+        const summons = combat.allies.filter((a) => a.kind === "summon");
+        if (summons.length >= cap) {
+          const oldest = summons[0];
+          combat.allies = combat.allies.filter((a) => a !== oldest);
+        }
+        combat.allies.push(minion);
+        log(combat, `${actor.name} invoque ${minion.name}.`, kind);
+      }
+    }
+  }
+
   // Effets sur soi (buff, bouclier, garde, soin).
   if (skill.self) for (const eff of skill.self) applyEffect(actor, eff, actor.atk, combat, kind);
 
@@ -767,6 +794,84 @@ function useSkill(combat, actor, other, skillId) {
     isBuff: skill.target === "self" || !skill.power,
     hasDamage: skill.power > 0,
   });
+}
+
+// --- Action d'un combattant ALLIÉ (familier / invocation, Lot 16) -------------
+// L'allié choisit lui-même sa compétence (chooseFamiliarSkill) puis l'applique :
+// dégâts à l'ennemi, état, malus, ou soutien au héros. Sans PV, il ne peut être
+// ni tué ni ciblé. Valeurs MODÉRÉES (il épaule, il ne gagne pas seul).
+function allyAct(combat, ally) {
+  if (combat.status !== "active" || combat.enemy.hp <= 0) return;
+  const id = chooseFamiliarSkill(ally, combat);
+  const s = getFamSkill(id);
+  if (!s) return;
+  const player = combat.player;
+  const enemy = combat.enemy;
+  let landed = false;
+
+  // Attaque à l'ennemi.
+  if (s.power > 0) {
+    const r = dealDamage(combat, ally, enemy, s.power, { skillId: id, element: s.element || ally.element || null });
+    if (!r.evaded) landed = true;
+    log(combat, `${ally.name} utilise ${s.name}${r.evaded ? " — esquivé !" : ` (${r.dmg})`}.`, "player");
+  } else {
+    log(combat, `${ally.name} utilise ${s.name}.`, "player");
+    landed = true;
+  }
+  // État élémentaire sur l'ennemi (si l'attaque a touché, ou effet direct).
+  if (s.state && (landed || s.power === 0)) applyState(combat, enemy, s.state, ally.atk, "player");
+  // Malus sur l'ennemi.
+  if (s.enemyDebuff && (landed || s.power === 0)) enemy.buffs.push({ type: s.enemyDebuff.type, amount: s.enemyDebuff.amount, turns: s.enemyDebuff.turns });
+  // Anti-buff : retire un renfort positif de l'ennemi.
+  if (s.antibuff) {
+    const i = enemy.buffs.findIndex((b) => /buff/.test(b.type) && b.type !== "atk_debuff");
+    if (i >= 0) { enemy.buffs.splice(i, 1); log(combat, `${ally.name} dissipe un renfort ennemi.`, "player"); }
+  }
+  // Soutien au héros.
+  if (s.heroGuard && player.guardMax > 0) {
+    player.guardPool = Math.min(player.guardMax, player.guardPool + Math.round(player.guardMax * s.heroGuard));
+  }
+  if (s.heroMana && player.res) {
+    player.res.cur = Math.min(player.res.max, player.res.cur + Math.round(player.res.max * s.heroMana));
+  }
+  if (s.heroBuff) player.buffs.push({ type: s.heroBuff.type, amount: s.heroBuff.amount, turns: s.heroBuff.turns });
+  if (s.heroHeal && player.hp < player.maxHp) {
+    // Soin de familier PLAFONNÉ très bas (instr.) : jamais un soin déguisé fort.
+    const amt = Math.round(player.maxHp * Math.min(FAMILIAR_REGEN_CAP, s.heroHeal) * healingMult(player));
+    if (amt > 0) player.hp = Math.min(player.maxHp, player.hp + amt);
+  }
+  if (s.cleanse && player.dots.length) {
+    player.dots.shift(); // retire l'altération la plus ancienne
+    log(combat, `${ally.name} purifie une altération de ${player.name}.`, "player");
+  }
+  if (s.soulfrag) combat.soulFragments += s.soulfrag;
+
+  if (s.cooldown) ally.cooldowns[id] = s.cooldown;
+  combat.lastActions.push({ actor: "ally", allyId: ally.id, skillId: id, anim: "light", hasDamage: s.power > 0 });
+}
+
+// Fait jouer tous les alliés (familier + invocations) une fois ce tour.
+function alliesAct(state, combat) {
+  if (!combat.allies || !combat.allies.length) return;
+  for (const ally of [...combat.allies]) {
+    if (combat.status !== "active") break;
+    allyAct(combat, ally);
+  }
+}
+
+// Entretien des alliés : recharges + durée de vie (invocations temporaires).
+function upkeepAllies(combat) {
+  if (!combat.allies) return;
+  const survivors = [];
+  for (const a of combat.allies) {
+    for (const id of Object.keys(a.cooldowns)) if (a.cooldowns[id] > 0) a.cooldowns[id] -= 1;
+    if (a.ttl !== Infinity) {
+      a.ttl -= 1;
+      if (a.ttl <= 0) { log(combat, `${a.name} se dissipe.`, "info"); continue; }
+    }
+    survivors.push(a);
+  }
+  combat.allies = survivors;
 }
 
 // IA ennemie « qui réfléchit » : évalue chaque compétence disponible et choisit
@@ -1042,6 +1147,13 @@ export function resolveRound(state, combat, playerSkillId) {
   checkPhase(combat); // un burst peut faire franchir un seuil de phase tout de suite
   checkDeaths(state, combat);
 
+  // Alliés (familier + invocations) : ils agissent à leur tour, via leur IA.
+  if (combat.status === "active") {
+    alliesAct(state, combat);
+    checkPhase(combat);
+    checkDeaths(state, combat);
+  }
+
   // Tours de l'ennemi tant que c'est son tour (≤ MAX_CONSEC). L'action est choisie
   // fraîchement et n'est révélée qu'au moment de son exécution (instr. 29-30).
   let eActed = 0;
@@ -1069,6 +1181,7 @@ export function resolveRound(state, combat, playerSkillId) {
 
   if (combat.status === "active") {
     upkeep(combat);
+    upkeepAllies(combat); // recharges + durée de vie des invocations
     checkPhase(combat); // un DoT peut aussi faire franchir un seuil
     checkDeaths(state, combat); // un DoT peut achever un combattant
   }

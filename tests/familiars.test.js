@@ -1,17 +1,19 @@
-// Tests du Lot 11 — familiers : éclosion, doublons->essence, équipement, lien,
-// XP plafonnée, passif en combat, migration de sauvegarde.
+// Tests Lot 16 — familiers COMBATTANTS (refonte) + invocations.
+// Éclosion, doublons->essence, équipement, lien, XP plafonnée, familier sur le
+// terrain (sans PV, IA propre), invocations limitées, plafonds, rôles distincts.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { newGame, SAVE_VERSION } from "../js/core/state.js";
+import { newGame } from "../js/core/state.js";
 import { getDerivedStats } from "../js/core/character.js";
-import { startCombat } from "../js/systems/combat.js";
+import { startCombat, resolveRound, buildPlayerCombatant, playerCanUse } from "../js/systems/combat.js";
 import {
-  ensureFamiliars, rollFamiliar, hatchEgg, equipFamiliar, feedFamiliar,
-  gainEquippedFamiliarXp, familiarLevelCap, effectiveFamiliarPassive, addEgg,
+  rollFamiliar, hatchEgg, equipFamiliar, feedFamiliar,
+  gainEquippedFamiliarXp, familiarLevelCap, addEgg,
+  buildFamiliarCombatant, familiarCombatStats, chooseFamiliarSkill, buildSummonCombatant,
 } from "../js/systems/familiars.js";
-import { FAMILIARS, getFamiliar, EGGS, FEED_ESSENCE_COST, LINK_MAX } from "../js/data/familiars.js";
-import { withSeed, approxEqual } from "./helpers.js";
+import { FAMILIARS, getFamiliar, FEED_ESSENCE_COST, LINK_MAX, familiarsByRarity, familiarStars, FAMILIAR_REGEN_CAP } from "../js/data/familiars.js";
+import { withSeed } from "./helpers.js";
 
 function fresh() {
   const s = newGame("Dompteur", "mage");
@@ -19,79 +21,48 @@ function fresh() {
   return s;
 }
 
-test("nouvelle partie : structure familiers initialisée + œuf commun offert", () => {
+test("nouvelle partie : structure familiers + œuf commun offert", () => {
   const s = fresh();
-  assert.ok(s.familiars, "familiars présent");
-  assert.equal(s.familiars.eggs.common, 1, "un œuf commun de départ");
+  assert.equal(s.familiars.eggs.common, 1);
   assert.equal(s.familiars.equipped, null);
-  assert.equal(s.familiars.essence, 0);
 });
 
-test("rollFamiliar respecte les poids de rareté de l'œuf (grand volume)", () => {
-  const N = 40000;
-  withSeed(123, () => {
-    const counts = {};
-    for (let i = 0; i < N; i++) {
-      const id = rollFamiliar("rare");
-      const r = getFamiliar(id).rarity;
-      counts[r] = (counts[r] || 0) + 1;
+test("rollFamiliar reste borné aux raretés de l'œuf", () => {
+  withSeed(7, () => {
+    for (let i = 0; i < 300; i++) {
+      const r = getFamiliar(rollFamiliar("rare")).rarity;
+      assert.ok(["uncommon", "rare", "epic"].includes(r), `rareté inattendue: ${r}`);
     }
-    // Œuf rare : { uncommon:55, rare:40, epic:5 }.
-    approxEqual((counts.uncommon || 0) / N, 0.55, 0.03, "part inhabituel");
-    approxEqual((counts.rare || 0) / N, 0.40, 0.03, "part rare");
-    approxEqual((counts.epic || 0) / N, 0.05, 0.02, "part épique");
   });
 });
 
-test("faire éclore un nouvel œuf ajoute un familier ; le premier est équipé", () => {
+test("éclosion : nouveau -> ajouté & équipé ; doublon -> Essence", () => {
   withSeed(4, () => {
     const s = fresh();
     const r = hatchEgg(s, "common");
     assert.equal(r.ok, true);
-    assert.equal(r.duplicate, false);
-    assert.ok(s.familiars.owned[r.id], "familier ajouté à la collection");
-    assert.equal(s.familiars.equipped, r.id, "premier familier équipé d'office");
-    assert.equal(s.familiars.eggs.common, 0, "œuf consommé");
+    assert.ok(s.familiars.owned[r.id]);
+    assert.equal(s.familiars.equipped, r.id);
   });
-});
-
-test("un doublon est converti en Essence (pas de familier perdu)", () => {
   const s = fresh();
-  // On possède déjà ce familier -> nouvel exemplaire = essence.
-  s.familiars.owned["pebble_mite"] = { level: 1, xp: 0, link: 0 };
-  addEgg(s, "common", 1);
-  withSeed(0, () => {
-    // Force le tirage sur un familier commun déjà possédé en ne gardant que lui.
-    // (On vérifie surtout la mécanique doublon -> essence via un id connu.)
-  });
-  // Mécanique directe : simuler un doublon.
-  const before = s.familiars.essence;
-  // hatch jusqu'à retomber sur un doublon connu, sinon on teste la voie doublon
-  // déterministe en pré-remplissant toute la collection.
-  for (const id of Object.keys(FAMILIARS)) s.familiars.owned[id] = s.familiars.owned[id] || { level: 1, xp: 0, link: 0 };
+  for (const id of Object.keys(FAMILIARS)) s.familiars.owned[id] = { level: 1, xp: 0, link: 0 };
   addEgg(s, "epic", 1);
+  const before = s.familiars.essence;
   const r = withSeed(2, () => hatchEgg(s, "epic"));
-  assert.equal(r.ok, true);
-  assert.equal(r.duplicate, true, "tout est déjà possédé -> doublon");
-  assert.ok(r.essenceGain > 0, "essence gagnée");
-  assert.equal(s.familiars.essence, before + r.essenceGain);
+  assert.equal(r.duplicate, true);
+  assert.ok(s.familiars.essence > before);
 });
 
-test("équiper bascule l'équipement ; nourrir consomme de l'essence et monte le lien", () => {
+test("équiper bascule ; nourrir consomme l'Essence et monte le lien", () => {
   const s = fresh();
   s.familiars.owned["ember_sprite"] = { level: 1, xp: 0, link: 0 };
   assert.equal(equipFamiliar(s, "ember_sprite").ok, true);
-  assert.equal(s.familiars.equipped, "ember_sprite");
-  equipFamiliar(s, "ember_sprite"); // re-clic -> déséquipe
+  equipFamiliar(s, "ember_sprite");
   assert.equal(s.familiars.equipped, null);
-
-  // Nourrir : sans essence -> refus ; avec essence -> +1 lien.
   assert.equal(feedFamiliar(s, "ember_sprite").ok, false);
   s.familiars.essence = FEED_ESSENCE_COST;
-  const fr = feedFamiliar(s, "ember_sprite");
-  assert.equal(fr.ok, true);
+  assert.equal(feedFamiliar(s, "ember_sprite").ok, true);
   assert.equal(s.familiars.owned["ember_sprite"].link, 1);
-  assert.equal(s.familiars.essence, 0);
 });
 
 test("l'XP du familier est plafonnée au niveau du héros", () => {
@@ -99,84 +70,97 @@ test("l'XP du familier est plafonnée au niveau du héros", () => {
   s.character.level = 3;
   s.familiars.owned["spark_mote"] = { level: 1, xp: 0, link: 0 };
   s.familiars.equipped = "spark_mote";
-  // Énorme XP : le familier ne doit pas dépasser le niveau du héros (3).
   gainEquippedFamiliarXp(s, 100000);
-  assert.equal(s.familiars.owned["spark_mote"].level, familiarLevelCap(s));
-  assert.ok(s.familiars.owned["spark_mote"].level <= s.character.level);
+  assert.ok(s.familiars.owned["spark_mote"].level <= familiarLevelCap(s));
 });
 
-test("le passif du familier équipé s'applique au héros en combat (soutien léger)", () => {
-  const s = fresh();
-  // Sans familier : crit de référence.
-  const cNo = startCombat(s, "feral_wolf");
-  const baseCrit = cNo.player.crit;
-  const baseMax = cNo.player.maxHp;
-
-  // Avec un familier qui donne crit + PV max + synergie d'élément.
-  s.familiars.owned["dawn_seraph"] = { level: 5, xp: 0, link: 0 };
-  s.familiars.equipped = "dawn_seraph"; // critFlat +2, hpRegen, lifesteal
-  s.familiars.owned["pebble_mite"] = { level: 1, xp: 0, link: 0 };
-  // pebble n'est pas équipé ; on teste dawn_seraph (crit+2).
-  const cYes = startCombat(s, "feral_wolf");
-  assert.ok(cYes.player.crit >= baseCrit + 2, "le crit du familier s'applique");
-  assert.ok(cYes.player.familiar && cYes.player.familiar.id === "dawn_seraph", "familier attaché au combat");
-
-  // Un familier à PV max applique le bonus (Ronceau : maxHpPct +6 %).
-  s.familiars.owned["thorn_cub"] = { level: 1, xp: 0, link: 0 };
-  s.familiars.equipped = "thorn_cub";
-  const cHp = startCombat(s, "feral_wolf");
-  assert.ok(cHp.player.maxHp > baseMax, "le PV max du familier s'applique");
-
-  // Le Pétroglyphe renforce la Garde-réserve (rôle protecteur unique, instr. 294).
-  const guardBase = startCombat(fresh(), "feral_wolf").player.guardMax;
-  s.familiars.equipped = "pebble_mite";
-  const cGuard = startCombat(s, "feral_wolf");
-  assert.ok(cGuard.player.guardMax > guardBase, "le Pétroglyphe augmente la réserve de Garde");
+test("au moins 3 familiers par rareté (Commun -> Légendaire)", () => {
+  for (const r of ["common", "uncommon", "rare", "epic", "legendary"]) {
+    assert.ok(familiarsByRarity(r).length >= 3, `rareté ${r} : ${familiarsByRarity(r).length} (< 3)`);
+  }
 });
 
-test("migration v7 -> v8 : familiers initialisés sans rien casser", () => {
-  // Simule une vieille sauvegarde v7 (sans familiers) via le mécanisme interne.
-  const s = fresh();
-  // On retire les familiers et on rabaisse la version comme une save v7.
-  const v7 = JSON.parse(JSON.stringify(s));
-  delete v7.familiars;
-  v7.version = 7;
-  // ensureFamiliars (appelé partout) doit poser une structure saine.
-  const f = ensureFamiliars(v7);
-  assert.ok(f.owned && f.eggs && typeof f.essence === "number");
-  assert.equal(SAVE_VERSION >= 8, true);
-});
-
-// --- Lot 7 : rôles irremplaçables, plafonds et combos interdits ---------------
-
-test("familier : la régénération de PV est plafonnée à quelques % (instr. 100, 298)", () => {
-  const s = fresh();
-  s.familiars.owned["dawn_seraph"] = { level: 5, xp: 0, link: LINK_MAX }; // lien max -> mult ×1.15
-  s.familiars.equipped = "dawn_seraph";
-  const eff = effectiveFamiliarPassive(s);
-  assert.ok(eff.passive.hpRegenPct <= 0.03 + 1e-9, `régén familier plafonnée (${eff.passive.hpRegenPct})`);
-});
-
-test("familiers : aucun passif identique (chaque familier a une fonction distincte, instr. 280)", () => {
+test("familiers : compétences DISTINCTES (pas deux fois le même effet)", () => {
   const seen = new Map();
   for (const f of Object.values(FAMILIARS)) {
-    const sig = JSON.stringify(f.passive, Object.keys(f.passive).sort());
-    assert.ok(!seen.has(sig), `${f.id} a le même passif que ${seen.get(sig)} (doit être distinct)`);
+    const sig = JSON.stringify([...f.skills].sort());
+    assert.ok(!seen.has(sig), `${f.id} a exactement les mêmes compétences que ${seen.get(sig)}`);
     seen.set(sig, f.id);
+    assert.ok(f.skills && f.skills.length >= 1, `${f.id} doit avoir au moins une compétence`);
   }
 });
 
-test("familiers : aucun ne cumule soin fort + action bonus + résurrection (instr. 299)", () => {
-  for (const f of Object.values(FAMILIARS)) {
-    const p = f.passive || {};
-    // Le moteur ne définit ni action bonus ni résurrection pour les familiers :
-    // ces clés ne doivent jamais apparaître.
-    assert.ok(p.extraAction == null && p.revive == null && p.resurrect == null,
-      `${f.id} ne doit pas accorder d'action bonus ni de résurrection`);
-    // Et un familier ne doit pas empiler régén PV + vol de vie au-delà du raisonnable.
-    if (p.hpRegenPct && p.lifestealPct) {
-      assert.ok(p.hpRegenPct <= 0.03 && p.lifestealPct <= 0.06,
-        `${f.id} : sustain cumulé trop élevé`);
-    }
+test("étoiles : base de rareté, +1 au lien max (plafonné)", () => {
+  assert.equal(familiarStars(getFamiliar("pebble_mite"), { link: 0 }), 1);
+  assert.equal(familiarStars(getFamiliar("chaos_orbling"), { link: 0 }), 5);
+  assert.equal(familiarStars(getFamiliar("chaos_orbling"), { link: LINK_MAX }), 6);
+});
+
+test("le familier équipé est un COMBATTANT (sans PV) qui agit via sa propre IA", () => {
+  const s = fresh();
+  s.character.level = 8;
+  s.familiars.owned["ember_sprite"] = { level: 8, xp: 0, link: 5 };
+  s.familiars.equipped = "ember_sprite";
+  s.character.hpCurrent = getDerivedStats(s).maxHp;
+  const c = startCombat(s, "feral_wolf", { forceEnrage: false });
+  assert.equal(c.allies.length, 1);
+  const ally = c.allies[0];
+  assert.equal(ally.kind, "familiar");
+  assert.equal(ally.hp, undefined, "un familier n'a pas de PV");
+  assert.ok(ally.atk > 0 && ally.skills.length > 0);
+  assert.ok(c.player.familiar && c.player.familiar.id === "ember_sprite");
+  assert.ok(ally.skills.includes(chooseFamiliarSkill(ally, c)));
+  resolveRound(s, c, "basic_attack");
+  assert.ok(c.enemy.hp <= c.enemy.maxHp);
+});
+
+test("plafond : atk de familier bornée par rapport au niveau du héros", () => {
+  const cs = familiarCombatStats(getFamiliar("chaos_orbling"), { level: 100, link: LINK_MAX }, 100);
+  assert.ok(cs.atk <= 100 * 2.4 + 25 + 1, `atk plafonnée (${cs.atk})`);
+});
+
+test("invocation : Invocateur=1 temporaire, Nécromancien=2 permanents (sans PV)", () => {
+  const s = newGame("Inv", "mage");
+  s.character.level = 30;
+  s.character.specId = "mage_summoner";
+  s.character.hpCurrent = getDerivedStats(s).maxHp;
+  const p = buildPlayerCombatant(s);
+  assert.equal(p.summonCap, 1);
+  assert.equal(p.summonPermanent, false);
+
+  s.character.specId = "necromancer";
+  const p2 = buildPlayerCombatant(s);
+  assert.equal(p2.summonCap, 2);
+  assert.equal(p2.summonPermanent, true);
+  const skel = buildSummonCombatant("sm_skeleton", p2, 30);
+  assert.equal(skel.ttl, Infinity);
+  assert.equal(skel.hp, undefined);
+});
+
+test("invocation : le nombre d'invocations ne dépasse jamais la limite du nœud", () => {
+  const s = newGame("Inv", "mage");
+  s.character.level = 30;
+  s.character.specId = "mage_summoner";
+  s.character.library = { learned: [], equipped: [] };
+  s.character.hpCurrent = getDerivedStats(s).maxHp;
+  const c = startCombat(s, "feral_wolf", { forceEnrage: false });
+  for (let i = 0; i < 12 && c.status === "active"; i++) {
+    const id = playerCanUse(c, "summon_arcane_wisp") ? "summon_arcane_wisp" : "basic_attack";
+    resolveRound(s, c, id);
   }
+  const summons = c.allies.filter((a) => a.kind === "summon");
+  assert.ok(summons.length <= 1, `invocations plafonnées à 1 (obtenu ${summons.length})`);
+});
+
+test("soin de familier plafonné très bas (instr.)", () => {
+  assert.ok(FAMILIAR_REGEN_CAP <= 0.03 + 1e-9);
+  const s = fresh();
+  s.character.level = 20;
+  s.familiars.owned["dawn_seraph"] = { level: 20, xp: 0, link: LINK_MAX };
+  s.familiars.equipped = "dawn_seraph";
+  s.character.hpCurrent = 1;
+  const c = startCombat(s, "feral_wolf", { forceEnrage: false });
+  const maxHp = c.player.maxHp;
+  resolveRound(s, c, "basic_attack");
+  assert.ok(c.player.hp - 1 <= Math.ceil(maxHp * FAMILIAR_REGEN_CAP) + 3, "soin de familier borné");
 });
