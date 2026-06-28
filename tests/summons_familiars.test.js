@@ -16,6 +16,7 @@ import {
 import { FAM_SKILLS, defaultPosture, defaultFamSkills } from "../js/data/famskills.js";
 import { getFamiliar } from "../js/data/familiars.js";
 import { getSummon, SUMMONS } from "../js/data/summons.js";
+import { withSeed } from "./helpers.js";
 
 // Donne un familier précis et l'équipe (déterministe, sans tirage d'œuf).
 function withFamiliar(s, famId) {
@@ -49,19 +50,24 @@ test("familier : aucun allié si aucun familier équipé", () => {
 });
 
 test("familier : le familier agit réellement (≥1 action) sans gagner seul ni boucler", () => {
-  const s = withFamiliar(freshMage(), "ember_sprite");
-  const c = startCombat(s, "ignar_emberheart", { forceEnrage: false });
-  s.character.level = 20;
-  let famActions = 0, rounds = 0;
-  while (c.status === "active" && rounds < 60) {
-    resolveRound(s, c, "basic_attack");
-    famActions += c.lastActions.filter((a) => a.actor === "familiar").length;
-    // un familier n'agit jamais plus d'une fois par manche (anti-boucle)
-    assert.ok(c.lastActions.filter((a) => a.actor === "familiar").length <= 1, "≤1 action de familier/manche");
-    rounds++;
-  }
-  assert.ok(famActions >= 1, "le familier a agi au moins une fois");
-  assert.ok(!Number.isNaN(c.player.hp), "pas de NaN sur les PV du héros");
+  withSeed(123, () => {
+    const s = withFamiliar(freshMage(), "ember_sprite");
+    // Niveau RELEVÉ AVANT le combat (sinon le héros niv.1 peut tomber dès la 1re
+    // manche, avant la phase alliée) + graine -> test déterministe.
+    s.character.level = 30;
+    s.character.hpCurrent = getDerivedStats(s).maxHp;
+    const c = startCombat(s, "ignar_emberheart", { forceEnrage: false });
+    let famActions = 0, rounds = 0;
+    while (c.status === "active" && rounds < 60) {
+      resolveRound(s, c, "basic_attack");
+      famActions += c.lastActions.filter((a) => a.actor === "familiar").length;
+      // un familier n'agit jamais plus d'une fois par manche (anti-boucle)
+      assert.ok(c.lastActions.filter((a) => a.actor === "familiar").length <= 1, "≤1 action de familier/manche");
+      rounds++;
+    }
+    assert.ok(famActions >= 1, "le familier a agi au moins une fois");
+    assert.ok(!Number.isNaN(c.player.hp), "pas de NaN sur les PV du héros");
+  });
 });
 
 test("familier : sans PV, jamais ciblable, ne meurt pas (pas dans la file d'unités)", () => {
