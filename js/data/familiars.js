@@ -35,6 +35,12 @@ export const FAMILIARS = {
     passive: { spdPct: 0.04 },
     desc: "Une étincelle vive qui presse le pas de son maître (Clairvoyance +4 %).",
   },
+  glimmer_moth: {
+    id: "glimmer_moth", name: "Lampyre", element: "light", role: "soutien", rarity: "common",
+    image: "assets/familiars/glimmer_moth.svg", sprite: "assets/familiars/glimmer_moth.svg",
+    passive: { hpRegenPct: 0.012 },
+    desc: "Un papillon de lumière : régénère très légèrement les PV de son maître (~1,2 %/tour).",
+  },
 
   // --- Inhabituels ---
   ember_sprite: {
@@ -89,6 +95,18 @@ export const FAMILIARS = {
     passive: { hpRegenPct: 0.03, lifestealPct: 0.05, critFlat: 2 },
     desc: "Un séraphin d'aube : régénère ~3 % PV/tour, vol de vie +5 % et crit +2 %.",
   },
+  frost_warden: {
+    id: "frost_warden", name: "Givrelin", element: "water", role: "soutien", rarity: "epic",
+    image: "assets/familiars/frost_warden.svg", sprite: "assets/familiars/frost_warden.svg",
+    passive: { spdPct: 0.05, elementDmgPct: { water: 0.18 } },
+    desc: "Un gardien de givre : Clairvoyance +5 % et dégâts d'Eau +18 %.",
+  },
+  sun_lion: {
+    id: "sun_lion", name: "Solfaste", element: "fire", role: "offensif", rarity: "epic",
+    image: "assets/familiars/sun_lion.svg", sprite: "assets/familiars/sun_lion.svg",
+    passive: { skillPowerPct: 0.09, critFlat: 3 },
+    desc: "Un lion solaire : compétences +9 % et critique +3 %.",
+  },
 
   // --- Légendaire (œuf épique / boss) ---
   chaos_orbling: {
@@ -96,6 +114,18 @@ export const FAMILIARS = {
     image: "assets/familiars/chaos_orbling.png", sprite: "assets/familiars/chaos_orbling.png",
     passive: { skillPowerPct: 0.1, critFlat: 4, elementDmgPct: { chaos: 0.15 } },
     desc: "Une anomalie vivante : compétences +10 %, crit +4 % et Chaos +15 %.",
+  },
+  void_revenant: {
+    id: "void_revenant", name: "Revenant du Vide", element: "umbral", role: "offensif", rarity: "legendary",
+    image: "assets/familiars/void_revenant.svg", sprite: "assets/familiars/void_revenant.svg",
+    passive: { lifestealPct: 0.08, elementDmgPct: { umbral: 0.16 } },
+    desc: "Un spectre du Vide : vol de vie +8 % et dégâts d'Umbral +16 %.",
+  },
+  astral_phoenix: {
+    id: "astral_phoenix", name: "Phénix astral", element: "light", role: "soutien", rarity: "legendary",
+    image: "assets/familiars/astral_phoenix.svg", sprite: "assets/familiars/astral_phoenix.svg",
+    passive: { hpRegenPct: 0.025, skillPowerPct: 0.06 },
+    desc: "Un phénix d'aube : régénère ~2,5 % PV/tour et compétences +6 %.",
   },
 };
 
