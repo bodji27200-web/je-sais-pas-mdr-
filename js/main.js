@@ -603,7 +603,8 @@ function setupOnlineNet(url) {
   onlineState.room = null;
   onlineState.combat = null;
   onlineState.combatLog = [];
-  onlineState.seat = null;
+  // Ne pas réinitialiser onlineState.seat : il est assigné AVANT setupOnlineNet
+  // dans net-create ("A") et net-join ("B") pour un accès immédiat correct.
   renderAll();
 
   const net = new CoopNet(url);
@@ -855,6 +856,7 @@ const handlers = {
     onlineState.serverUrl = url;
     onlineState._createAfterWelcome = true;
     onlineState._joinAfterWelcome = null;
+    onlineState.seat = "A"; // l'hôte est toujours siège A
     setupOnlineNet(url);
   },
 
@@ -883,6 +885,7 @@ const handlers = {
     onlineState.serverUrl = url;
     onlineState._createAfterWelcome = false;
     onlineState._joinAfterWelcome = code;
+    onlineState.seat = "B"; // le rejoignant est toujours siège B
     setupOnlineNet(url);
   },
 
@@ -894,14 +897,21 @@ const handlers = {
 
   // Lobby : se marquer prêt (envoie le loadout = state complet ou personnage de repli)
   "net-ready": () => {
-    if (!onlineState.net) return;
+    if (!onlineState.net) return toast("Non connecté au serveur.", "warn");
     let loadout = getState();
     if (!loadout) {
-      // Pas de partie solo : crée un personnage de niveau 1 avec la classe choisie.
       loadout = newGame("Invité·e", onlineState.guestClass || "warrior");
       loadout.character.hpCurrent = getDerivedStats(loadout).maxHp;
     }
-    onlineState.net.ready(true, loadout);
+    // On n'envoie que les champs utiles au moteur de combat (pas les métiers, succès, etc.)
+    const minLoad = {
+      character: loadout.character,
+      inventory: { equipment: loadout.inventory?.equipment || [], gold: loadout.inventory?.gold || 0 },
+      familiars: loadout.familiars,
+      classtree: loadout.classtree,
+    };
+    const sent = onlineState.net.ready(true, minLoad);
+    if (!sent) toast("Connexion perdue — reconnecte-toi.", "warn");
   },
 
   // Lobby (hôte) : lancer une session
