@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: les-royaumes-coop
+    env: node
+    plan: free
+    region: oregon
+    buildCommand: ""
+    startCommand: node server/index.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production

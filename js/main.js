@@ -74,8 +74,10 @@ import {
   topbarActivityInner,
 } from "./ui/views.js";
 import { renderDuoSetup, renderDuoCombat, DUO_SKIRMISHES } from "./ui/coopViews.js";
+import { renderOnlineHome, renderOnlineLobby, renderOnlineCombat } from "./ui/onlineViews.js";
 import { createDuoCombat, submitIntent, resolveTurn, bothChosen, awaitingSeats, livingHeroes, livingEnemies, SEATS } from "./coop/duoCombat.js";
 import { createDuoDungeon, syncDungeon, chooseBlessing, skipBlessing } from "./coop/duoDungeon.js";
+import { CoopNet } from "./coop/net.js";
 import { DUNGEONS } from "./data/dungeons.js";
 
 const TABS = [
@@ -97,6 +99,27 @@ let currentTreeNode = null; // classe sélectionnée pour consultation (fiche)
 let currentDuo = null;       // duoCombat (escarmouche) OU duoDungeon (a .combat)
 let duoSetup = { partnerClass: "mage" };
 let duoUI = { activeSeat: "A", target: null, pendingBlessing: null };
+// Mode du panneau Duo : "local" ou "online"
+let duoMode = "local";
+// État de la coop en ligne
+const onlineState = {
+  phase: "idle",           // idle | connecting | lobby | in_combat
+  net: null,               // instance CoopNet
+  myAccountId: null,       // identifiant de notre compte
+  seat: null,              // "A" | "B"
+  room: null,              // état du salon (depuis serveur)
+  combat: null,            // publicView du combat (depuis serveur)
+  combatLog: [],           // entrées de journal accumulées
+  dungeon: null,           // { waveIndex, status }
+  awaiting: [],            // sièges encore en attente de sélection
+  pendingBlessings: null,  // options de bénédiction proposées
+  myTarget: null,          // cible sélectionnée localement
+  error: null,             // message d'erreur affiché
+  serverUrl: localStorage.getItem("coop_server_url") || "ws://localhost:8080",
+  // Flags de flux d'initialisation
+  _createAfterWelcome: false,
+  _joinAfterWelcome: null,
+};
 
 // --- Helpers du mode coop local (hotseat) ---
 function duoCombatOf() { return currentDuo && (currentDuo.combat || currentDuo); }
@@ -180,6 +203,13 @@ function preloadZoneCombatAssets(zoneId) {
 
 // --- Rendu ------------------------------------------------------------------
 
+function renderModeSwitcher() {
+  return `<div class="duo-mode-tabs">
+    <button class="tab-pill ${duoMode === "local" ? "active" : ""}" data-act="duo-mode" data-m="local">🤝 Local</button>
+    <button class="tab-pill ${duoMode === "online" ? "active" : ""}" data-act="duo-mode" data-m="online">🌐 En ligne</button>
+  </div>`;
+}
+
 function renderScreen() {
   const state = getState();
   if (currentCombat) return renderBattle(state, currentCombat);
@@ -194,8 +224,18 @@ function renderScreen() {
       return renderInventory(state);
     case "tree":
       return renderClassTree(state, currentTreeVoie, currentTreeNode);
-    case "duo":
-      return currentDuo ? renderDuoCombat(state, currentDuo, duoUI) : renderDuoSetup(state, duoSetup);
+    case "duo": {
+      const sw = renderModeSwitcher();
+      if (duoMode === "online") {
+        const view = onlineState.phase === "in_combat"
+          ? renderOnlineCombat(onlineState)
+          : onlineState.phase === "lobby"
+            ? renderOnlineLobby(onlineState)
+            : renderOnlineHome(onlineState);
+        return sw + view;
+      }
+      return sw + (currentDuo ? renderDuoCombat(state, currentDuo, duoUI) : renderDuoSetup(state, duoSetup));
+    }
     case "familiars":
       return renderFamiliars(state, familiarFilters);
     case "combat":
@@ -552,6 +592,132 @@ function showOfflineSummary(summary) {
 
 // --- Gestion des actions (délégation de clics) ------------------------------
 
+// --- Coop en ligne : connexion et gestion des événements serveur -----------
+
+function setupOnlineNet(url) {
+  // Ferme l'éventuelle connexion précédente proprement.
+  if (onlineState.net) { try { onlineState.net.close(); } catch {} }
+  onlineState.phase = "connecting";
+  onlineState.error = null;
+  onlineState.room = null;
+  onlineState.combat = null;
+  onlineState.combatLog = [];
+  onlineState.seat = null;
+  renderAll();
+
+  const net = new CoopNet(url);
+  onlineState.net = net;
+
+  net.on("welcome", (d) => {
+    onlineState.myAccountId = d.accountId;
+    if (d.token) localStorage.setItem("coop_token_" + d.accountId, d.token);
+    if (onlineState._createAfterWelcome) {
+      onlineState._createAfterWelcome = false;
+      net.createRoom();
+    } else if (onlineState._joinAfterWelcome) {
+      const code = onlineState._joinAfterWelcome;
+      onlineState._joinAfterWelcome = null;
+      net.joinRoom(code);
+    }
+  });
+
+  net.on("room/state", (d) => {
+    onlineState.room = d;
+    // Détermine notre siège via accountId
+    if (d.seats.A && d.seats.A.accountId === onlineState.myAccountId) onlineState.seat = "A";
+    else if (d.seats.B && d.seats.B.accountId === onlineState.myAccountId) onlineState.seat = "B";
+    if (d.phase === "lobby" || d.phase === "in_combat" || d.phase === "in_dungeon") {
+      if (onlineState.phase === "connecting" || onlineState.phase === "idle") onlineState.phase = "lobby";
+      if (d.phase === "lobby") { onlineState.phase = "lobby"; }
+    }
+    onlineState.error = null;
+    renderAll();
+  });
+
+  net.on("session/started", (d) => {
+    onlineState.combat = d.view;
+    onlineState.dungeon = d.dungeon || null;
+    onlineState.combatLog = (d.view && d.view.log) ? [...d.view.log] : [];
+    onlineState.awaiting = (d.view && d.view.awaiting) || [];
+    onlineState.pendingBlessings = null;
+    onlineState.myTarget = null;
+    onlineState.phase = "in_combat";
+    renderAll();
+  });
+
+  net.on("combat/view", (d) => {
+    onlineState.combat = d.view;
+    onlineState.dungeon = d.dungeon || null;
+    if (d.view && d.view.log) onlineState.combatLog = [...d.view.log];
+    onlineState.awaiting = (d.view && d.view.awaiting) || [];
+    onlineState.pendingBlessings = null;
+    renderAll();
+  });
+
+  net.on("combat/resolution", (d) => {
+    if (d.log) onlineState.combatLog.push(...d.log);
+    renderAll();
+  });
+
+  net.on("combat/awaiting", (d) => {
+    onlineState.awaiting = d.needFrom || [];
+    renderAll();
+  });
+
+  net.on("combat/blessing", (d) => {
+    if (d.view) { onlineState.combat = d.view; onlineState.dungeon = d.dungeon || null; }
+    onlineState.pendingBlessings = d.options || [];
+    renderAll();
+  });
+
+  net.on("combat/result", (d) => {
+    if (d.view) onlineState.combat = d.view;
+    // Le résultat final : on reste en in_combat pour afficher victoire/défaite,
+    // puis l'utilisateur clique "Retour au salon" pour revenir en lobby.
+    onlineState.awaiting = [];
+    onlineState.pendingBlessings = null;
+    renderAll();
+  });
+
+  net.on("error", (d) => {
+    const code = (d && d.code) || "ERREUR";
+    const msg = (d && d.message) || code;
+    onlineState.error = msg;
+    // Si l'erreur survient pendant la connexion, retourner à idle
+    if (onlineState.phase === "connecting") onlineState.phase = "idle";
+    renderAll();
+    toast("Serveur : " + msg, "warn");
+  });
+
+  net.on("disconnected", () => {
+    onlineState.phase = "idle";
+    onlineState.error = "Déconnecté du serveur. Vérifie l'URL et réessaie.";
+    onlineState.room = null;
+    onlineState.combat = null;
+    onlineState.net = null;
+    renderAll();
+  });
+
+  net.connect().then(() => {
+    const state = getState();
+    const handle = state?.character?.name || "Aventurier";
+    // Tente d'abord une reconnexion avec le token existant.
+    const savedToken = onlineState.myAccountId
+      ? localStorage.getItem("coop_token_" + onlineState.myAccountId)
+      : null;
+    if (savedToken) {
+      net.hello(savedToken);
+    } else {
+      net.guest(handle);
+    }
+  }).catch(() => {
+    onlineState.phase = "idle";
+    onlineState.error = "Impossible de se connecter au serveur. Vérifie l'URL.";
+    onlineState.net = null;
+    renderAll();
+  });
+}
+
 // Démantèle effectivement une pièce (après confirmation éventuelle).
 function doDismantle(uid) {
   const r = dismantleItem(getState(), uid);
@@ -674,6 +840,123 @@ const handlers = {
     save();
     renderAll();
   },
+  // --- Sélecteur de mode du panneau Duo ---
+  "duo-mode": (el) => { duoMode = el.dataset.m; renderAll(); },
+
+  // --- Coop en ligne : helpers internes ------------------------------------
+  // (setupOnlineNet est défini juste avant les handlers, après les imports)
+
+  // Accueil : créer une partie
+  "net-create": () => {
+    const urlInput = document.getElementById("net-server-url");
+    const url = (urlInput && urlInput.value.trim()) || onlineState.serverUrl;
+    localStorage.setItem("coop_server_url", url);
+    onlineState.serverUrl = url;
+    onlineState._createAfterWelcome = true;
+    onlineState._joinAfterWelcome = null;
+    setupOnlineNet(url);
+  },
+
+  // Accueil : rejoindre (ouvre une modale pour le code)
+  "net-join-prompt": () => {
+    showModal(`
+      <h2>Rejoindre une partie</h2>
+      <p class="muted">Entre le code d'invitation reçu par ton ami·e :</p>
+      <input id="net-join-code" class="net-url-input" type="text" placeholder="AETH7Q2P" maxlength="16" style="text-transform:uppercase">
+      <div class="end-actions" style="margin-top:1rem">
+        <button class="btn" data-act="close-modal">Annuler</button>
+        <button class="btn primary" data-act="net-join">Rejoindre</button>
+      </div>
+    `);
+    setTimeout(() => document.getElementById("net-join-code")?.focus(), 50);
+  },
+
+  // Modale de rejoindre → connexion
+  "net-join": () => {
+    const code = document.getElementById("net-join-code")?.value.trim().toUpperCase();
+    if (!code) return toast("Entre un code d'invitation.", "warn");
+    closeModal();
+    const urlInput = document.getElementById("net-server-url");
+    const url = (urlInput && urlInput.value.trim()) || onlineState.serverUrl;
+    localStorage.setItem("coop_server_url", url);
+    onlineState.serverUrl = url;
+    onlineState._createAfterWelcome = false;
+    onlineState._joinAfterWelcome = code;
+    setupOnlineNet(url);
+  },
+
+  // Lobby : se marquer prêt (envoie le loadout = state complet)
+  "net-ready": () => {
+    if (!onlineState.net) return;
+    const loadout = getState();
+    if (!loadout) return toast("Aucune partie chargée.", "warn");
+    onlineState.net.ready(true, loadout);
+  },
+
+  // Lobby (hôte) : lancer une session
+  "net-start": (el) => {
+    if (!onlineState.net) return;
+    onlineState.net.startSession(el.dataset.mode, el.dataset.id);
+  },
+
+  // Combat : sélectionner une cible
+  "net-target": (el) => { onlineState.myTarget = el.dataset.ref; renderAll(); },
+
+  // Combat : envoyer une compétence
+  "net-skill": (el) => {
+    if (!onlineState.net) return;
+    const target = onlineState.myTarget
+      || ((onlineState.combat?.enemies || []).find((e) => !e.down && e.hp > 0)?.uid)
+      || "self";
+    onlineState.net.intent(el.dataset.id, target);
+    // Retire notre siège de "awaiting" localement pour feedback immédiat
+    onlineState.awaiting = (onlineState.awaiting || []).filter((s) => s !== onlineState.seat);
+    renderAll();
+  },
+
+  // Combat donjon : choisir une bénédiction (hôte)
+  "net-bless": (el) => {
+    if (!onlineState.net) return;
+    onlineState.net.blessing(el.dataset.id || null);
+    onlineState.pendingBlessings = null;
+    renderAll();
+  },
+
+  // Victoire / défaite : retour au lobby sans quitter le salon
+  "net-back-lobby": () => {
+    onlineState.phase = "lobby";
+    onlineState.combat = null;
+    onlineState.combatLog = [];
+    onlineState.dungeon = null;
+    onlineState.awaiting = [];
+    onlineState.pendingBlessings = null;
+    onlineState.myTarget = null;
+    onlineState.error = null;
+    renderAll();
+  },
+
+  // Quitter : ferme la connexion et retour à idle
+  "net-leave": () => {
+    if (onlineState.net) {
+      try { onlineState.net.leaveRoom(); } catch {}
+      try { onlineState.net.close(); } catch {}
+      onlineState.net = null;
+    }
+    onlineState.phase = "idle";
+    onlineState.seat = null;
+    onlineState.room = null;
+    onlineState.combat = null;
+    onlineState.combatLog = [];
+    onlineState.dungeon = null;
+    onlineState.awaiting = [];
+    onlineState.pendingBlessings = null;
+    onlineState.myTarget = null;
+    onlineState.error = null;
+    onlineState._createAfterWelcome = false;
+    onlineState._joinAfterWelcome = null;
+    renderAll();
+  },
+
   // --- Coop locale (hotseat duo) ---
   "duo-partner": (el) => { duoSetup.partnerClass = el.dataset.cls; renderAll(); },
   "duo-start": (el) => {

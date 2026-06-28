@@ -207,7 +207,7 @@ export class CoopHub {
     return { conn, room, seat: conn && conn.seat };
   }
   _roomState(room) {
-    const pub = (s) => s ? { handle: s.handle, ready: s.ready, hasLoadout: !!s.loadout } : null;
+    const pub = (s) => s ? { accountId: s.accountId, handle: s.handle, ready: s.ready, hasLoadout: !!s.loadout } : null;
     return { roomId: room.roomId, inviteCode: room.inviteCode, phase: room.phase, capacity: 2, seats: { A: pub(room.seats.A), B: pub(room.seats.B) } };
   }
   _broadcastRoom(room) {
