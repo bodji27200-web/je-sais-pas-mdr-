@@ -31,7 +31,7 @@ import { craft } from "./systems/crafting.js";
 import { upgradeItem, dismantleItem, dismantleReward, needsDismantleConfirm } from "./systems/gear.js";
 import { findEquipmentInstance } from "./core/state.js";
 import { getRarity } from "./data/rarities.js";
-import { startCombat, resolveRound } from "./systems/combat.js";
+import { startCombat, resolveRound, buildPlayerCombatant } from "./systems/combat.js";
 import { enemyUnlock, zoneUnlocked } from "./systems/zoneprog.js";
 import { getClass } from "./data/classes.js";
 import { getEnemy } from "./data/enemies.js";
@@ -73,10 +73,12 @@ import {
   renderAchievements,
   topbarActivityInner,
 } from "./ui/views.js";
-import { renderDuoSetup, renderDuoCombat, DUO_SKIRMISHES } from "./ui/coopViews.js";
+import { renderDuoSetup, renderDuoCombat, renderOnlineConnect, renderOnlineLobby, renderOnlineCombat, DUO_SKIRMISHES } from "./ui/coopViews.js";
 import { createDuoCombat, submitIntent, resolveTurn, bothChosen, awaitingSeats, livingHeroes, livingEnemies, SEATS } from "./coop/duoCombat.js";
 import { createDuoDungeon, syncDungeon, chooseBlessing, skipBlessing } from "./coop/duoDungeon.js";
 import { DUNGEONS } from "./data/dungeons.js";
+import { CoopNet } from "./coop/net.js";
+import { getSkill as getSkillDef } from "./data/skills.js";
 
 const TABS = [
   { id: "character", label: "Héros", icon: "🧝" },
@@ -97,6 +99,37 @@ let currentTreeNode = null; // classe sélectionnée pour consultation (fiche)
 let currentDuo = null;       // duoCombat (escarmouche) OU duoDungeon (a .combat)
 let duoSetup = { partnerClass: "mage" };
 let duoUI = { activeSeat: "A", target: null, pendingBlessing: null };
+// Coop EN LIGNE (à distance)
+let coopNet = null;
+let coopOnline = {
+  active: false, url: "", handle: "", connected: false, connecting: false,
+  room: null, mySeat: null, inSession: false, view: null, dungeon: null,
+  awaiting: [], log: [], blessing: null, result: null, target: null, error: "",
+};
+function resetOnline() {
+  coopOnline = { active: false, url: coopOnline.url, handle: coopOnline.handle, connected: false, connecting: false, room: null, mySeat: null, inSession: false, view: null, dungeon: null, awaiting: [], log: [], blessing: null, result: null, target: null, error: "" };
+}
+// Kit du joueur local (pour l'UI en ligne) : ids + noms + coûts.
+function myOnlineKit() {
+  try {
+    const sk = buildPlayerCombatant(getState()).skills;
+    return sk.map((id) => { const s = getSkillDef(id); return { id, name: (s && s.name) || id, cost: (s && s.cost) || 0 }; });
+  } catch { return [{ id: "basic_attack", name: "Attaque", cost: 0 }]; }
+}
+// Branche les écouteurs réseau sur l'état + re-rendu.
+function wireCoopNet(net) {
+  net.on("welcome", (p) => { coopOnline.connected = true; coopOnline.connecting = false; coopOnline.error = ""; if (p && p.handle) coopOnline.handle = p.handle; renderAll(); });
+  net.on("room/state", (p) => { coopOnline.room = p; coopOnline.error = ""; renderAll(); });
+  net.on("session/started", (p) => { coopOnline.inSession = true; coopOnline.result = null; coopOnline.blessing = null; coopOnline.log = []; coopOnline.view = p.view; coopOnline.dungeon = p.dungeon; coopOnline.awaiting = (p.view && p.view.awaiting) || []; renderAll(); });
+  net.on("combat/view", (p) => { coopOnline.view = p.view; coopOnline.dungeon = p.dungeon; coopOnline.blessing = null; coopOnline.awaiting = (p.view && p.view.awaiting) || []; renderAll(); });
+  net.on("combat/awaiting", (p) => { coopOnline.awaiting = (p && p.needFrom) || []; renderAll(); });
+  net.on("combat/resolution", (p) => { if (p && p.log) coopOnline.log = coopOnline.log.concat(p.log).slice(-60); renderAll(); });
+  net.on("combat/blessing", (p) => { coopOnline.blessing = p.options; if (p.view) coopOnline.view = p.view; renderAll(); });
+  net.on("combat/result", (p) => { coopOnline.result = p.outcome; coopOnline.inSession = true; renderAll(); });
+  net.on("error", (p) => { coopOnline.error = (p && p.code) || "Erreur"; toast(coopOnline.error, "warn"); renderAll(); });
+  net.on("disconnected", () => { coopOnline.connected = false; if (coopOnline.active) toast("Déconnecté du serveur", "warn"); renderAll(); });
+  net.on("neterror", () => { coopOnline.connecting = false; coopOnline.error = "Connexion impossible (vérifie l'adresse / le serveur)"; renderAll(); });
+}
 
 // --- Helpers du mode coop local (hotseat) ---
 function duoCombatOf() { return currentDuo && (currentDuo.combat || currentDuo); }
@@ -195,6 +228,11 @@ function renderScreen() {
     case "tree":
       return renderClassTree(state, currentTreeVoie, currentTreeNode);
     case "duo":
+      if (coopOnline.active) {
+        if (!coopOnline.connected) return renderOnlineConnect(coopOnline);
+        if (coopOnline.inSession && coopOnline.view) return renderOnlineCombat(coopOnline, myOnlineKit());
+        return renderOnlineLobby(coopOnline);
+      }
       return currentDuo ? renderDuoCombat(state, currentDuo, duoUI) : renderDuoSetup(state, duoSetup);
     case "familiars":
       return renderFamiliars(state, familiarFilters);
@@ -713,6 +751,42 @@ const handlers = {
     renderAll();
   },
   "duo-quit": () => { currentDuo = null; duoUI = { activeSeat: "A", target: null, pendingBlessing: null }; renderAll(); },
+  // --- Coop EN LIGNE ---
+  "online-open": () => { coopOnline.active = true; renderAll(); },
+  "online-back": () => { coopOnline.active = false; renderAll(); },
+  "online-connect": () => {
+    const url = (document.getElementById("online-url")?.value || "").trim();
+    const handle = (document.getElementById("online-handle")?.value || "").trim() || "Invité";
+    if (!url) { coopOnline.error = "Indique l'adresse du serveur."; return renderAll(); }
+    coopOnline.url = url; coopOnline.handle = handle; coopOnline.connecting = true; coopOnline.error = "";
+    try { coopNet && coopNet.close(); } catch {}
+    coopNet = new CoopNet(url);
+    wireCoopNet(coopNet);
+    renderAll();
+    coopNet.connect().then(() => coopNet.guest(handle)).catch(() => { coopOnline.connecting = false; coopOnline.error = "Connexion impossible (vérifie l'adresse / le serveur)."; renderAll(); });
+  },
+  "online-create": () => { coopOnline.mySeat = "A"; coopOnline.error = ""; coopNet && coopNet.createRoom(); },
+  "online-join": () => {
+    const code = (document.getElementById("online-code")?.value || "").trim();
+    if (!code) { coopOnline.error = "Saisis le code du salon."; return renderAll(); }
+    coopOnline.mySeat = "B"; coopOnline.error = ""; coopNet && coopNet.joinRoom(code);
+  },
+  "online-ready": (el) => {
+    const ready = el.dataset.ready === "1";
+    // On envoie son build (loadout) au serveur (§12) au moment d'être prêt.
+    coopNet && coopNet.ready(ready, ready ? getState() : null);
+  },
+  "online-start": (el) => { coopNet && coopNet.startSession(el.dataset.mode, el.dataset.id); },
+  "online-target": (el) => { coopOnline.target = el.dataset.ref; renderAll(); },
+  "online-intent": (el) => {
+    const v = coopOnline.view;
+    const target = coopOnline.target || (v && v.enemies.find((e) => !e.down) || {}).id || "self";
+    coopNet && coopNet.intent(el.dataset.id, target);
+    coopOnline.target = null;
+  },
+  "online-bless": (el) => { coopNet && coopNet.blessing(el.dataset.id || null); coopOnline.blessing = null; },
+  "online-return": () => { coopOnline.inSession = false; coopOnline.view = null; coopOnline.result = null; coopOnline.log = []; renderAll(); },
+  "online-quit": () => { try { coopNet && coopNet.close(); } catch {} coopNet = null; resetOnline(); renderAll(); },
   "start-activity": (el) => {
     const tier = el.dataset.tier || null;
     // data-auto="1" (bouton Démarrer) -> suit le meilleur palier ; un palier

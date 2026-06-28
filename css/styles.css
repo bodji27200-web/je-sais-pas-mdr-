@@ -519,6 +519,18 @@ a { color: var(--gold); }
 .duo-result.lose h3 { color: #e9a0a0; }
 .duo-footer { margin-top: 8px; text-align: right; }
 @media (max-width: 560px) { .duo-heroes { grid-template-columns: 1fr; } }
+
+/* Coop en ligne */
+.online-cta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 6px 0 10px; padding: 10px; border-radius: 10px; border: 1px solid var(--border-soft); background: rgba(120,180,255,0.06); }
+.online-form { display: flex; flex-direction: column; gap: 10px; max-width: 420px; }
+.online-form label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; }
+.text-input { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border-soft); background: rgba(0,0,0,0.25); color: var(--text); font-size: 0.9rem; }
+.online-help { margin-top: 12px; }
+.online-help summary { cursor: pointer; }
+.online-help code { background: rgba(0,0,0,0.3); padding: 1px 5px; border-radius: 4px; }
+.online-lobby-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 8px 0; }
+.online-join { display: flex; gap: 6px; }
+.invite-code { letter-spacing: 2px; background: rgba(245,210,78,0.12); padding: 2px 8px; border-radius: 6px; }
 @media (max-width: 640px) { .arena-summons { gap: 8px; left: 10%; } .summon-unit { width: 52px; } .summon-unit .fighter-sprite { width: 46px; height: 46px; } }
 
 /* Intention télégraphiée du boss — Lot 10 */
