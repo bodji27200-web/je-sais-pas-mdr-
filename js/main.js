@@ -73,6 +73,10 @@ import {
   renderAchievements,
   topbarActivityInner,
 } from "./ui/views.js";
+import { renderDuoSetup, renderDuoCombat, DUO_SKIRMISHES } from "./ui/coopViews.js";
+import { createDuoCombat, submitIntent, resolveTurn, bothChosen, awaitingSeats, livingHeroes, livingEnemies, SEATS } from "./coop/duoCombat.js";
+import { createDuoDungeon, syncDungeon, chooseBlessing, skipBlessing } from "./coop/duoDungeon.js";
+import { DUNGEONS } from "./data/dungeons.js";
 
 const TABS = [
   { id: "character", label: "Héros", icon: "🧝" },
@@ -82,12 +86,53 @@ const TABS = [
   { id: "tree", label: "Arbre", icon: "🌳" },
   { id: "familiars", label: "Familiers", icon: "🐾" },
   { id: "combat", label: "Combat", icon: "⚔️" },
+  { id: "duo", label: "Duo", icon: "🤝" },
 ];
 
 let currentTab = "jobs";
 let currentCombat = null;
 let currentTreeVoie = null; // voie affichée dans l'arbre (null = voie du héros)
 let currentTreeNode = null; // classe sélectionnée pour consultation (fiche)
+// Coop locale (hotseat duo)
+let currentDuo = null;       // duoCombat (escarmouche) OU duoDungeon (a .combat)
+let duoSetup = { partnerClass: "mage" };
+let duoUI = { activeSeat: "A", target: null, pendingBlessing: null };
+
+// --- Helpers du mode coop local (hotseat) ---
+function duoCombatOf() { return currentDuo && (currentDuo.combat || currentDuo); }
+function duoFirstSeat() {
+  const c = duoCombatOf();
+  if (!c) return "A";
+  const aw = awaitingSeats(c);
+  return aw[0] || "A";
+}
+// Après le choix d'un siège : passer au siège restant, ou résoudre si les deux ont choisi.
+function duoAfterChoice() {
+  const c = duoCombatOf();
+  if (!c) return;
+  if (bothChosen(c)) {
+    resolveTurn(c);
+    if (currentDuo.def) { // donjon : faire progresser les vagues
+      const s = syncDungeon(currentDuo);
+      if (s.status === "blessing_offered") duoUI.pendingBlessing = s.options;
+    }
+    duoUI.target = null;
+    duoUI.activeSeat = duoFirstSeat();
+  } else {
+    duoUI.activeSeat = awaitingSeats(c)[0] || duoFirstSeat();
+    duoUI.target = null;
+  }
+}
+function duoErrorLabel(code) {
+  return ({
+    SKILL_NOT_OWNED: "Compétence non disponible pour ce héros.",
+    ON_COOLDOWN: "Compétence en recharge.",
+    NOT_ENOUGH_RESOURCE: "Ressource insuffisante.",
+    INVALID_TARGET: "Cible invalide pour cette compétence.",
+    HERO_DOWN: "Ce héros est à terre.",
+    OUT_OF_TURN: "Ce n'est pas le moment d'agir.",
+  })[code] || "Action impossible.";
+}
 let selectedClassId = null;
 let currentZoneId = null; // zone sélectionnée dans le menu Combat (défaut : 1re)
 let familiarFilters = { element: "all", role: "all", rarity: "all" };
@@ -149,6 +194,8 @@ function renderScreen() {
       return renderInventory(state);
     case "tree":
       return renderClassTree(state, currentTreeVoie, currentTreeNode);
+    case "duo":
+      return currentDuo ? renderDuoCombat(state, currentDuo, duoUI) : renderDuoSetup(state, duoSetup);
     case "familiars":
       return renderFamiliars(state, familiarFilters);
     case "combat":
@@ -627,6 +674,45 @@ const handlers = {
     save();
     renderAll();
   },
+  // --- Coop locale (hotseat duo) ---
+  "duo-partner": (el) => { duoSetup.partnerClass = el.dataset.cls; renderAll(); },
+  "duo-start": (el) => {
+    const stateA = getState();
+    const lvl = stateA.character.level;
+    const stateB = newGame("Partenaire", duoSetup.partnerClass || "mage");
+    stateB.character.level = lvl;
+    stateB.character.hpCurrent = getDerivedStats(stateB).maxHp;
+    const opts = { forceEnrage: false };
+    if (el.dataset.mode === "dungeon") {
+      currentDuo = createDuoDungeon(stateA, stateB, el.dataset.id, opts);
+    } else {
+      const sk = DUO_SKIRMISHES[el.dataset.id];
+      currentDuo = createDuoCombat(stateA, stateB, { enemies: (sk && sk.enemies) || [] }, opts);
+    }
+    duoUI = { activeSeat: duoFirstSeat(), target: null, pendingBlessing: null };
+    renderAll();
+  },
+  "duo-target": (el) => { duoUI.target = el.dataset.ref; renderAll(); },
+  "duo-skill": (el) => {
+    const c = duoCombatOf();
+    if (!c) return;
+    const seat = duoUI.activeSeat;
+    const target = duoUI.target || (livingEnemies(c)[0] && livingEnemies(c)[0].uid) || "self";
+    const r = submitIntent(c, seat, { skillId: el.dataset.id, targetRef: target });
+    if (!r.ok) return toast(duoErrorLabel(r.error), "warn");
+    duoAfterChoice();
+    renderAll();
+  },
+  "duo-bless": (el) => {
+    if (!currentDuo || !currentDuo.def) return;
+    if (el.dataset.id) chooseBlessing(currentDuo, el.dataset.id);
+    else skipBlessing(currentDuo);
+    duoUI.pendingBlessing = null;
+    duoUI.activeSeat = duoFirstSeat();
+    duoUI.target = null;
+    renderAll();
+  },
+  "duo-quit": () => { currentDuo = null; duoUI = { activeSeat: "A", target: null, pendingBlessing: null }; renderAll(); },
   "start-activity": (el) => {
     const tier = el.dataset.tier || null;
     // data-auto="1" (bouton Démarrer) -> suit le meilleur palier ; un palier
