@@ -421,19 +421,30 @@ export function recover(combat, { hpPct = 0, guardPct = 0, resPct = 0 } = {}) {
 
 // Vue filtrée d'état (ce que le client reçoit — pas les sélections secrètes, §8.2).
 export function publicView(combat) {
-  const unit = (u) => ({
+  const heroUnit = (u) => ({
     id: idOf(u), name: u.name, side: u.side, fxId: u.fxId,
     hp: u.hp, maxHp: u.maxHp, guardPool: u.guardPool, guardMax: u.guardMax,
-    resource: u.res ? { id: u.res.id, cur: u.res.cur, max: u.res.max } : null,
+    shield: u.shield || 0,
+    res: u.res ? { id: u.res.id, name: u.res.name, color: u.res.color, cur: u.res.cur, max: u.res.max } : null,
+    buffs: u.buffs.map((b) => ({ type: b.type, turns: b.turns })),
+    states: u.states.map((s) => ({ id: s.id, turns: s.turns, stacks: s.stacks })),
+    down: u.hp <= 0, taunt: u.taunt > 0,
+    skills: u.skills || [],
+    cooldowns: { ...u.cooldowns },
+  });
+  const enemyUnit = (u) => ({
+    id: idOf(u), uid: u.uid || idOf(u), name: u.name, side: u.side, fxId: u.fxId,
+    hp: u.hp, maxHp: u.maxHp, guardPool: u.guardPool, guardMax: u.guardMax,
     buffs: u.buffs.map((b) => ({ type: b.type, turns: b.turns })),
     states: u.states.map((s) => ({ id: s.id, turns: s.turns, stacks: s.stacks })),
     down: u.hp <= 0, taunt: u.taunt > 0,
   });
   return {
     turn: combat.turn, phase: combat.phase, status: combat.status,
-    heroes: { A: unit(combat.heroes.A), B: unit(combat.heroes.B) },
-    enemies: combat.enemies.map(unit),
+    heroes: { A: heroUnit(combat.heroes.A), B: heroUnit(combat.heroes.B) },
+    enemies: combat.enemies.map(enemyUnit),
     awaiting: awaitingSeats(combat),
+    log: combat.log ? combat.log.slice(-15) : [],
     turnOrderPreview: allUnits(combat).filter((u) => u.hp > 0)
       .sort((a, b) => a.nextAt - b.nextAt).map(idOf),
   };

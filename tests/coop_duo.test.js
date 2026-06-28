@@ -157,8 +157,12 @@ test("duo : défaite UNIQUEMENT si les DEUX héros sont K.O. (un seul K.O. conti
 test("duo : la vue publique ne divulgue pas les sélections secrètes", () => {
   const c = duo(["feral_wolf"]);
   submitIntent(c, "A", { skillId: "basic_attack", targetRef: c.enemies[0].uid });
-  const v = JSON.stringify(publicView(c));
-  assert.ok(!v.includes("basic_attack"), "la compétence choisie n'apparaît pas dans la vue publique");
+  const view = publicView(c);
+  const v = JSON.stringify(view);
+  // Le champ "pending" (intentions secrètes) ne doit pas apparaître dans la vue publique.
+  assert.ok(!v.includes('"pending"'), "l'objet pending (intentions secrètes) n'est pas exposé");
+  // La liste de compétences disponibles (skills) est publique et attendue dans la vue.
+  assert.ok(view.heroes.A.skills && view.heroes.A.skills.length > 0, "la liste de compétences est exposée");
   assert.ok(v.includes("turnOrderPreview"), "l'ordre prévu (Clairvoyance) est exposé");
 });
 
