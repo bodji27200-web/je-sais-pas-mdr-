@@ -361,6 +361,64 @@ export function resolveTurn(combat, opts = {}) {
 
 function idOf(u) { return u.side === "hero" ? "hero:" + u.seat : u.uid; }
 
+// --- Vagues (donjons coop, §18/§19) -----------------------------------------
+// Règles ENTRE deux vagues : PV / Garde / ressource / recharges PERSISTENT ; les
+// buffs ordinaires, postures, DoT et états élémentaires sont NETTOYÉS (anti-cumul
+// inter-vagues) ; les bénédictions de donjon (portées par hero.blessings) restent.
+export function applyBetweenWaveRules(combat) {
+  for (const seat of SEATS) {
+    const h = combat.heroes[seat];
+    h.buffs = [];
+    h.dots = [];
+    h.states = [];
+    h.guard = null;
+    h.guardActive = null;
+    h.shield = 0; h.shieldTurns = 0;
+    h.threat = 0; h.taunt = 0;
+    // PV, guardPool, res.cur et cooldowns CONSERVÉS (continuité tactique).
+  }
+}
+
+// Charge une nouvelle vague d'ennemis dans le MÊME combat (les héros, leurs PV,
+// Garde, ressource et recharges sont conservés). Réinitialise la sélection.
+export function loadWave(combat, enemyIds, opts = {}) {
+  applyBetweenWaveRules(combat);
+  const enemies = [];
+  let uid = 0;
+  for (const id of enemyIds || []) {
+    const e = buildEnemyCombatant(id, opts);
+    if (!e) continue;
+    e.uid = "e" + (uid++);
+    e.side = "enemy";
+    e.fxId = "enemy:" + e.uid;
+    e.nextAt = (SPEED_UNIT / effectiveSpd(e)) * (opts.noJitter ? 0 : Math.random() * 0.6);
+    enemies.push(e);
+  }
+  combat.enemies = enemies;
+  for (const seat of SEATS) {
+    const h = combat.heroes[seat];
+    h.nextAt = (SPEED_UNIT / effectiveSpd(h)) * (opts.noJitter ? 0 : Math.random() * 0.6);
+  }
+  combat.pending = { A: null, B: null };
+  combat.status = "active";
+  combat.phase = "selecting";
+  combat.lastFx = [];
+  combat.log = [];
+  return combat;
+}
+
+// Récupération partielle (vague « recover », §18.1) : rend une part des PV / Garde
+// / ressource SANS plein gratuit. Bornée par les maxima.
+export function recover(combat, { hpPct = 0, guardPct = 0, resPct = 0 } = {}) {
+  for (const seat of SEATS) {
+    const h = combat.heroes[seat];
+    if (h.hp <= 0) continue; // un héros à terre n'est pas relevé par une récup'
+    if (hpPct) h.hp = Math.min(h.maxHp, h.hp + Math.round(h.maxHp * hpPct));
+    if (guardPct && h.guardMax > 0) h.guardPool = Math.min(h.guardMax, h.guardPool + Math.round(h.guardMax * guardPct));
+    if (resPct && h.res) h.res.cur = Math.min(h.res.max, h.res.cur + Math.round(h.res.max * resPct));
+  }
+}
+
 // Vue filtrée d'état (ce que le client reçoit — pas les sélections secrètes, §8.2).
 export function publicView(combat) {
   const unit = (u) => ({
