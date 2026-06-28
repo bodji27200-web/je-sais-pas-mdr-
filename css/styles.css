@@ -421,6 +421,12 @@ a { color: var(--gold); }
 .summon-unit .fighter-states.small { position: absolute; top: -28px; left: 50%; transform: translateX(-50%) scale(0.78); white-space: nowrap; }
 .summon-emoji { filter: drop-shadow(0 0 4px rgba(120,180,255,0.6)); }
 
+/* Sprite PROCÉDURAL (illustration générée) : fond derrière le portrait. Masqué dès
+   qu'un vrai PNG charge (.img-ok) ; remplace l'emoji de secours quand présent. */
+.sprite-proc { position: absolute; inset: 0; background-size: contain; background-repeat: no-repeat; background-position: center bottom; z-index: 0; pointer-events: none; border-radius: 10px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5)); }
+.fighter-sprite.img-ok .sprite-proc { display: none; }
+.fighter-sprite:has(.sprite-proc) .sprite-emoji { display: none; }
+
 /* Familier actif : kit + postures d'IA dans la collection. */
 .fam-battle { margin: 6px 0 2px; padding-top: 6px; border-top: 1px dashed var(--border-soft); }
 .fam-postures { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; }

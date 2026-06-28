@@ -12,6 +12,21 @@ import { FAM_SKILLS, FAM_POSTURES, FAM_POSTURE_LABELS } from "../data/famskills.
 import { nodeUnlocked, canUnlockNode, equippedNodeId, masteryProgress, ownedHeritageTraits } from "../systems/classtree.js";
 import { nodesForPath, RANKS, getNode, rankInfo, MASTERY_MAX_LEVEL, totalClassCount, getHeritageTrait } from "../data/classTree.js";
 import { getSummon } from "../data/summons.js";
+import { spriteDataUri } from "./sprites.js";
+
+// Affinité élémentaire dominante d'un combattant (résistance la plus forte = <1).
+function _affinity(resist) {
+  if (!resist) return null;
+  let best = null, bv = 1;
+  for (const k of Object.keys(resist)) if (resist[k] < bv) { bv = resist[k]; best = k; }
+  return best;
+}
+// Fond de sprite PROCÉDURAL (illustration générée) pour un combattant : sert quand
+// aucun PNG n'est fourni (sinon le PNG passe par-dessus). Voir ui/sprites.js.
+function procBg(c, seed) {
+  const opts = { element: c.element || _affinity(c.resist), role: c.role, boss: !!c.isBoss };
+  return `background-image:url("${spriteDataUri(seed || c.enemyId || c.name || "x", opts)}")`;
+}
 import { familiarXpAt } from "../data/curves.js";
 import { JOBS, unlockedTiers, bestTier, nextTier } from "../data/jobs.js";
 import { RESOURCES, getResource } from "../data/resources.js";
@@ -1480,6 +1495,7 @@ function renderFighter(side, spritePath, emoji, hpC, idbase, isBoss) {
       <div class="fighter-move">
         <div class="fighter-shadow"></div>
         <div class="fighter-sprite">
+          <div class="sprite-proc" style="${procBg(hpC, idbase === "enemy" ? hpC.enemyId : hpC.name)}"></div>
           <span class="sprite-emoji">${emoji || "❔"}</span>
           <div class="sprite-anim">${fighterImg(spritePath)}</div>
         </div>
@@ -1492,7 +1508,10 @@ function renderFamiliarSprite(fam) {
   return `
     <div class="fighter familiar-pet" id="bt-familiar" title="Familier autonome (partenaire)">
       <div class="fighter-shadow small"></div>
-      <div class="fighter-sprite">${fighterImg(fam.sprite)}</div>
+      <div class="fighter-sprite">
+        <div class="sprite-proc" style="${procBg(fam, fam.id)}"></div>
+        ${fighterImg(fam.sprite)}
+      </div>
     </div>`;
 }
 
@@ -1512,6 +1531,7 @@ function renderSummonUnit(sm) {
       <div class="fighter-move">
         <div class="fighter-shadow small"></div>
         <div class="fighter-sprite">
+          <div class="sprite-proc" style="${procBg(sm, sm.summonId || sm.defId)}"></div>
           <span class="sprite-emoji summon-emoji">✶</span>
           <div class="sprite-anim">${fighterImg(sm.sprite)}</div>
         </div>
